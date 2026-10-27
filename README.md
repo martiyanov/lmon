@@ -1,5 +1,7 @@
 # lmon
 
+**English** · [По-русски / Russian](README.ru.md)
+
 A minimal one-line system monitor for your terminal. A fixed header row,
 then a stream of measurements — ping to the internet, ping to your gateway,
 load average, memory pressure and CPU temperature — colored green / yellow /
