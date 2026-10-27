@@ -18,18 +18,39 @@ written in Go. The original zsh version is kept in [legacy/](legacy/lmon.zsh).
 
 ## Install
 
-With Go 1.22+:
+**macOS** (Apple Silicon):
+
+```sh
+curl -fsSL https://github.com/martiyanov/lmon/releases/latest/download/lmon_darwin_arm64.tar.gz | tar -xz
+sudo mv lmon /usr/local/bin/
+```
+
+On an Intel Mac use `lmon_darwin_amd64.tar.gz`.
+
+**Debian / Ubuntu** (and other `.deb` systems):
+
+```sh
+curl -fsSLO https://github.com/martiyanov/lmon/releases/latest/download/lmon_amd64.deb
+sudo dpkg -i lmon_amd64.deb
+```
+
+On ARM machines use `lmon_arm64.deb`. Fedora/RHEL: pick the `.rpm` asset
+from the [releases page](https://github.com/martiyanov/lmon/releases).
+
+**Other Linux**:
+
+```sh
+curl -fsSL https://github.com/martiyanov/lmon/releases/latest/download/lmon_linux_amd64.tar.gz | tar -xz -C /tmp
+sudo mv /tmp/lmon /usr/local/bin/
+```
+
+**If you have Go 1.22+**:
 
 ```sh
 go install github.com/martiyanov/lmon@latest
 ```
 
-Or build from source:
-
-```sh
-git clone https://github.com/martiyanov/lmon
-cd lmon && go build -o /usr/local/bin/lmon .
-```
+All binaries are static, no dependencies beyond the system `ping`.
 
 **Requirements:** the system `ping` utility (used as-is, no root needed).
 On macOS the temperature column additionally needs

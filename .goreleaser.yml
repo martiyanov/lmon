@@ -1,0 +1,28 @@
+version: 2
+
+project_name: lmon
+
+builds:
+  - env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+
+# имена архивов без версии — чтобы ссылки releases/latest/download/... были стабильными
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true
+
+nfpms:
+  - package_name: lmon
+    file_name_template: "{{ .PackageName }}_{{ .Arch }}"
+    formats: [deb, rpm]
+    maintainer: martiyanov
+    description: Minimal terminal monitor - ping, load average, memory, CPU temperature
+    license: MIT
+    homepage: https://github.com/martiyanov/lmon
