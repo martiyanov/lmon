@@ -20,7 +20,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const version = "1.0.0"
+const version = "1.0.1"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
