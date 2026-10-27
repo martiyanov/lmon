@@ -69,6 +69,24 @@ func parseVMStat(out string) map[string]int64 {
 	return pages
 }
 
+// DefaultGateway возвращает шлюз по умолчанию (route -n get default).
+func DefaultGateway() (string, error) {
+	out, err := exec.Command("route", "-n", "get", "default").Output()
+	if err != nil {
+		return "", err
+	}
+	return parseRouteGateway(string(out))
+}
+
+func parseRouteGateway(out string) (string, error) {
+	// строка вида "    gateway: 192.168.1.1"
+	m := regexp.MustCompile(`(?m)^\s*gateway:\s+([0-9.]+)`).FindStringSubmatch(out)
+	if m == nil {
+		return "", errors.New("gateway: маршрут по умолчанию не найден")
+	}
+	return m[1], nil
+}
+
 // TempC возвращает температуру CPU. На macOS нужна внешняя утилита smctemp
 // (https://github.com/holtmann/osx/tree/master/smctemp); без неё — 0.
 func TempC() int {

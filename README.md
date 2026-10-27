@@ -84,7 +84,7 @@ lmon --version          # version
 | `T` | CPU temperature, °C | ≤ 60 | ≤ 75 | > 75 |
 
 If `N` and `G` jump together — the problem is local (Wi-Fi / router).
-If only `N` jumps — it's the uplink or your provider. An unreachable host
+An unreachable host shows `999`. If only `N` jumps — it's the uplink or your provider. An unreachable host
 shows `999`.
 
 ### Options (flags and environment variables)
@@ -92,7 +92,7 @@ shows `999`.
 | Flag | Env | Default | Description |
 |------|-----|---------|-------------|
 | `--target` | `LMON_TARGET` | `8.8.8.8` | external host to ping |
-| `--gw` | `LMON_GW` | `192.168.0.1` | your gateway |
+| `--gw` | `LMON_GW` | auto-detect | your gateway |
 | `--interval` | `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
 
 ```sh

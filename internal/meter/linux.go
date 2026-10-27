@@ -3,7 +3,9 @@
 package meter
 
 import (
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -59,6 +61,35 @@ func parseMemInfo(s string) (total, available int64) {
 		}
 	}
 	return total, available
+}
+
+// DefaultGateway возвращает шлюз по умолчанию из /proc/net/route
+// (маршрут с Destination 00000000 и флагом шлюза).
+func DefaultGateway() (string, error) {
+	data, err := os.ReadFile("/proc/net/route")
+	if err != nil {
+		return "", err
+	}
+	return parseProcRoute(string(data))
+}
+
+func parseProcRoute(s string) (string, error) {
+	for _, line := range strings.Split(s, "\n")[1:] {
+		f := strings.Fields(line)
+		if len(f) < 4 || f[1] != "00000000" {
+			continue
+		}
+		flags, err := strconv.ParseUint(f[3], 16, 32)
+		if err != nil || flags&0x2 == 0 { // RTF_GATEWAY
+			continue
+		}
+		b, err := hex.DecodeString(f[2])
+		if err != nil || len(b) != 4 {
+			continue
+		}
+		return fmt.Sprintf("%d.%d.%d.%d", b[3], b[2], b[1], b[0]), nil // little-endian
+	}
+	return "", errors.New("gateway: маршрут по умолчанию не найден")
 }
 
 // TempC возвращает температуру CPU из sysfs: сначала сенсоры hwmon

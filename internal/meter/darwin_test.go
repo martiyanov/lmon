@@ -50,3 +50,22 @@ func TestParseVMStatOldFormat(t *testing.T) {
 		t.Errorf("compressed = %d, want 100", pages["compressed"])
 	}
 }
+
+func TestParseRouteGateway(t *testing.T) {
+	out := `   route to: default
+destination: default
+       mask: default
+    gateway: 192.168.1.1
+  interface: en0
+      flags: <UP,GATEWAY,DONE,STATIC>`
+	gw, err := parseRouteGateway(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gw != "192.168.1.1" {
+		t.Errorf("parseRouteGateway = %q, want 192.168.1.1", gw)
+	}
+	if _, err := parseRouteGateway("route: writing to routing socket: not in table\n"); err == nil {
+		t.Error("parseRouteGateway: ожидалась ошибка при отсутствии маршрута")
+	}
+}

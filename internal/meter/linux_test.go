@@ -29,3 +29,21 @@ SwapTotal:             0 kB
 		t.Errorf("MemPercent = %d, want 51", got)
 	}
 }
+
+func TestParseProcRoute(t *testing.T) {
+	sample := `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT
+wlp3s0	00000000	0101A8C0	0003	0	0	600	00000000	0	0	0
+wlp3s0	0001A8C0	00000000	0001	0	0	600	00FFFFFF	0	0	0
+docker0	000011AC	00000000	0001	0	0	0	00FFFFFF	0	0	0
+`
+	gw, err := parseProcRoute(sample)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gw != "192.168.1.1" {
+		t.Errorf("parseProcRoute = %q, want 192.168.1.1", gw)
+	}
+	if _, err := parseProcRoute("Iface\tDestination\tGateway\tFlags\n"); err == nil {
+		t.Error("parseProcRoute: ожидалась ошибка при отсутствии маршрута")
+	}
+}

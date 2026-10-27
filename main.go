@@ -20,7 +20,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const version = "1.0.2"
+const version = "1.0.3"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -31,9 +31,9 @@ const helpText = `lmon ` + version + ` — минимальный монитор
 Колонки:
   N  — пинг до внешнего хоста (--target / LMON_TARGET, по умолчанию 8.8.8.8), мс.
        Показывает качество канала до интернета.
-  G  — пинг до шлюза (--gw / LMON_GW, по умолчанию 192.168.0.1), мс.
-       Если N и G прыгают вместе — проблема локальная (Wi-Fi/роутер).
-       Если только N — внешний маршрут или провайдер.
+  G  — пинг до шлюза (--gw / LMON_GW, по умолчанию шлюз определяется
+       автоматически). мс. Если N и G прыгают вместе — проблема локальная
+       (Wi-Fi/роутер). Если только N — внешний маршрут или провайдер.
   L  — load average, целая часть. Загрузка системы.
   M  — занятая память, % (знак % указан в заголовке).
   T  — температура CPU, °C.
@@ -54,7 +54,7 @@ const helpText = `lmon ` + version + ` — минимальный монитор
 
 Настройки (флаги и переменные окружения):
   --target    LMON_TARGET     внешний хост (по умолчанию 8.8.8.8)
-  --gw        LMON_GW         шлюз (по умолчанию 192.168.0.1)
+  --gw        LMON_GW         шлюз (по умолчанию — автоопределение)
   --interval  LMON_INTERVAL   пауза между строками, сек (по умолчанию 1)
 
 Примеры:
@@ -121,7 +121,7 @@ func parseConfig(args []string) (config, error) {
 	fs := flag.NewFlagSet("lmon", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	target := fs.String("target", envStr("LMON_TARGET", "8.8.8.8"), "external host")
-	gw := fs.String("gw", envStr("LMON_GW", "192.168.0.1"), "gateway")
+	gw := fs.String("gw", envStr("LMON_GW", ""), "gateway (auto-detected by default)")
 	interval := fs.Float64("interval", envFloat("LMON_INTERVAL", 1), "seconds between lines")
 
 	if err := fs.Parse(args); err != nil {
@@ -137,11 +137,21 @@ func parseConfig(args []string) (config, error) {
 		iters = n
 	}
 
+	gwHost := *gw
+	if gwHost == "" {
+		// шлюз по умолчанию определяется автоматически (route / /proc/net/route)
+		if detected, err := meter.DefaultGateway(); err == nil {
+			gwHost = detected
+		} else {
+			gwHost = "192.168.0.1"
+		}
+	}
+
 	d := time.Duration(*interval * float64(time.Second))
 	if d <= 0 {
 		d = time.Second
 	}
-	return config{target: *target, gw: *gw, interval: d, iters: iters}, nil
+	return config{target: *target, gw: gwHost, interval: d, iters: iters}, nil
 }
 
 func envStr(name, def string) string {

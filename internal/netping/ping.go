@@ -18,12 +18,26 @@ var timeRe = regexp.MustCompile(`time[=<]([0-9]+(?:\.[0-9]+)?)`)
 
 // Latency возвращает время отклика до host в миллисекундах (усечённое до
 // целого). Отправляются два пакета: первый часто только «будит» Wi-Fi-радио,
-// поэтому честной задержкой считается последний ответ.
+// поэтому честной задержкой считается последний ответ. Если оба пакета
+// потеряны (частая история — ICMP rate-limit), делается один ретрай
+// одиночным пакетом.
 func Latency(ctx context.Context, host string) int {
+	if t := ping(ctx, args(host)); t != unreachable {
+		return t
+	}
+	select {
+	case <-ctx.Done():
+		return unreachable
+	case <-time.After(300 * time.Millisecond):
+	}
+	return ping(ctx, retryArgs(host))
+}
+
+func ping(ctx context.Context, args []string) int {
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 
-	out, _ := exec.CommandContext(ctx, "ping", args(host)...).Output()
+	out, _ := exec.CommandContext(ctx, "ping", args...).Output()
 	if times := parseTimes(string(out)); len(times) > 0 {
 		return int(times[len(times)-1])
 	}
@@ -37,6 +51,13 @@ func args(host string) []string {
 	}
 	// на Linux -W в секундах, а интервал меньше 0.2 с требует root
 	return []string{"-c", "2", "-i", "0.2", "-W", "1", host}
+}
+
+func retryArgs(host string) []string {
+	if runtime.GOOS == "darwin" {
+		return []string{"-c", "1", "-W", "1000", host}
+	}
+	return []string{"-c", "1", "-W", "1", host}
 }
 
 func parseTimes(out string) []float64 {
