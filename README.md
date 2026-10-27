@@ -84,7 +84,7 @@ lmon --version          # version
 | `T` | CPU temperature, °C | ≤ 60 | ≤ 75 | > 75 |
 
 If `N` and `G` jump together — the problem is local (Wi-Fi / router).
-An unreachable host shows `999`. If only `N` jumps — it's the uplink or your provider. An unreachable host
+If only `N` jumps — it's the uplink or your provider. An unreachable host
 shows `999`.
 
 ### Options (flags and environment variables)
