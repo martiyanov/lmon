@@ -20,7 +20,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const version = "1.0.3"
+const version = "1.0.4"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -196,11 +196,13 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 }
 
 func (u *ui) sampleRow(ctx context.Context, cfg config) string {
-	// Оба пинга — параллельно, чтобы цикл не длился два таймаута подряд.
-	res := make(chan int, 2)
-	go func() { res <- netping.Latency(ctx, cfg.target) }()
-	go func() { res <- netping.Latency(ctx, cfg.gw) }()
-	netMS, gwMS := <-res, <-res
+	// Оба пинга — параллельно; каждый со своим каналом, чтобы значения
+	// не перепутались при произвольном порядке завершения горутин.
+	netCh := make(chan int, 1)
+	gwCh := make(chan int, 1)
+	go func() { netCh <- netping.Latency(ctx, cfg.target) }()
+	go func() { gwCh <- netping.Latency(ctx, cfg.gw) }()
+	netMS, gwMS := <-netCh, <-gwCh
 
 	load, _ := meter.LoadAvg()
 	mem := meter.MemPercent()
