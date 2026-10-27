@@ -69,23 +69,49 @@ sysfs (`hwmon` / `thermal_zone`), no extra tools required.
 ```sh
 lmon                    # run forever, one line per second
 lmon 20                 # print 20 lines and exit
+lmon -b                 # color blocks instead of digits
+lmon --cpu --swap       # add extra columns
 lmon help               # built-in reference (Russian)
 lmon --version          # version
 ```
 
 ### Columns
 
-| Col | Meaning | Green | Yellow | Red |
-|-----|---------|-------|--------|-----|
-| `N` | ping to an external host (`--target`, default `8.8.8.8`), ms | ≤ 50 | ≤ 150 | > 150 |
-| `G` | ping to your gateway (`--gw`, default `192.168.0.1`), ms | ≤ 10 | ≤ 50 | > 50 |
-| `L` | load average (integer part) | ≤ 4 | ≤ 8 | > 8 |
-| `M` | used memory, % | ≤ 60 | ≤ 85 | > 85 |
-| `T` | CPU temperature, °C | ≤ 60 | ≤ 75 | > 75 |
+The base set is always shown; extra columns are enabled with flags:
 
-If `N` and `G` jump together — the problem is local (Wi-Fi / router).
-If only `N` jumps — it's the uplink or your provider. An unreachable host
-shows `999`.
+| Col | Meaning | Flag | Green | Yellow | Red |
+|-----|---------|------|-------|--------|-----|
+| `N` | ping to an external host (`--target`, default `8.8.8.8`), ms | — | ≤ 50 | ≤ 150 | > 150 |
+| `G` | ping to your gateway (`--gw`, auto-detected by default), ms | — | ≤ 10 | ≤ 50 | > 50 |
+| `L` | load average (integer part) | — | ≤ 4 | ≤ 8 | > 8 |
+| `M` | used memory, % | — | ≤ 60 | ≤ 85 | > 85 |
+| `T` | CPU temperature, °C | — | ≤ 60 | ≤ 75 | > 75 |
+| `C` | CPU usage, % | `--cpu` | ≤ 50 | ≤ 80 | > 80 |
+| `I` | iowait, % (Linux only, `·` on macOS) | `--iowait` | ≤ 5 | ≤ 20 | > 20 |
+| `S` | swap used, % | `--swap` | ≤ 30 | ≤ 70 | > 70 |
+| `U` | root disk used, % | `--disk` | ≤ 80 | ≤ 90 | > 90 |
+| `B` | battery charge, % (inverted: more is better) | `--batt` | ≥ 50 | ≥ 20 | < 20 |
+
+### Blocks mode
+
+`lmon -b` (`--blocks`) replaces digits with colored squares `███` —
+one per column, with a continuous green → yellow → red gradient along
+each column's scale. You read the status with peripheral vision instead
+of parsing numbers. A dim square (or `·`) means no sensor on this
+machine; `999` means the host is unreachable.
+
+### Reading bad numbers
+
+- `N` and `G` red together — local problem: Wi-Fi, router, cable.
+  Only `N` red — the uplink or your provider.
+- `L` high while `C` is low — the system waits (disk, network, locks)
+  rather than computes; high `I` confirms it's the disk (Linux).
+- `M` red and `S` growing — out of memory, swapping started; everything
+  slows down.
+- `C` ≈ 100 for a long time — a process is eating the CPU; find it
+  with `top`.
+- `T` > 80–90 °C — overheating/throttling: dust, fans, sustained load.
+- `U` > 90 — the disk is nearly full; the system misbehaves.
 
 ### Options (flags and environment variables)
 
@@ -94,10 +120,12 @@ shows `999`.
 | `--target` | `LMON_TARGET` | `8.8.8.8` | external host to ping |
 | `--gw` | `LMON_GW` | auto-detect | your gateway |
 | `--interval` | `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
+| `-b`, `--blocks` | — | off | color blocks instead of digits |
+| `--cpu` `--iowait` `--swap` `--disk` `--batt` | — | off | add extra columns |
 
 ```sh
 lmon --target 1.1.1.1 --interval 2 10
-LMON_GW=192.168.1.1 lmon
+lmon -b --cpu --batt 30
 ```
 
 The first line after start may show an inflated ping: the Wi-Fi radio

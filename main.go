@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const version = "1.0.4"
+const version = "1.1.0"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -28,29 +29,54 @@ const helpText = `lmon ` + version + ` — минимальный монитор
 При изменении размера терминала число строк подстраивается,
 а заголовок остаётся на месте.
 
-Колонки:
-  N  — пинг до внешнего хоста (--target / LMON_TARGET, по умолчанию 8.8.8.8), мс.
-       Показывает качество канала до интернета.
-  G  — пинг до шлюза (--gw / LMON_GW, по умолчанию шлюз определяется
-       автоматически). мс. Если N и G прыгают вместе — проблема локальная
-       (Wi-Fi/роутер). Если только N — внешний маршрут или провайдер.
+Базовые колонки (всегда):
+  N  — пинг до внешнего хоста (--target / LMON_TARGET, по умолчанию
+       8.8.8.8), мс. Качество канала до интернета.
+  G  — пинг до шлюза (--gw / LMON_GW; по умолчанию определяется
+       автоматически), мс.
   L  — load average, целая часть. Загрузка системы.
-  M  — занятая память, % (знак % указан в заголовке).
-  T  — температура CPU, °C.
+  M% — занятая память, %.
+  T° — температура CPU, °C (на macOS нужен smctemp, без него 0).
+
+Дополнительные колонки (включаются флагами):
+  --cpu      C% — загрузка CPU, % (на macOS — окно в 1 с через iostat)
+  --iowait   I% — iowait CPU, % (только Linux; на macOS — «·»)
+  --swap     S% — занятый swap, %
+  --disk     U% — занято на корневом разделе, %
+  --batt     B% — заряд батареи, % (нет батареи — «·»)
+
+Режим квадратов:
+  -b, --blocks — вместо цифр цветные квадраты ███, градация цвета
+  от зелёного через жёлтый к красному по шкале каждой колонки.
+  Статус видно боковым зрением, на цифры смотреть не нужно.
+  Тусклый квадрат — датчика нет.
 
 Цвета: зелёный — норма, жёлтый — внимание, красный — плохо.
-Пороги:
-  N: <=50 мс — зелёный, <=150 — жёлтый, >150 — красный
-  G: <=10 мс — зелёный, <=50 — жёлтый, >50 — красный
-  L: <=4 — зелёный, <=8 — жёлтый, >8 — красный
-  M: <=60% — зелёный, <=85% — жёлтый, >85% — красный
-  T: <=60°C — зелёный, <=75°C — жёлтый, >75°C — красный
+Пороги (зелёный ≤ / жёлтый ≤ / дальше красный):
+  N: 50/150 мс    G: 10/50 мс     L: 4/8      M%: 60/85
+  T°: 60/75       C%: 50/80       I%: 5/20    S%: 30/70
+  U%: 80/90       B%: наоборот — ≥50 зелёный, ≥20 жёлтый, ниже красный
+
+Диагностика: что значат плохие цифры
+  • N и G красные вместе — проблема локальная: Wi-Fi, роутер, кабель.
+    Только N красный — внешний маршрут или провайдер.
+  • L высокий, а C% низкий — система не считает, а ждёт: диск, сеть,
+    локи. Высокий I% подтверждает: ждём диск (Linux).
+  • M% красный и S% растёт — память кончилась, ушло в своп, всё станет
+    медленным. Закрыть пожирателей памяти или добавить RAM.
+  • C% ≈ 100 долго — какой-то процесс съел процессор; виновника
+    покажет top.
+  • T° > 80–90 — перегрев/троттлинг: забились вентиляторы, пыль
+    или длительная пиковая нагрузка.
+  • U% > 90 — кончается место на диске; система начинает сбоить.
 
 Использование:
-  lmon              — бесконечно, примерно раз в секунду
-  lmon 20           — 20 строк и выход
-  lmon help         — эта справка
-  lmon --version    — версия
+  lmon               — бесконечно, примерно раз в секунду
+  lmon 20            — 20 строк и выход
+  lmon -b            — режим цветных квадратов
+  lmon --cpu --swap  — добавить колонки CPU и swap
+  lmon help          — эта справка
+  lmon --version     — версия
 
 Настройки (флаги и переменные окружения):
   --target    LMON_TARGET     внешний хост (по умолчанию 8.8.8.8)
@@ -59,8 +85,8 @@ const helpText = `lmon ` + version + ` — минимальный монитор
 
 Примеры:
   lmon --target 1.1.1.1
-  lmon --interval 2 20
-  LMON_GW=192.168.0.1 lmon 10
+  lmon -b --cpu --batt 30
+  LMON_GW=192.168.1.1 lmon 10
 
 Первая строка после запуска может быть завышена: Wi-Fi-радио
 просыпается. Дальше значения стабилизируются.
@@ -77,9 +103,6 @@ const (
 	yel   = "\x1b[1;33m"
 	red   = "\x1b[1;31m"
 	dim   = "\x1b[2m"
-
-	headerRow = "  N   G   L  M%   T°"
-	sepRow    = "--- --- --- --- ----"
 )
 
 type config struct {
@@ -87,6 +110,12 @@ type config struct {
 	gw       string
 	interval time.Duration
 	iters    int
+	blocks   bool
+	cpu      bool
+	iowait   bool
+	swap     bool
+	disk     bool
+	batt     bool
 }
 
 func main() {
@@ -123,6 +152,15 @@ func parseConfig(args []string) (config, error) {
 	target := fs.String("target", envStr("LMON_TARGET", "8.8.8.8"), "external host")
 	gw := fs.String("gw", envStr("LMON_GW", ""), "gateway (auto-detected by default)")
 	interval := fs.Float64("interval", envFloat("LMON_INTERVAL", 1), "seconds between lines")
+	var blocks bool
+	fs.BoolVar(&blocks, "blocks", false, "colored blocks instead of digits")
+	fs.BoolVar(&blocks, "b", false, "shorthand for --blocks")
+	var cpu, iowait, swap, disk, batt bool
+	fs.BoolVar(&cpu, "cpu", false, "add CPU usage column")
+	fs.BoolVar(&iowait, "iowait", false, "add iowait column (Linux only)")
+	fs.BoolVar(&swap, "swap", false, "add swap usage column")
+	fs.BoolVar(&disk, "disk", false, "add root disk usage column")
+	fs.BoolVar(&batt, "batt", false, "add battery charge column")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
@@ -151,7 +189,8 @@ func parseConfig(args []string) (config, error) {
 	if d <= 0 {
 		d = time.Second
 	}
-	return config{target: *target, gw: gwHost, interval: d, iters: iters}, nil
+	return config{target: *target, gw: gwHost, interval: d, iters: iters,
+		blocks: blocks, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt}, nil
 }
 
 func envStr(name, def string) string {
@@ -172,7 +211,8 @@ func envFloat(name string, def float64) float64 {
 
 func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	tty := stdoutIsTTY()
-	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == ""}
+	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks}
+	u.head, u.sep = headerOf(layout(cfg))
 	defer u.restore()
 	u.setup()
 
@@ -195,31 +235,154 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	}
 }
 
+// reading — одно измерение: значение, пороги цвета и оформление колонки.
+// Пороги: green/yellow — как в цифровом режиме, red — точка, где градиент
+// блоков становится полностью красным. v < 0 — датчика нет («·»).
+type reading struct {
+	head               string
+	v                  int
+	green, yellow, red int
+	deg                bool // приписать ° (температура)
+	invert             bool // больше — лучше (батарея)
+}
+
+// layout возвращает колонки в порядке вывода; значения заполнит sampleRow.
+func layout(cfg config) []reading {
+	rs := []reading{
+		{head: "N", green: 50, yellow: 150, red: 300},
+		{head: "G", green: 10, yellow: 50, red: 100},
+		{head: "L", green: 4, yellow: 8, red: 16},
+		{head: "M%", green: 60, yellow: 85, red: 97},
+		{head: "T°", green: 60, yellow: 75, red: 90, deg: true},
+	}
+	if cfg.cpu {
+		rs = append(rs, reading{head: "C%", green: 50, yellow: 80, red: 100})
+	}
+	if cfg.iowait {
+		rs = append(rs, reading{head: "I%", green: 5, yellow: 20, red: 50})
+	}
+	if cfg.swap {
+		rs = append(rs, reading{head: "S%", green: 30, yellow: 70, red: 100})
+	}
+	if cfg.disk {
+		rs = append(rs, reading{head: "U%", green: 80, yellow: 90, red: 100})
+	}
+	if cfg.batt {
+		rs = append(rs, reading{head: "B%", green: 50, yellow: 20, red: 0, invert: true})
+	}
+	return rs
+}
+
+// severity нормирует значение в 0..1 (0 — зелёный, 1 — красный) для блоков.
+func (r reading) severity() float64 {
+	if r.invert { // батарея: полный заряд — зелёный, разряд — к красному
+		switch {
+		case r.v >= r.green:
+			return 0
+		case r.v <= 0:
+			return 1
+		}
+		return float64(r.green-r.v) / float64(r.green)
+	}
+	switch {
+	case r.v <= r.green:
+		return 0
+	case r.v <= r.yellow:
+		return 0.5 * float64(r.v-r.green) / float64(r.yellow-r.green)
+	case r.v >= r.red:
+		return 1
+	}
+	return 0.5 + 0.5*float64(r.v-r.yellow)/float64(r.red-r.yellow)
+}
+
 func (u *ui) sampleRow(ctx context.Context, cfg config) string {
-	// Оба пинга — параллельно; каждый со своим каналом, чтобы значения
-	// не перепутались при произвольном порядке завершения горутин.
+	rs := layout(cfg)
+
+	// Медленные измерения — параллельно, каждый со своим каналом,
+	// чтобы значения не перепутались, а цикл не длился сумму задержек.
 	netCh := make(chan int, 1)
 	gwCh := make(chan int, 1)
 	go func() { netCh <- netping.Latency(ctx, cfg.target) }()
 	go func() { gwCh <- netping.Latency(ctx, cfg.gw) }()
-	netMS, gwMS := <-netCh, <-gwCh
+	var cpuCh chan int
+	if cfg.cpu || cfg.iowait {
+		cpuCh = make(chan int, 2)
+		go func() { a, i := meter.CPUSample(); cpuCh <- a; cpuCh <- i }()
+	}
 
+	// быстрые метрики
 	load, _ := meter.LoadAvg()
-	mem := meter.MemPercent()
-	temp := meter.TempC()
+	rs[0].v, rs[1].v = <-netCh, <-gwCh
+	rs[2].v = int(load)
+	rs[3].v = meter.MemPercent()
+	rs[4].v = meter.TempC()
+	i := 5
+	if cpuCh != nil {
+		cpu, iowait := <-cpuCh, <-cpuCh
+		if cfg.cpu {
+			rs[i].v = cpu
+			i++
+		}
+		if cfg.iowait {
+			rs[i].v = iowait
+			i++
+		}
+	}
+	if cfg.swap {
+		rs[i].v = meter.SwapPercent()
+		i++
+	}
+	if cfg.disk {
+		rs[i].v = meter.DiskPercent()
+		i++
+	}
+	if cfg.batt {
+		rs[i].v = meter.BatteryPercent()
+	}
 
-	return u.cell(netMS, 50, 150) + " " +
-		u.cell(gwMS, 10, 50) + " " +
-		u.loadCell(load) + " " +
-		u.cell(mem, 60, 85) + " " +
-		u.tempCell(temp, 60, 75)
+	cells := make([]string, len(rs))
+	for j, r := range rs {
+		if u.blocks && u.color {
+			cells[j] = u.blockCell(r)
+		} else {
+			cells[j] = u.digitCell(r)
+		}
+	}
+	return strings.Join(cells, " ")
+}
+
+// gradient256 возвращает код цвета 256-цветной палитры для точки шкалы
+// 0..1: 0 — зелёный, 0.5 — жёлтый, 1 — красный.
+func gradient256(s float64) string {
+	r, g, b := rampRGB(s)
+	q := func(v int) int { return (v*5 + 128) / 255 } // ближайший куб 6×6×6
+	return strconv.Itoa(16 + 36*q(r) + 6*q(g) + q(b))
+}
+
+func rampRGB(s float64) (r, g, b int) {
+	// зелёный (0,220,0) → жёлтый (255,220,0) → красный (255,40,0)
+	switch {
+	case s <= 0:
+		return 0, 220, 0
+	case s >= 1:
+		return 255, 40, 0
+	}
+	t := int(s * 511)
+	if t < 256 { // зелёный → жёлтый: красный канал растёт 0..255
+		return t, 220, 0
+	}
+	// жёлтый → красный: зелёный канал падает 220..40
+	return 255, 220 - (t-256)*180/255, 0
 }
 
 type ui struct {
-	w     io.Writer
-	tty   bool
-	color bool
-	rows  int
+	w      io.Writer
+	tty    bool
+	color  bool
+	blocks bool
+	rows   int
+	head   string
+	sep    string
 }
 
 func (u *ui) setup() {
@@ -251,11 +414,22 @@ func (u *ui) redraw(rows int) {
 	u.rows = rows
 }
 
+// headerOf строит строки заголовка и разделителя из списка колонок.
+func headerOf(rs []reading) (head, sep string) {
+	hs := make([]string, len(rs))
+	ss := make([]string, len(rs))
+	for i, r := range rs {
+		hs[i] = fmt.Sprintf("%3s", r.head)
+		ss[i] = "---"
+	}
+	return strings.Join(hs, " "), strings.Join(ss, " ")
+}
+
 func (u *ui) printHeader() {
 	if u.color {
-		fmt.Fprintf(u.w, "%s%s%s\n%s%s%s\n", dim, headerRow, reset, dim, sepRow, reset)
+		fmt.Fprintf(u.w, "%s%s%s\n%s%s%s\n", dim, u.head, reset, dim, u.sep, reset)
 	} else {
-		fmt.Fprintf(u.w, "%s\n%s\n", headerRow, sepRow)
+		fmt.Fprintf(u.w, "%s\n%s\n", u.head, u.sep)
 	}
 }
 
@@ -274,38 +448,55 @@ func (u *ui) restore() {
 	}
 }
 
-func (u *ui) cell(v, green, yellow int) string {
-	s := fmt.Sprintf("%3d", v)
+// digitCell — классическое цифровое представление с трёхступенчатым цветом.
+func (u *ui) digitCell(r reading) string {
+	if r.v < 0 { // датчика нет
+		s := fmt.Sprintf("%3s", "·")
+		if u.color {
+			return dim + s + reset
+		}
+		return s
+	}
+	s := fmt.Sprintf("%3d", r.v)
+	if r.deg {
+		s += "°"
+	}
 	if !u.color {
 		return s
 	}
-	switch {
-	case v <= green:
-		return grn + s + reset
-	case v <= yellow:
-		return yel + s + reset
-	default:
-		return red + s + reset
+	var c string
+	if r.invert {
+		switch {
+		case r.v >= r.green:
+			c = grn
+		case r.v >= r.yellow:
+			c = yel
+		default:
+			c = red
+		}
+	} else {
+		switch {
+		case r.v <= r.green:
+			c = grn
+		case r.v <= r.yellow:
+			c = yel
+		default:
+			c = red
+		}
 	}
+	return c + s + reset
 }
 
-func (u *ui) loadCell(load float64) string { // целая часть load average
-	return u.cell(int(load), 4, 8)
-}
-
-func (u *ui) tempCell(t, green, yellow int) string {
-	s := fmt.Sprintf("%3d°", t)
-	if !u.color {
-		return s
+// blockCell — квадрат-индикатор с непрерывной градацией цвета.
+func (u *ui) blockCell(r reading) string {
+	if r.v < 0 { // датчика нет
+		return dim + "███" + reset
 	}
-	switch {
-	case t <= green:
-		return grn + s + reset
-	case t <= yellow:
-		return yel + s + reset
-	default:
-		return red + s + reset
+	s := "\x1b[38;5;" + gradient256(r.severity()) + "m███" + reset
+	if r.deg {
+		s += "°"
 	}
+	return s
 }
 
 func stdoutIsTTY() bool {
