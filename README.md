@@ -18,7 +18,13 @@ written in Go. The original zsh version is kept in [legacy/](legacy/lmon.zsh).
 
 ## Install
 
-**macOS** (Apple Silicon):
+**macOS (Homebrew)**:
+
+```sh
+brew install martiyanov/tap/lmon
+```
+
+**macOS** (без Homebrew, Apple Silicon):
 
 ```sh
 curl -fsSL https://github.com/martiyanov/lmon/releases/latest/download/lmon_darwin_arm64.tar.gz | tar -xz
