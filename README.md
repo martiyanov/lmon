@@ -28,7 +28,7 @@ Or build from source:
 
 ```sh
 git clone https://github.com/martiyanov/lmon
-cd lmon && go build -o /usr/local/bin/lmon ./cmd/lmon
+cd lmon && go build -o /usr/local/bin/lmon .
 ```
 
 **Requirements:** the system `ping` utility (used as-is, no root needed).
