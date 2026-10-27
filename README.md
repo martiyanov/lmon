@@ -13,8 +13,10 @@ red so you can spot trouble at a glance.
 118   3   1  63  56°   ← Wi-Fi hiccup, gateway is fine → it's the uplink
 ```
 
-Single static binary for **macOS** (arm64/amd64) and **Linux** (amd64/arm64),
-written in Go. The original zsh version is kept in [legacy/](legacy/lmon.zsh).
+Single static binary for **macOS**, **Linux** and **Windows 10+**
+(amd64/arm64), written in Go. The original zsh version is kept in
+[legacy/](legacy/lmon.zsh). Design principles: see
+[CONCEPT.md](CONCEPT.md).
 
 ## Install
 
@@ -49,6 +51,17 @@ from the [releases page](https://github.com/martiyanov/lmon/releases).
 curl -fsSL https://github.com/martiyanov/lmon/releases/latest/download/lmon_linux_amd64.tar.gz | tar -xz -C /tmp
 sudo mv /tmp/lmon /usr/local/bin/
 ```
+
+**Windows 10+** (PowerShell):
+
+```powershell
+curl.exe -fsSL -o lmon.zip https://github.com/martiyanov/lmon/releases/latest/download/lmon_windows_amd64.zip
+Expand-Archive lmon.zip; Move-Item lmon\lmon.exe "$env:LOCALAPPDATA\Microsoft\WindowsApps" -Force
+```
+
+(then run `lmon` in Windows Terminal; on ARM use `lmon_windows_arm64.zip`).
+On Windows the `L` (load average) and `T` (temperature) columns show `·` —
+the OS does not expose those readings; everything else works.
 
 **If you have Go 1.22+**:
 

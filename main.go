@@ -17,11 +17,9 @@ import (
 
 	"github.com/martiyanov/lmon/internal/meter"
 	"github.com/martiyanov/lmon/internal/netping"
-
-	"golang.org/x/sys/unix"
 )
 
-const version = "1.1.0"
+const version = "1.2.0"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -95,6 +93,8 @@ const helpText = `lmon ` + version + ` — минимальный монитор
 на macOS требует установленной утилиты smctemp
 (https://github.com/holtmann/osx/tree/master/smctemp), без неё — 0;
 на Linux читается из sysfs (hwmon/thermal_zone).
+На Windows (10+) работает всё, кроме L (load average отсутствует)
+и T (датчика нет) — вместо них «·»; шлюз ищется через route print.
 `
 
 const (
@@ -210,6 +210,9 @@ func envFloat(name string, def float64) float64 {
 }
 
 func monitor(ctx context.Context, cfg config, w io.Writer) int {
+	termSetup()
+	defer termRestore()
+
 	tty := stdoutIsTTY()
 	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks}
 	u.head, u.sep = headerOf(layout(cfg))
@@ -311,9 +314,12 @@ func (u *ui) sampleRow(ctx context.Context, cfg config) string {
 	}
 
 	// быстрые метрики
-	load, _ := meter.LoadAvg()
+	load, loadErr := meter.LoadAvg()
 	rs[0].v, rs[1].v = <-netCh, <-gwCh
-	rs[2].v = int(load)
+	rs[2].v = -1
+	if loadErr == nil {
+		rs[2].v = int(load)
+	}
 	rs[3].v = meter.MemPercent()
 	rs[4].v = meter.TempC()
 	i := 5
@@ -502,12 +508,4 @@ func (u *ui) blockCell(r reading) string {
 func stdoutIsTTY() bool {
 	fi, err := os.Stdout.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
-}
-
-func termRows() int {
-	ws, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
-	if err != nil || ws.Row == 0 {
-		return 24
-	}
-	return int(ws.Row)
 }
