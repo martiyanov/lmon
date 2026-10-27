@@ -6,63 +6,82 @@ load average, memory pressure and CPU temperature — colored green / yellow /
 red so you can spot trouble at a glance.
 
 ```
-  N   G   L  M%  T°
+  N   G   L  M%   T°
 --- --- --- --- ----
  12   2   1  62  55°
  11   2   1  63  55°
 118   3   1  63  56°   ← Wi-Fi hiccup, gateway is fine → it's the uplink
 ```
 
-**Status:** macOS only at the moment (a Linux port and a Go rewrite are on
-the roadmap). Requires `zsh`; the temperature column needs
-[`smctemp`](https://github.com/holtmann/osx/tree/master/smctemp)
-(optional — shows `0` without it).
+Single static binary for **macOS** (arm64/amd64) and **Linux** (amd64/arm64),
+written in Go. The original zsh version is kept in [legacy/](legacy/lmon.zsh).
 
 ## Install
 
+With Go 1.22+:
+
 ```sh
-curl -fsSL https://raw.githubusercontent.com/martiyanov/lmon/main/lmon -o lmon
-chmod +x lmon
-sudo mv lmon /usr/local/bin/
+go install github.com/martiyanov/lmon@latest
 ```
 
-(or just clone the repo and copy `lmon` anywhere in your `PATH`)
+Or build from source:
+
+```sh
+git clone https://github.com/martiyanov/lmon
+cd lmon && go build -o /usr/local/bin/lmon ./cmd/lmon
+```
+
+**Requirements:** the system `ping` utility (used as-is, no root needed).
+On macOS the temperature column additionally needs
+[`smctemp`](https://github.com/holtmann/osx/tree/master/smctemp)
+(optional — shows `0` without it). On Linux the temperature is read from
+sysfs (`hwmon` / `thermal_zone`), no extra tools required.
 
 ## Usage
 
 ```sh
-lmon          # run forever, one line per second
-lmon 20       # print 20 lines and exit
-lmon help     # built-in reference
+lmon                    # run forever, one line per second
+lmon 20                 # print 20 lines and exit
+lmon help               # built-in reference (Russian)
+lmon --version          # version
 ```
 
 ### Columns
 
 | Col | Meaning | Green | Yellow | Red |
 |-----|---------|-------|--------|-----|
-| `N` | ping to an external host (`LMON_TARGET`, default `8.8.8.8`), ms | ≤ 50 | ≤ 150 | > 150 |
-| `G` | ping to your gateway (`LMON_GW`, default `192.168.0.1`), ms | ≤ 10 | ≤ 50 | > 50 |
+| `N` | ping to an external host (`--target`, default `8.8.8.8`), ms | ≤ 50 | ≤ 150 | > 150 |
+| `G` | ping to your gateway (`--gw`, default `192.168.0.1`), ms | ≤ 10 | ≤ 50 | > 50 |
 | `L` | load average (integer part) | ≤ 4 | ≤ 8 | > 8 |
 | `M` | used memory, % | ≤ 60 | ≤ 85 | > 85 |
 | `T` | CPU temperature, °C | ≤ 60 | ≤ 75 | > 75 |
 
 If `N` and `G` jump together — the problem is local (Wi-Fi / router).
-If only `N` jumps — it's the uplink or your provider.
+If only `N` jumps — it's the uplink or your provider. An unreachable host
+shows `999`.
 
-### Environment variables
+### Options (flags and environment variables)
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LMON_TARGET` | `8.8.8.8` | external host to ping |
-| `LMON_GW` | `192.168.0.1` | your gateway |
-| `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
+| Flag | Env | Default | Description |
+|------|-----|---------|-------------|
+| `--target` | `LMON_TARGET` | `8.8.8.8` | external host to ping |
+| `--gw` | `LMON_GW` | `192.168.0.1` | your gateway |
+| `--interval` | `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
 
 ```sh
-LMON_TARGET=1.1.1.1 LMON_INTERVAL=2 lmon 10
+lmon --target 1.1.1.1 --interval 2 10
+LMON_GW=192.168.1.1 lmon
 ```
 
 The first line after start may show an inflated ping: the Wi-Fi radio
 needs to wake up. Values settle after that.
+
+## How it works
+
+Ping runs through the system `ping` binary (flags adapted per OS), so no
+privileges are required. Load average comes from the kernel (`sysctl` on
+macOS, `/proc/loadavg` on Linux). Memory: `vm_stat` on macOS,
+`/proc/meminfo` on Linux. Colors respect `NO_COLOR`.
 
 ## License
 
