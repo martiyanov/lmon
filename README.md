@@ -76,7 +76,7 @@ All binaries are static, no dependencies beyond the system `ping`.
 **Requirements:** the system `ping` utility (used as-is, no root needed).
 On macOS the temperature column additionally needs
 [`smctemp`](https://github.com/holtmann/osx/tree/master/smctemp)
-(optional — shows `0` without it). On Linux the temperature is read from
+(optional — shows `·` without it). On Linux the temperature is read from
 sysfs (`hwmon` / `thermal_zone`), no extra tools required.
 
 ## Usage

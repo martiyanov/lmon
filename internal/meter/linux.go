@@ -3,6 +3,7 @@
 package meter
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // LoadAvg возвращает load average за минуту из /proc/loadavg.
@@ -85,8 +87,16 @@ func DefaultGateway(target string) (string, error) {
 
 var viaRe = regexp.MustCompile(`\bvia\s+(\d{1,3}(?:\.\d{1,3}){3})\b`)
 
+// runCmd выполняет системную команду с таймаутом, чтобы зависший процесс
+// не останавливал цикл монитора.
+func runCmd(name string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return exec.CommandContext(ctx, name, args...).Output()
+}
+
 func ipRouteGet(target string) (string, error) {
-	out, err := exec.Command("ip", "-4", "route", "get", target).Output()
+	out, err := runCmd("ip", "-4", "route", "get", target)
 	if err != nil {
 		return "", err
 	}
@@ -97,7 +107,7 @@ func ipRouteGet(target string) (string, error) {
 }
 
 func ipRouteDefault() (string, error) {
-	out, err := exec.Command("ip", "-4", "route", "show", "default").Output()
+	out, err := runCmd("ip", "-4", "route", "show", "default")
 	if err != nil {
 		return "", err
 	}

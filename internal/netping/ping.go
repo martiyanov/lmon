@@ -13,7 +13,23 @@ import (
 	"time"
 )
 
-// unreachable показывается, когда хост не отвечает.
+// State — состояние измерения: значение и его природа разделены,
+// чтобы измеренные 999 мс не путались с «узел не ответил».
+type State uint8
+
+const (
+	StateValid       State = iota // получен ответ, ValueMS — честная задержка
+	StateUnavailable              // измерение невозможно (нет ping, отмена)
+	StateUnreachable              // узел не ответил
+)
+
+// Result — результат измерения задержки.
+type Result struct {
+	ValueMS int
+	State   State
+}
+
+// unreachable — внутренняя метка «нет ответа».
 const unreachable = 999
 
 // timeRe понимает и локализованный вывод ping (например, «время=45мс»
@@ -25,39 +41,39 @@ var timeRe = regexp.MustCompile(`(?:time|время)[=<]([0-9]+(?:[.,][0-9]+)?)`
 // поэтому честной задержкой считается последний ответ. Если оба пакета
 // потеряны (частая история — ICMP rate-limit), делается один ретрай
 // одиночным пакетом.
-func Latency(ctx context.Context, host string) int {
+func Latency(ctx context.Context, host string) Result {
 	start := time.Now()
-	if t := ping(ctx, args(host)); t != unreachable {
-		return t
+	if r := ping(ctx, args(host)); r.State != StateUnreachable {
+		return r
 	}
 	// ретрай — только если бюджет измерения ещё позволяет,
 	// чтобы строка не ждала два полных таймаута подряд
 	if time.Since(start) > 3*time.Second {
-		return unreachable
+		return Result{State: StateUnreachable}
 	}
 	select {
 	case <-ctx.Done():
-		return -1
+		return Result{State: StateUnavailable}
 	case <-time.After(300 * time.Millisecond):
 	}
 	return ping(ctx, retryArgs(host))
 }
 
-func ping(ctx context.Context, args []string) int {
+func ping(ctx context.Context, args []string) Result {
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 
 	out, err := exec.CommandContext(ctx, "ping", args...).Output()
 	// сам ping не запустился (нет бинарника) или цикл отменён —
-	// измерение невозможно: -1 («·»), а не «хост недоступен»
+	// измерение невозможно, а не «хост недоступен»
 	var execErr *exec.Error
 	if errors.As(err, &execErr) || ctx.Err() != nil {
-		return -1
+		return Result{State: StateUnavailable}
 	}
 	if times := parseTimes(string(out)); len(times) > 0 {
-		return int(times[len(times)-1])
+		return Result{ValueMS: int(times[len(times)-1]), State: StateValid}
 	}
-	return unreachable
+	return Result{State: StateUnreachable}
 }
 
 func args(host string) []string {

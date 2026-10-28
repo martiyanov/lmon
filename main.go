@@ -22,7 +22,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.3.1"
+const version = "1.3.2"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -352,6 +352,19 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	}
 }
 
+// pingValue переводит состояние измерения в значение колонки:
+// valid — задержка, unreachable — 999, unavailable — «·» (-1).
+func pingValue(r netping.Result) int {
+	switch r.State {
+	case netping.StateValid:
+		return r.ValueMS
+	case netping.StateUnreachable:
+		return 999
+	default:
+		return -1
+	}
+}
+
 // refreshGateway обновляет автоматически определяемый шлюз: появление,
 // смена и исчезновение обрабатываются одинаково; ручной --gw не трогаем.
 func refreshGateway(cfg *config, detect func(string) (string, error)) {
@@ -459,16 +472,16 @@ func (u *ui) sampleRow(ctx context.Context, cfg config) string {
 	// Медленные измерения — параллельно, каждый со своим каналом,
 	// чтобы значения не перепутались, а цикл не длился сумму задержек.
 	vals := make(map[string]int, len(rs))
-	var netCh, gwCh chan int
+	var netCh, gwCh chan netping.Result
 	if need("N") {
-		netCh = make(chan int, 1)
+		netCh = make(chan netping.Result, 1)
 		go func() { netCh <- netping.Latency(ctx, cfg.target) }()
 	}
 	if need("G") {
 		if cfg.gw == "" { // шлюз не определился — датчика нет
 			vals["G"] = -1
 		} else {
-			gwCh = make(chan int, 1)
+			gwCh = make(chan netping.Result, 1)
 			go func() { gwCh <- netping.Latency(ctx, cfg.gw) }()
 		}
 	}
@@ -480,10 +493,10 @@ func (u *ui) sampleRow(ctx context.Context, cfg config) string {
 
 	// быстрые метрики — считаем только то, что показывается
 	if netCh != nil {
-		vals["N"] = <-netCh
+		vals["N"] = pingValue(<-netCh)
 	}
 	if gwCh != nil {
-		vals["G"] = <-gwCh
+		vals["G"] = pingValue(<-gwCh)
 	}
 	if need("L") {
 		if load, err := meter.LoadAvg(); err == nil {

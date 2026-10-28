@@ -3,12 +3,14 @@
 package meter
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -135,8 +137,15 @@ var routeRe = regexp.MustCompile(`(?m)^\s*0\.0\.0\.0\s+0\.0\.0\.0\s+(\d{1,3}(?:\
 // DefaultGateway разбирает вывод route print (таблица маршрутов не локализована).
 // Из нескольких default-маршрутов берётся маршрут с наименьшей метрикой;
 // записи с шлюзом «On-link» (без IP next-hop) пропускаются.
+// runCmd выполняет системную команду с таймаутом.
+func runCmd(name string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return exec.CommandContext(ctx, name, args...).Output()
+}
+
 func DefaultGateway(target string) (string, error) {
-	out, err := exec.Command("route", "print", "-4", "0.0.0.0").Output()
+	out, err := runCmd("route", "print", "-4", "0.0.0.0")
 	if err != nil {
 		return "", err
 	}

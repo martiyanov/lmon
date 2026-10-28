@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/martiyanov/lmon/internal/netping"
 )
 
 func TestCheckHost(t *testing.T) {
@@ -135,5 +137,20 @@ func TestOnceNoANSI(t *testing.T) {
 	}
 	if strings.TrimSpace(row) == "" || strings.Contains(row, "·") && row != "  ·" {
 		t.Logf("row=%q (память может быть недоступна)", row)
+	}
+}
+
+func TestPingValue(t *testing.T) {
+	if got := pingValue(netping.Result{ValueMS: 999, State: netping.StateValid}); got != 999 {
+		t.Errorf("измеренные 999 мс обязаны остаться 999, got %d", got)
+	}
+	if got := pingValue(netping.Result{State: netping.StateUnreachable}); got != 999 {
+		t.Errorf("нет ответа = 999, got %d", got)
+	}
+	if got := pingValue(netping.Result{State: netping.StateUnavailable}); got != -1 {
+		t.Errorf("нет ping = -1, got %d", got)
+	}
+	if got := pingValue(netping.Result{ValueMS: 42, State: netping.StateValid}); got != 42 {
+		t.Errorf("valid = значение, got %d", got)
 	}
 }
