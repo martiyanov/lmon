@@ -17,8 +17,8 @@ func TestSensors(t *testing.T) {
 	if m := MemPercent(); m < 0 || m > 100 {
 		t.Errorf("MemPercent = %d", m)
 	}
-	if s := SwapPercent(); s < 0 || s > 100 {
-		t.Errorf("SwapPercent = %d", s)
+	if s := SwapPercent(); s != -1 {
+		t.Errorf("SwapPercent = %d, want -1 (реальный swap-счётчик недоступен)", s)
 	}
 	if b := BatteryPercent(); b != -1 && (b < 0 || b > 100) {
 		t.Errorf("BatteryPercent = %d", b)
