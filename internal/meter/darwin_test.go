@@ -36,10 +36,10 @@ func TestParseVMStat(t *testing.T) {
 	}
 
 	total := pages["free"] + pages["active"] + pages["inactive"] +
-		pages["speculative"] + pages["wired"] + pages["compressed"]
-	used := pages["active"] + pages["wired"] + pages["compressed"]
-	if got := int(used * 100 / total); got != 67 {
-		t.Errorf("MemPercent = %d, want 67", got)
+		pages["speculative"] + pages["wired"] + pages["compressor"]
+	used := pages["active"] + pages["wired"] + pages["compressor"]
+	if got := int(used * 100 / total); got != 69 {
+		t.Errorf("MemPercent = %d, want 69", got)
 	}
 }
 
@@ -67,5 +67,61 @@ destination: default
 	}
 	if _, err := parseRouteGateway("route: writing to routing socket: not in table\n"); err == nil {
 		t.Error("parseRouteGateway: ожидалась ошибка при отсутствии маршрута")
+	}
+}
+
+const netstatSample = `Routing tables
+
+Internet:
+Destination        Gateway            Flags               Netif Expire
+default            link#16            UCSI                utun8
+default            192.168.1.1        UGScg                 en0
+127                127.0.0.1          UCS                    lo0
+`
+
+func TestNetstatDefaultVPN(t *testing.T) {
+	// default через utun без IP-шлюза + обычный через en0:
+	// берём IP-шлюз, интерфейс — последний столбец строки
+	gw, iface := parseNetstat(netstatSample)
+	if gw != "192.168.1.1" {
+		t.Errorf("netstatDefault gw = %q, want 192.168.1.1", gw)
+	}
+	if iface != "utun8" && iface != "en0" {
+		t.Errorf("netstatDefault iface = %q", iface)
+	}
+
+	only := `Internet:
+Destination        Gateway            Flags               Netif Expire
+default            link#16            UCSI                utun8
+`
+	gw2, iface2 := parseNetstat(only)
+	if gw2 != "" {
+		t.Errorf("только utun: gw = %q, want пусто", gw2)
+	}
+	if iface2 != "utun8" {
+		t.Errorf("только utun: iface = %q, want utun8", iface2)
+	}
+}
+
+const vmStatNew = `Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                               100000.
+Pages speculative:                        10000.
+Pages wired down:                         200000.
+Pages occupied by compressor:             60000.
+Pages inactive:                           150000.
+Pages active:                             400000.
+`
+
+func TestParseVMStatCompressor(t *testing.T) {
+	// compressor новых macOS учитывается как сжатые занятые страницы
+	pages := parseVMStat(vmStatNew)
+	if pages["compressor"] != 60000 {
+		t.Fatalf("compressor = %d, want 60000", pages["compressor"])
+	}
+	total := pages["free"] + pages["active"] + pages["inactive"] +
+		pages["speculative"] + pages["wired"] + pages["compressor"]
+	used := pages["active"] + pages["wired"] + pages["compressor"]
+	if got := int(used * 100 / total); got != 71 {
+		t.Errorf("MEM с compressor = %d, want 71", got)
 	}
 }

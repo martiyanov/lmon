@@ -3,12 +3,15 @@
 package meter
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
+	"net/netip"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -37,21 +40,27 @@ var pageRe = map[string]*regexp.Regexp{
 	"inactive":    regexp.MustCompile(`Pages inactive:\s+(\d+)`),
 	"speculative": regexp.MustCompile(`Pages speculative:\s+(\d+)`),
 	"wired":       regexp.MustCompile(`Pages wired down:\s+(\d+)`),
-	"compressed":  regexp.MustCompile(`Pages compressed:\s+(\d+)`), // старые macOS
+	"compressed":  regexp.MustCompile(`Pages compressed:\s+(\d+)`),             // старые macOS
+	"compressor":  regexp.MustCompile(`Pages occupied by compressor:\s+(\d+)`), // современные macOS
 }
 
 // MemPercent возвращает долю занятой памяти в процентах (парсинг vm_stat,
 // та же формула, что в zsh-версии: занято = active + wired + compressed).
 func MemPercent() int {
-	out, err := exec.Command("vm_stat").Output()
+	out, err := runCmd("vm_stat")
 	if err != nil {
-		return 0
+		return -1
 	}
 	pages := parseVMStat(string(out))
+	// compressor (новые macOS) = те же сжатые занятые страницы, что
+	// «Pages compressed» в старых: считаем занятыми и включаем в общие
+	if pages["compressed"] == 0 {
+		pages["compressed"] = pages["compressor"]
+	}
 	total := pages["free"] + pages["active"] + pages["inactive"] +
 		pages["speculative"] + pages["wired"] + pages["compressed"]
 	if total == 0 {
-		return 0
+		return -1
 	}
 	used := pages["active"] + pages["wired"] + pages["compressed"]
 	return int(used * 100 / total)
@@ -80,9 +89,11 @@ func DefaultGateway(target string) (string, error) {
 	if gw, err := routeGetDefault(); err == nil {
 		return gw, nil
 	}
-	if gw, iface, err := netstatDefault(); err == nil {
+	gw, iface := netstatDefault()
+	if gw != "" {
 		return gw, nil
-	} else if iface != "" {
+	}
+	if iface != "" { // default через интерфейс без IP-шлюза (VPN/utun) — берём DHCP-шлюз интерфейса
 		if gw, err := dhcpRouter(iface); err == nil {
 			return gw, nil
 		}
@@ -91,31 +102,43 @@ func DefaultGateway(target string) (string, error) {
 }
 
 func routeGetDefault() (string, error) {
-	out, err := exec.Command("route", "-n", "get", "default").Output()
+	out, err := runCmd("route", "-n", "get", "default")
 	if err != nil {
 		return "", err
 	}
 	return parseRouteGateway(string(out))
 }
 
-var netstatDefaultRe = regexp.MustCompile(`(?m)^default\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(\S+)`)
-
-// netstatDefault возвращает шлюз и интерфейс первого default-маршрута
-// с настоящим IP-шлюзом (маршруты utun point-to-point его не имеют).
-func netstatDefault() (gw, iface string, err error) {
-	out, err := exec.Command("netstat", "-rn", "-f", "inet").Output()
+// netstatDefault возвращает (IP-шлюз, интерфейс) по выводу netstat -rn.
+// Шлюз — первый default-маршрут с настоящим IPv4 next-hop (флаги перед
+// интерфейсом не являются адресом); интерфейс — последний столбец первой
+// default-строки: он нужен для DHCP-fallback, когда IP-шлюза нет (VPN).
+func netstatDefault() (gw, iface string) {
+	out, err := runCmd("netstat", "-rn", "-f", "inet")
 	if err != nil {
-		return "", "", err
+		return "", ""
 	}
-	m := netstatDefaultRe.FindStringSubmatch(string(out))
-	if m == nil {
-		return "", "", errors.New("gateway: default-маршрут с IP-шлюзом не найден")
+	return parseNetstat(string(out))
+}
+
+func parseNetstat(out string) (gw, iface string) {
+	for _, line := range strings.Split(out, "\n") {
+		f := strings.Fields(line)
+		if len(f) < 4 || f[0] != "default" {
+			continue
+		}
+		if iface == "" {
+			iface = f[len(f)-1]
+		}
+		if ip, err := netip.ParseAddr(f[1]); err == nil && ip.Is4() {
+			return f[1], iface
+		}
 	}
-	return m[1], m[2], nil
+	return "", iface
 }
 
 func dhcpRouter(iface string) (string, error) {
-	out, err := exec.Command("ipconfig", "getoption", iface, "router").Output()
+	out, err := runCmd("ipconfig", "getoption", iface, "router")
 	if err != nil {
 		return "", err
 	}
@@ -124,6 +147,14 @@ func dhcpRouter(iface string) (string, error) {
 		return "", errors.New("gateway: DHCP router пуст")
 	}
 	return gw, nil
+}
+
+// runCmd выполняет системную команду с таймаутом, чтобы зависший процесс
+// не останавливал цикл монитора.
+func runCmd(name string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return exec.CommandContext(ctx, name, args...).Output()
 }
 
 func parseRouteGateway(out string) (string, error) {
@@ -143,7 +174,7 @@ func TempC() int {
 	if err != nil {
 		return -1
 	}
-	out, err := exec.Command(path, "-c").Output()
+	out, err := runCmd(path, "-c")
 	if err != nil {
 		return -1
 	}

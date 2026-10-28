@@ -21,9 +21,12 @@ MemAvailable:   8000000 kB
 Buffers:          100000 kB
 SwapTotal:             0 kB
 `
-	total, available := parseMemInfo(sample)
-	if total != 16384000 || available != 8000000 {
-		t.Fatalf("parseMemInfo = (%d, %d), want (16384000, 8000000)", total, available)
+	total, available, ok := parseMemInfo(sample)
+	if !ok || total != 16384000 || available != 8000000 {
+		t.Fatalf("parseMemInfo = (%d, %d, %v), want (16384000, 8000000, true)", total, available, ok)
+	}
+	if _, _, ok := parseMemInfo("MemTotal: 100 kB\n"); ok {
+		t.Error("parseMemInfo: без MemAvailable ожидался ok=false")
 	}
 	if got := int((total - available) * 100 / total); got != 51 {
 		t.Errorf("MemPercent = %d, want 51", got)

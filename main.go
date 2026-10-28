@@ -22,7 +22,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.3.0"
+const version = "1.3.1"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -202,15 +202,14 @@ func parseConfig(args []string) (config, error) {
 		return config{}, fmt.Errorf("--target: %w", err)
 	}
 
-	// Шлюз по умолчанию определяется автоматически; если не вышло —
-	// честно показываем «·» вместо выдуманного адреса.
-	gwHost, gwAuto := *gw, false
-	if gwHost == "" {
-		if detected, err := meter.DefaultGateway(*target); err == nil && detected != "" {
-			gwHost, gwAuto = detected, true
+	// gwAuto — режим автоопределения (шлюз не задан вручную), а не факт
+	// удачного обнаружения: сеть может появиться и позже.
+	gwHost := *gw
+	gwAuto := gwHost == ""
+	if !gwAuto {
+		if err := checkHost(gwHost); err != nil {
+			return config{}, fmt.Errorf("--gw: %w", err)
 		}
-	} else if err := checkHost(gwHost); err != nil {
-		return config{}, fmt.Errorf("--gw: %w", err)
 	}
 
 	// --cols / LMON_COLS: свой набор и порядок колонок; перекрывает флаги.
@@ -289,18 +288,32 @@ func envFloat(name string, def float64) float64 {
 }
 
 func monitor(ctx context.Context, cfg config, w io.Writer) int {
+	// шлюз нужен только если показывается колонка GW
+	cols := layout(cfg)
+	wantGW := false
+	for _, r := range cols {
+		if r.id == "G" {
+			wantGW = true
+			break
+		}
+	}
+	if wantGW {
+		refreshGateway(&cfg, meter.DefaultGateway)
+	}
+
+	// разовый вывод значений одной строкой — для tmux-статусбара и скриптов:
+	// без ANSI, без заголовка, без изменения режима терминала
+	if cfg.once {
+		fmt.Fprintln(w, (&ui{w: w}).sampleRow(ctx, cfg))
+		return 0
+	}
+
 	termSetup()
 	defer termRestore()
 
 	tty := stdoutIsTTY()
 	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks}
-	u.head, u.sep = headerOf(layout(cfg))
-
-	// разовый вывод значений одной строкой — для tmux-статусбара и скриптов
-	if cfg.once {
-		fmt.Fprintln(w, u.sampleRow(ctx, cfg))
-		return 0
-	}
+	u.head, u.sep = headerOf(cols)
 
 	defer u.restore()
 	u.setup()
@@ -323,11 +336,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		}
 		select {
 		case <-refreshGW.C:
-			if cfg.gwAuto {
-				if gw, err := meter.DefaultGateway(cfg.target); err == nil && gw != "" && gw != cfg.gw {
-					cfg.gw = gw
-				}
-			}
+			refreshGateway(&cfg, meter.DefaultGateway)
 		default:
 		}
 		u.maybeResize()
@@ -340,6 +349,19 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 			return 130
 		case <-ticker.C:
 		}
+	}
+}
+
+// refreshGateway обновляет автоматически определяемый шлюз: появление,
+// смена и исчезновение обрабатываются одинаково; ручной --gw не трогаем.
+func refreshGateway(cfg *config, detect func(string) (string, error)) {
+	if !cfg.gwAuto {
+		return
+	}
+	if gw, err := detect(cfg.target); err == nil && gw != "" {
+		cfg.gw = gw
+	} else {
+		cfg.gw = "" // шлюза сейчас нет — колонка GW покажет «·»
 	}
 }
 
@@ -463,10 +485,12 @@ func (u *ui) sampleRow(ctx context.Context, cfg config) string {
 	if gwCh != nil {
 		vals["G"] = <-gwCh
 	}
-	if load, err := meter.LoadAvg(); err == nil {
-		vals["L"] = int(load)
-	} else {
-		vals["L"] = -1
+	if need("L") {
+		if load, err := meter.LoadAvg(); err == nil {
+			vals["L"] = int(load)
+		} else {
+			vals["L"] = -1
+		}
 	}
 	if need("M") {
 		vals["M"] = meter.MemPercent()

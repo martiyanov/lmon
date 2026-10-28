@@ -36,16 +36,17 @@ func parseLoadAvg(s string) (float64, error) {
 func MemPercent() int {
 	data, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
-		return 0
+		return -1
 	}
-	total, available := parseMemInfo(string(data))
-	if total == 0 {
-		return 0
+	total, available, ok := parseMemInfo(string(data))
+	if !ok || total <= 0 || available < 0 || available > total {
+		return -1 // ошибка чтения/полей — «·», не ноль
 	}
 	return int((total - available) * 100 / total)
 }
 
-func parseMemInfo(s string) (total, available int64) {
+func parseMemInfo(s string) (total, available int64, ok bool) {
+	var haveTotal, haveAvail bool
 	for _, line := range strings.Split(s, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 2 {
@@ -57,12 +58,12 @@ func parseMemInfo(s string) (total, available int64) {
 		}
 		switch fields[0] {
 		case "MemTotal:":
-			total = v
+			total, haveTotal = v, true
 		case "MemAvailable:":
-			available = v
+			available, haveAvail = v, true
 		}
 	}
-	return total, available
+	return total, available, haveTotal && haveAvail
 }
 
 // DefaultGateway ищет шлюз по умолчанию. Цепочка:
@@ -142,7 +143,7 @@ func TempC() int {
 	if t, ok := tempFromThermalZones(); ok {
 		return t
 	}
-	return 0
+	return -1 // датчика нет — не выдумываем ноль
 }
 
 func tempFromHwmon() (int, bool) {

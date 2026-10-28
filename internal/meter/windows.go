@@ -69,8 +69,8 @@ func queryMemory() (physLoad, pageLoad int) {
 	var ms memoryStatusEx
 	ms.Length = uint32(unsafe.Sizeof(ms))
 	r1, _, _ := procGlobalMemoryStatusEx.Call(uintptr(unsafe.Pointer(&ms)))
-	if r1 == 0 {
-		return 0, 0
+	if r1 == 0 || ms.TotalPhys == 0 {
+		return -1, -1
 	}
 	if ms.TotalPhys != 0 {
 		physLoad = int((ms.TotalPhys - ms.AvailPhys) * 100 / ms.TotalPhys)
@@ -123,8 +123,8 @@ type systemPowerStatus struct {
 // BatteryPercent — заряд батареи; -1, если батареи нет.
 func BatteryPercent() int {
 	var ps systemPowerStatus
-	procGetSystemPowerStatus.Call(uintptr(unsafe.Pointer(&ps)))
-	if ps.BatteryLifePercent > 100 || ps.BatteryFlag&0x80 != 0 {
+	r1, _, _ := procGetSystemPowerStatus.Call(uintptr(unsafe.Pointer(&ps)))
+	if r1 == 0 || ps.BatteryLifePercent > 100 || ps.BatteryFlag&0x80 != 0 {
 		return -1
 	}
 	return int(ps.BatteryLifePercent)

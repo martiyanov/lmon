@@ -26,12 +26,18 @@ var timeRe = regexp.MustCompile(`(?:time|время)[=<]([0-9]+(?:[.,][0-9]+)?)`
 // потеряны (частая история — ICMP rate-limit), делается один ретрай
 // одиночным пакетом.
 func Latency(ctx context.Context, host string) int {
+	start := time.Now()
 	if t := ping(ctx, args(host)); t != unreachable {
 		return t
 	}
+	// ретрай — только если бюджет измерения ещё позволяет,
+	// чтобы строка не ждала два полных таймаута подряд
+	if time.Since(start) > 3*time.Second {
+		return unreachable
+	}
 	select {
 	case <-ctx.Done():
-		return unreachable
+		return -1
 	case <-time.After(300 * time.Millisecond):
 	}
 	return ping(ctx, retryArgs(host))

@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"errors"
+	"strings"
 	"testing"
 )
 
@@ -84,5 +88,52 @@ func TestHeaderOf(t *testing.T) {
 	}
 	if sep != "--- --- ---" {
 		t.Errorf("headerOf sep = %q", sep)
+	}
+}
+
+func TestGatewayLifecycle(t *testing.T) {
+	detect := func(gw string, fail bool) func(string) (string, error) {
+		return func(string) (string, error) {
+			if fail {
+				return "", errors.New("нет сети")
+			}
+			return gw, nil
+		}
+	}
+	manual := config{gw: "10.0.0.138"}
+	refreshGateway(&manual, detect("192.168.1.1", false))
+	if manual.gw != "10.0.0.138" {
+		t.Errorf("ручной --gw изменился: %q", manual.gw)
+	}
+
+	auto := config{gwAuto: true} // шлюза нет при старте
+	refreshGateway(&auto, detect("", true))
+	if auto.gw != "" {
+		t.Errorf("без сети gw = %q, want пусто", auto.gw)
+	}
+	refreshGateway(&auto, detect("192.168.1.1", false)) // сеть появилась
+	if auto.gw != "192.168.1.1" {
+		t.Errorf("сеть появилась, gw = %q, want 192.168.1.1", auto.gw)
+	}
+	refreshGateway(&auto, detect("10.1.1.1", false)) // шлюз сменился
+	if auto.gw != "10.1.1.1" {
+		t.Errorf("смена шлюза: gw = %q, want 10.1.1.1", auto.gw)
+	}
+	refreshGateway(&auto, detect("", true)) // шлюз исчез
+	if auto.gw != "" {
+		t.Errorf("шлюз исчез, gw = %q, want пусто", auto.gw)
+	}
+}
+
+func TestOnceNoANSI(t *testing.T) {
+	// --cols M — только память: без пингов, мгновенно
+	var b bytes.Buffer
+	u := &ui{w: &b}
+	row := u.sampleRow(context.Background(), config{cols: []string{"M"}})
+	if strings.ContainsRune(row, '\x1b') {
+		t.Errorf("вывод содержит ESC: %q", row)
+	}
+	if strings.TrimSpace(row) == "" || strings.Contains(row, "·") && row != "  ·" {
+		t.Logf("row=%q (память может быть недоступна)", row)
 	}
 }
