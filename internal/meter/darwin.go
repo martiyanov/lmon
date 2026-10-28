@@ -69,13 +69,61 @@ func parseVMStat(out string) map[string]int64 {
 	return pages
 }
 
-// DefaultGateway возвращает шлюз по умолчанию (route -n get default).
-func DefaultGateway() (string, error) {
+// DefaultGateway ищет шлюз по умолчанию. Цепочка (в духе честности:
+// лучше вернуть ошибку, чем выдуманный адрес):
+//  1. route -n get default — основной путь;
+//  2. netstat -rn -f inet — маршрут default через физический интерфейс
+//     (актуально при VPN: route get может вернуть utun без IP шлюза);
+//  3. ipconfig getoption <iface> router — DHCP-шлюз интерфейса, даже
+//     если default-маршрут перекрыт VPN.
+func DefaultGateway(target string) (string, error) {
+	if gw, err := routeGetDefault(); err == nil {
+		return gw, nil
+	}
+	if gw, iface, err := netstatDefault(); err == nil {
+		return gw, nil
+	} else if iface != "" {
+		if gw, err := dhcpRouter(iface); err == nil {
+			return gw, nil
+		}
+	}
+	return "", errors.New("gateway: не найден")
+}
+
+func routeGetDefault() (string, error) {
 	out, err := exec.Command("route", "-n", "get", "default").Output()
 	if err != nil {
 		return "", err
 	}
 	return parseRouteGateway(string(out))
+}
+
+var netstatDefaultRe = regexp.MustCompile(`(?m)^default\s+(\d{1,3}(?:\.\d{1,3}){3})\s+(\S+)`)
+
+// netstatDefault возвращает шлюз и интерфейс первого default-маршрута
+// с настоящим IP-шлюзом (маршруты utun point-to-point его не имеют).
+func netstatDefault() (gw, iface string, err error) {
+	out, err := exec.Command("netstat", "-rn", "-f", "inet").Output()
+	if err != nil {
+		return "", "", err
+	}
+	m := netstatDefaultRe.FindStringSubmatch(string(out))
+	if m == nil {
+		return "", "", errors.New("gateway: default-маршрут с IP-шлюзом не найден")
+	}
+	return m[1], m[2], nil
+}
+
+func dhcpRouter(iface string) (string, error) {
+	out, err := exec.Command("ipconfig", "getoption", iface, "router").Output()
+	if err != nil {
+		return "", err
+	}
+	gw := strings.TrimSpace(string(out))
+	if gw == "" || !strings.Contains(gw, ".") {
+		return "", errors.New("gateway: DHCP router пуст")
+	}
+	return gw, nil
 }
 
 func parseRouteGateway(out string) (string, error) {
@@ -88,23 +136,24 @@ func parseRouteGateway(out string) (string, error) {
 }
 
 // TempC возвращает температуру CPU. На macOS нужна внешняя утилита smctemp
-// (https://github.com/holtmann/osx/tree/master/smctemp); без неё — 0.
+// (https://github.com/holtmann/osx/tree/master/smctemp). Нет утилиты или
+// данных — честное -1 (колонка покажет «·»), а не выдуманный ноль.
 func TempC() int {
 	path, err := exec.LookPath("smctemp")
 	if err != nil {
-		return 0
+		return -1
 	}
 	out, err := exec.Command(path, "-c").Output()
 	if err != nil {
-		return 0
+		return -1
 	}
 	fields := strings.Fields(string(out))
 	if len(fields) == 0 {
-		return 0
+		return -1
 	}
 	t, err := strconv.ParseFloat(fields[0], 64)
 	if err != nil {
-		return 0
+		return -1
 	}
 	return int(t)
 }

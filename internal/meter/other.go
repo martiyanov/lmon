@@ -14,6 +14,6 @@ func SwapPercent() int      { return 0 }
 func DiskPercent() int      { return -1 }
 func BatteryPercent() int   { return -1 }
 
-func DefaultGateway() (string, error) {
+func DefaultGateway(target string) (string, error) {
 	return "", errors.New("gateway: платформа не поддерживается")
 }

@@ -20,6 +20,14 @@ func termRows() int {
 	return rows
 }
 
+func termCols() int {
+	var csbi windows.ConsoleScreenBufferInfo
+	if err := windows.GetConsoleScreenBufferInfo(windows.Handle(os.Stdout.Fd()), &csbi); err != nil {
+		return 0
+	}
+	return int(csbi.Window.Right - csbi.Window.Left + 1)
+}
+
 var (
 	vtMode  uint32
 	vtWasOn bool

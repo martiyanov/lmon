@@ -5,9 +5,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"math"
+	"net/netip"
 	"os"
 	"os/signal"
 	"strconv"
@@ -19,7 +22,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.2.0"
+const version = "1.3.0"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -27,74 +30,82 @@ const helpText = `lmon ` + version + ` — минимальный монитор
 При изменении размера терминала число строк подстраивается,
 а заголовок остаётся на месте.
 
-Базовые колонки (всегда):
-  N  — пинг до внешнего хоста (--target / LMON_TARGET, по умолчанию
-       8.8.8.8), мс. Качество канала до интернета.
-  G  — пинг до шлюза (--gw / LMON_GW; по умолчанию определяется
-       автоматически), мс.
-  L  — load average, целая часть. Загрузка системы.
-  M% — занятая память, %.
-  T° — температура CPU, °C (на macOS нужен smctemp, без него 0).
-
-Дополнительные колонки (включаются флагами):
-  --cpu      C% — загрузка CPU, % (на macOS — окно в 1 с через iostat)
-  --iowait   I% — iowait CPU, % (только Linux; на macOS — «·»)
-  --swap     S% — занятый swap, %
-  --disk     U% — занято на корневом разделе, %
-  --batt     B% — заряд батареи, % (нет батареи — «·»)
+Колонки (в скобках — буква для --cols):
+  NET (N)  — пинг до внешнего хоста (--target / LMON_TARGET, по умолчанию
+             8.8.8.8), мс. Качество канала до интернета.
+  GW  (G)  — пинг до шлюза (--gw / LMON_GW; по умолчанию определяется
+             автоматически: route/netstat/ipconfig на macOS, ip route и
+             /proc/net/route на Linux, route print на Windows).
+             Не определился — «·».
+  AVG (L)  — load average, целая часть. На Windows отсутствует («·»).
+  MEM (M)  — занятая память, %.
+  TMP (T)  — температура CPU, °C. На macOS нужен smctemp (без него «·»);
+             на Linux читается из sysfs; на Windows нет датчика («·»).
+  CPU (C)  — загрузка CPU, % (--cpu).
+  IOW (I)  — iowait CPU, % (--iowait; только Linux, иначе «·»).
+  SWP (S)  — занятый swap, % (--swap; на Windows «·»).
+  DSK (U)  — занято на системном диске, % (--disk).
+  BAT (B)  — заряд батареи, % (--batt; шкала перевёрнута: меньше — хуже).
 
 Режим квадратов:
   -b, --blocks — вместо цифр цветные квадраты ███, градация цвета
   от зелёного через жёлтый к красному по шкале каждой колонки.
-  Статус видно боковым зрением, на цифры смотреть не нужно.
-  Тусклый квадрат — датчика нет.
+  Статус видно боковым зрением. Тусклый квадрат — датчика нет.
+
+Набор колонок:
+  --cols NG,CSB  — свой набор и порядок (каждая буква — колонка,
+                   разделители запятая/пробел/плюс; LMON_COLS).
+                   Флаги --cpu и др. добавляют колонки справа.
+  --once         — одна строка значений без заголовка и без ANSI —
+                   для tmux-статусбара и скриптов:
+                   set -g status-right '#(lmon --once --cols=NGMC)'
 
 Цвета: зелёный — норма, жёлтый — внимание, красный — плохо.
 Пороги (зелёный ≤ / жёлтый ≤ / дальше красный):
-  N: 50/150 мс    G: 10/50 мс     L: 4/8      M%: 60/85
-  T°: 60/75       C%: 50/80       I%: 5/20    S%: 30/70
-  U%: 80/90       B%: наоборот — ≥50 зелёный, ≥20 жёлтый, ниже красный
+  NET: 50/150 мс   GW: 10/50 мс    AVG: 4/8     MEM: 60/85
+  TMP: 60/75       CPU: 50/80      IOW: 5/20    SWP: 30/70
+  DSK: 80/90       BAT: наоборот — ≥50 зелёный, ≥20 жёлтый, ниже красный
+Значения крупнее 999 показываются как +++.
 
 Диагностика: что значат плохие цифры
-  • N и G красные вместе — проблема локальная: Wi-Fi, роутер, кабель.
-    Только N красный — внешний маршрут или провайдер.
-  • L высокий, а C% низкий — система не считает, а ждёт: диск, сеть,
-    локи. Высокий I% подтверждает: ждём диск (Linux).
-  • M% красный и S% растёт — память кончилась, ушло в своп, всё станет
+  • NET и GW красные вместе — проблема локальная: Wi-Fi, роутер, кабель.
+    Только NET красный — внешний маршрут или провайдер.
+  • AVG высокий, а CPU низкий — система не считает, а ждёт: диск, сеть,
+    локи. Высокий IOW подтверждает: ждём диск (Linux).
+  • MEM красный и SWP растёт — память кончилась, ушло в своп, всё станет
     медленным. Закрыть пожирателей памяти или добавить RAM.
-  • C% ≈ 100 долго — какой-то процесс съел процессор; виновника
+  • CPU ≈ 100 долго — какой-то процесс съел процессор; виновника
     покажет top.
-  • T° > 80–90 — перегрев/троттлинг: забились вентиляторы, пыль
+  • TMP > 80–90 — перегрев/троттлинг: забились вентиляторы, пыль
     или длительная пиковая нагрузка.
-  • U% > 90 — кончается место на диске; система начинает сбоить.
+  • DSK > 90 — кончается место на диске; система начинает сбоить.
 
 Использование:
   lmon               — бесконечно, примерно раз в секунду
   lmon 20            — 20 строк и выход
   lmon -b            — режим цветных квадратов
   lmon --cpu --swap  — добавить колонки CPU и swap
+  lmon --cols TNGC   — свой набор и порядок колонок
+  lmon --once        — одна строка значений (tmux/скрипты)
   lmon help          — эта справка
   lmon --version     — версия
 
 Настройки (флаги и переменные окружения):
   --target    LMON_TARGET     внешний хост (по умолчанию 8.8.8.8)
   --gw        LMON_GW         шлюз (по умолчанию — автоопределение)
-  --interval  LMON_INTERVAL   пауза между строками, сек (по умолчанию 1)
+  --interval  LMON_INTERVAL   пауза между циклами, сек (0 < x ≤ 3600)
 
 Примеры:
   lmon --target 1.1.1.1
   lmon -b --cpu --batt 30
-  LMON_GW=192.168.1.1 lmon 10
+  LMON_COLS=NGMC lmon --once
 
 Первая строка после запуска может быть завышена: Wi-Fi-радио
 просыпается. Дальше значения стабилизируются.
 
-Пинг выполняется системной утилитой ping. Температура (колонка T)
-на macOS требует установленной утилиты smctemp
-(https://github.com/holtmann/osx/tree/master/smctemp), без неё — 0;
-на Linux читается из sysfs (hwmon/thermal_zone).
-На Windows (10+) работает всё, кроме L (load average отсутствует)
-и T (датчика нет) — вместо них «·»; шлюз ищется через route print.
+Пинг выполняется системной утилитой ping (нет утилиты — «·»).
+Интервал отсчитывается от начала цикла, поэтому долгие измерения
+не накапливают задержку.
 `
 
 const (
@@ -108,14 +119,17 @@ const (
 type config struct {
 	target   string
 	gw       string
+	gwAuto   bool // шлюз определён автоматически — можно переопределить позже
 	interval time.Duration
 	iters    int
+	once     bool
 	blocks   bool
 	cpu      bool
 	iowait   bool
 	swap     bool
 	disk     bool
 	batt     bool
+	cols     []string
 }
 
 func main() {
@@ -161,13 +175,19 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&swap, "swap", false, "add swap usage column")
 	fs.BoolVar(&disk, "disk", false, "add root disk usage column")
 	fs.BoolVar(&batt, "batt", false, "add battery charge column")
+	colsFlag := fs.String("cols", os.Getenv("LMON_COLS"), "base column set and order, e.g. NG,CSB (flags add more)")
+	var once bool
+	fs.BoolVar(&once, "once", false, "print one line of values and exit (for tmux/status bars)")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
 	}
 
 	var iters int
-	if fs.NArg() > 0 {
+	if fs.NArg() > 1 {
+		return config{}, errors.New("ожидается не более одного позиционного аргумента (число строк)")
+	}
+	if fs.NArg() == 1 {
 		n, err := strconv.Atoi(fs.Arg(0))
 		if err != nil || n < 0 {
 			return config{}, fmt.Errorf("аргумент %q: ожидается число строк", fs.Arg(0))
@@ -175,13 +195,45 @@ func parseConfig(args []string) (config, error) {
 		iters = n
 	}
 
-	gwHost := *gw
+	if math.IsNaN(*interval) || math.IsInf(*interval, 0) || *interval <= 0 || *interval > 3600 {
+		return config{}, fmt.Errorf("--interval=%v: нужно число секунд в (0; 3600]", *interval)
+	}
+	if err := checkHost(*target); err != nil {
+		return config{}, fmt.Errorf("--target: %w", err)
+	}
+
+	// Шлюз по умолчанию определяется автоматически; если не вышло —
+	// честно показываем «·» вместо выдуманного адреса.
+	gwHost, gwAuto := *gw, false
 	if gwHost == "" {
-		// шлюз по умолчанию определяется автоматически (route / /proc/net/route)
-		if detected, err := meter.DefaultGateway(); err == nil {
-			gwHost = detected
-		} else {
-			gwHost = "192.168.0.1"
+		if detected, err := meter.DefaultGateway(*target); err == nil && detected != "" {
+			gwHost, gwAuto = detected, true
+		}
+	} else if err := checkHost(gwHost); err != nil {
+		return config{}, fmt.Errorf("--gw: %w", err)
+	}
+
+	// --cols / LMON_COLS: свой набор и порядок колонок; перекрывает флаги.
+	// Каждая буква — колонка; запятая/пробел/плюс — разделители: «NG,CSB».
+	var cols []string
+	if spec := *colsFlag; spec != "" {
+		seen := map[string]bool{}
+		for _, r := range strings.ToUpper(spec) {
+			id := string(r)
+			if r == ',' || r == ' ' || r == '+' {
+				continue
+			}
+			if _, ok := colRegistry[id]; !ok {
+				return config{}, fmt.Errorf("--cols: неизвестная колонка %q (есть: N G L M T C I S U B)", id)
+			}
+			if seen[id] {
+				return config{}, fmt.Errorf("--cols: колонка %q указана дважды", id)
+			}
+			seen[id] = true
+			cols = append(cols, id)
+		}
+		if len(cols) == 0 {
+			return config{}, errors.New("--cols: пустой набор колонок")
 		}
 	}
 
@@ -189,8 +241,35 @@ func parseConfig(args []string) (config, error) {
 	if d <= 0 {
 		d = time.Second
 	}
-	return config{target: *target, gw: gwHost, interval: d, iters: iters,
+	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
 		blocks: blocks, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt}, nil
+}
+
+// checkHost допускает IPv4-адрес или DNS-имя; остальное (пустая строка,
+// аргумент, начинающийся с «-», пробелы, управляющие символы) — ошибка:
+// значение попадает в argv системного ping.
+func checkHost(h string) error {
+	if h == "" {
+		return errors.New("пустое значение")
+	}
+	if strings.HasPrefix(h, "-") {
+		return fmt.Errorf("%q начинается с дефиса", h)
+	}
+	if ip, err := netip.ParseAddr(h); err == nil {
+		if ip.Is4() {
+			return nil
+		}
+		return errors.New("поддерживаются только IPv4-адреса")
+	}
+	for _, r := range h {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '.' || r == '-' || r == '_':
+		default:
+			return fmt.Errorf("недопустимый символ %q", r)
+		}
+	}
+	return nil
 }
 
 func envStr(name, def string) string {
@@ -216,13 +295,39 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	tty := stdoutIsTTY()
 	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks}
 	u.head, u.sep = headerOf(layout(cfg))
+
+	// разовый вывод значений одной строкой — для tmux-статусбара и скриптов
+	if cfg.once {
+		fmt.Fprintln(w, u.sampleRow(ctx, cfg))
+		return 0
+	}
+
 	defer u.restore()
 	u.setup()
+	u.warnIfNarrow()
+
+	// тикер отсчитывает интервал от начала цикла, а не от конца:
+	// долгие измерения не накапливают задержку, потерянные тики пропускаются
+	ticker := time.NewTicker(cfg.interval)
+	defer ticker.Stop()
+
+	// сеть меняется (Wi-Fi↔Ethernet, VPN) — переопределяем шлюз, но не чаще раза в 30 с
+	refreshGW := time.NewTicker(30 * time.Second)
+	defer refreshGW.Stop()
 
 	for it := 1; ; it++ {
 		select {
 		case <-ctx.Done():
 			return 130
+		default:
+		}
+		select {
+		case <-refreshGW.C:
+			if cfg.gwAuto {
+				if gw, err := meter.DefaultGateway(cfg.target); err == nil && gw != "" && gw != cfg.gw {
+					cfg.gw = gw
+				}
+			}
 		default:
 		}
 		u.maybeResize()
@@ -233,7 +338,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		select {
 		case <-ctx.Done():
 			return 130
-		case <-time.After(cfg.interval):
+		case <-ticker.C:
 		}
 	}
 }
@@ -242,6 +347,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 // Пороги: green/yellow — как в цифровом режиме, red — точка, где градиент
 // блоков становится полностью красным. v < 0 — датчика нет («·»).
 type reading struct {
+	id                 string
 	head               string
 	v                  int
 	green, yellow, red int
@@ -249,30 +355,49 @@ type reading struct {
 	invert             bool // больше — лучше (батарея)
 }
 
+// colRegistry — все известные колонки; ключ — однобуквенный id из --cols.
+var colRegistry = map[string]reading{
+	"N": {id: "N", head: "NET", green: 50, yellow: 150, red: 300},
+	"G": {id: "G", head: "GW", green: 10, yellow: 50, red: 100},
+	"L": {id: "L", head: "AVG", green: 4, yellow: 8, red: 16},
+	"M": {id: "M", head: "MEM", green: 60, yellow: 85, red: 97},
+	"T": {id: "T", head: "TMP", green: 60, yellow: 75, red: 90, deg: true},
+	"C": {id: "C", head: "CPU", green: 50, yellow: 80, red: 100},
+	"I": {id: "I", head: "IOW", green: 5, yellow: 20, red: 50},
+	"S": {id: "S", head: "SWP", green: 30, yellow: 70, red: 100},
+	"U": {id: "U", head: "DSK", green: 80, yellow: 90, red: 100},
+	"B": {id: "B", head: "BAT", green: 50, yellow: 20, red: 0, invert: true},
+}
+
 // layout возвращает колонки в порядке вывода; значения заполнит sampleRow.
+// --cols задаёт набор и порядок целиком; без него — базовые колонки
+// плюс включённые флагами.
 func layout(cfg config) []reading {
-	rs := []reading{
-		{head: "N", green: 50, yellow: 150, red: 300},
-		{head: "G", green: 10, yellow: 50, red: 100},
-		{head: "L", green: 4, yellow: 8, red: 16},
-		{head: "M%", green: 60, yellow: 85, red: 97},
-		{head: "T°", green: 60, yellow: 75, red: 90, deg: true},
+	base := []string{"N", "G", "L", "M", "T"}
+	if len(cfg.cols) > 0 {
+		base = cfg.cols
 	}
-	if cfg.cpu {
-		rs = append(rs, reading{head: "C%", green: 50, yellow: 80, red: 100})
+	rs := make([]reading, 0, len(base)+5)
+	for _, id := range base {
+		rs = append(rs, colRegistry[id])
 	}
-	if cfg.iowait {
-		rs = append(rs, reading{head: "I%", green: 5, yellow: 20, red: 50})
+	// флаги добавляют колонки справа; уже указанные в --cols не дублируются
+	add := func(id string, on bool) {
+		if !on {
+			return
+		}
+		for _, r := range rs {
+			if r.id == id {
+				return
+			}
+		}
+		rs = append(rs, colRegistry[id])
 	}
-	if cfg.swap {
-		rs = append(rs, reading{head: "S%", green: 30, yellow: 70, red: 100})
-	}
-	if cfg.disk {
-		rs = append(rs, reading{head: "U%", green: 80, yellow: 90, red: 100})
-	}
-	if cfg.batt {
-		rs = append(rs, reading{head: "B%", green: 50, yellow: 20, red: 0, invert: true})
-	}
+	add("C", cfg.cpu)
+	add("I", cfg.iowait)
+	add("S", cfg.swap)
+	add("U", cfg.disk)
+	add("B", cfg.batt)
 	return rs
 }
 
@@ -300,50 +425,69 @@ func (r reading) severity() float64 {
 
 func (u *ui) sampleRow(ctx context.Context, cfg config) string {
 	rs := layout(cfg)
+	need := func(id string) bool {
+		for _, r := range rs {
+			if r.id == id {
+				return true
+			}
+		}
+		return false
+	}
 
 	// Медленные измерения — параллельно, каждый со своим каналом,
 	// чтобы значения не перепутались, а цикл не длился сумму задержек.
-	netCh := make(chan int, 1)
-	gwCh := make(chan int, 1)
-	go func() { netCh <- netping.Latency(ctx, cfg.target) }()
-	go func() { gwCh <- netping.Latency(ctx, cfg.gw) }()
+	vals := make(map[string]int, len(rs))
+	var netCh, gwCh chan int
+	if need("N") {
+		netCh = make(chan int, 1)
+		go func() { netCh <- netping.Latency(ctx, cfg.target) }()
+	}
+	if need("G") {
+		if cfg.gw == "" { // шлюз не определился — датчика нет
+			vals["G"] = -1
+		} else {
+			gwCh = make(chan int, 1)
+			go func() { gwCh <- netping.Latency(ctx, cfg.gw) }()
+		}
+	}
 	var cpuCh chan int
-	if cfg.cpu || cfg.iowait {
+	if need("C") || need("I") {
 		cpuCh = make(chan int, 2)
 		go func() { a, i := meter.CPUSample(); cpuCh <- a; cpuCh <- i }()
 	}
 
-	// быстрые метрики
-	load, loadErr := meter.LoadAvg()
-	rs[0].v, rs[1].v = <-netCh, <-gwCh
-	rs[2].v = -1
-	if loadErr == nil {
-		rs[2].v = int(load)
+	// быстрые метрики — считаем только то, что показывается
+	if netCh != nil {
+		vals["N"] = <-netCh
 	}
-	rs[3].v = meter.MemPercent()
-	rs[4].v = meter.TempC()
-	i := 5
+	if gwCh != nil {
+		vals["G"] = <-gwCh
+	}
+	if load, err := meter.LoadAvg(); err == nil {
+		vals["L"] = int(load)
+	} else {
+		vals["L"] = -1
+	}
+	if need("M") {
+		vals["M"] = meter.MemPercent()
+	}
+	if need("T") {
+		vals["T"] = meter.TempC()
+	}
 	if cpuCh != nil {
-		cpu, iowait := <-cpuCh, <-cpuCh
-		if cfg.cpu {
-			rs[i].v = cpu
-			i++
-		}
-		if cfg.iowait {
-			rs[i].v = iowait
-			i++
-		}
+		vals["C"], vals["I"] = <-cpuCh, <-cpuCh
 	}
-	if cfg.swap {
-		rs[i].v = meter.SwapPercent()
-		i++
+	if need("S") {
+		vals["S"] = meter.SwapPercent()
 	}
-	if cfg.disk {
-		rs[i].v = meter.DiskPercent()
-		i++
+	if need("U") {
+		vals["U"] = meter.DiskPercent()
 	}
-	if cfg.batt {
-		rs[i].v = meter.BatteryPercent()
+	if need("B") {
+		vals["B"] = meter.BatteryPercent()
+	}
+	for i := range rs {
+		rs[i].v = vals[rs[i].id] // отсутствует в map → 0 не бывает: need() покрыл все
 	}
 
 	cells := make([]string, len(rs))
@@ -398,6 +542,17 @@ func (u *ui) setup() {
 	}
 	fmt.Fprint(u.w, "\x1b[?25l") // спрятать курсор — не мелькает
 	u.redraw(termRows())
+}
+
+// warnIfNarrow предупреждает один раз, если терминал уже заголовка:
+// строка будет переноситься и таблица поедет.
+func (u *ui) warnIfNarrow() {
+	if !u.tty {
+		return
+	}
+	if cols := termCols(); cols > 0 && len([]rune(u.head)) > cols {
+		fmt.Fprintln(os.Stderr, "lmon: терминал уже набора колонок — строки будут переноситься")
+	}
 }
 
 func (u *ui) maybeResize() {
@@ -463,9 +618,14 @@ func (u *ui) digitCell(r reading) string {
 		}
 		return s
 	}
-	s := fmt.Sprintf("%3d", r.v)
-	if r.deg {
-		s += "°"
+	var s string
+	switch {
+	case r.v > 999: // слишком большое — индикатор переполнения, ширина сохраняется
+		s = "+++"
+	case r.deg && r.v >= 0 && r.v < 100:
+		s = fmt.Sprintf("%2d°", r.v) // ровно 3 позиции; при ≥100 ° уже в заголовке
+	default:
+		s = fmt.Sprintf("%3d", r.v)
 	}
 	if !u.color {
 		return s
@@ -494,15 +654,12 @@ func (u *ui) digitCell(r reading) string {
 }
 
 // blockCell — квадрат-индикатор с непрерывной градацией цвета.
+// В блочном режиме градусы не приписываются: цвет несёт весь смысл.
 func (u *ui) blockCell(r reading) string {
 	if r.v < 0 { // датчика нет
 		return dim + "███" + reset
 	}
-	s := "\x1b[38;5;" + gradient256(r.severity()) + "m███" + reset
-	if r.deg {
-		s += "°"
-	}
-	return s
+	return "\x1b[38;5;" + gradient256(r.severity()) + "m███" + reset
 }
 
 func stdoutIsTTY() bool {

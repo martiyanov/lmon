@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -82,8 +84,10 @@ func queryMemory() (physLoad, pageLoad int) {
 // MemPercent — занятая физическая память (как в диспетчере задач).
 func MemPercent() int { p, _ := queryMemory(); return p }
 
-// SwapPercent — занятый файл подкачки.
-func SwapPercent() int { _, p := queryMemory(); return p }
+// SwapPercent — реальная статистика файла подкачка через WinAPI недоступна
+// без счётчиков производительности; MEMORYSTATUSEX даёт committed memory,
+// а не swap. Показываем честное «нет данных».
+func SwapPercent() int { return -1 }
 
 // TempC — надёжного датчика температуры через WinAPI нет
 // (WMI-счётчик ненадёжен и требует прав администратора).
@@ -126,17 +130,28 @@ func BatteryPercent() int {
 	return int(ps.BatteryLifePercent)
 }
 
-var routeRe = regexp.MustCompile(`(?m)^\s*0\.0\.0\.0\s+0\.0\.0\.0\s+(\d{1,3}(?:\.\d{1,3}){3})`)
+var routeRe = regexp.MustCompile(`(?m)^\s*0\.0\.0\.0\s+0\.0\.0\.0\s+(\d{1,3}(?:\.\d{1,3}){3})\s+\S+\s+(\d+)`)
 
 // DefaultGateway разбирает вывод route print (таблица маршрутов не локализована).
-func DefaultGateway() (string, error) {
+// Из нескольких default-маршрутов берётся маршрут с наименьшей метрикой;
+// записи с шлюзом «On-link» (без IP next-hop) пропускаются.
+func DefaultGateway(target string) (string, error) {
 	out, err := exec.Command("route", "print", "-4", "0.0.0.0").Output()
 	if err != nil {
 		return "", err
 	}
-	m := routeRe.FindStringSubmatch(string(out))
-	if m == nil {
+	best, bestMetric := "", -1
+	for _, m := range routeRe.FindAllStringSubmatch(string(out), -1) {
+		metric, err := strconv.Atoi(strings.TrimSpace(m[2]))
+		if err != nil || metric < 0 {
+			metric = 999999
+		}
+		if bestMetric < 0 || metric < bestMetric {
+			best, bestMetric = m[1], metric
+		}
+	}
+	if best == "" {
 		return "", errors.New("gateway: маршрут по умолчанию не найден")
 	}
-	return m[1], nil
+	return best, nil
 }

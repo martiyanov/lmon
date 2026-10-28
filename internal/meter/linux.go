@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -63,9 +65,48 @@ func parseMemInfo(s string) (total, available int64) {
 	return total, available
 }
 
-// DefaultGateway возвращает шлюз по умолчанию из /proc/net/route
-// (маршрут с Destination 00000000 и флагом шлюза).
-func DefaultGateway() (string, error) {
+// DefaultGateway ищет шлюз по умолчанию. Цепочка:
+//  1. ip -4 route get <target> — маршрут, который ядро выбрало для цели;
+//  2. ip -4 route show default;
+//  3. /proc/net/route (учитывается флаг шлюза RTF_GATEWAY).
+func DefaultGateway(target string) (string, error) {
+	if gw, err := ipRouteGet(target); err == nil {
+		return gw, nil
+	}
+	if gw, err := ipRouteDefault(); err == nil {
+		return gw, nil
+	}
+	if gw, err := procRouteDefault(); err == nil {
+		return gw, nil
+	}
+	return "", errors.New("gateway: не найден")
+}
+
+var viaRe = regexp.MustCompile(`\bvia\s+(\d{1,3}(?:\.\d{1,3}){3})\b`)
+
+func ipRouteGet(target string) (string, error) {
+	out, err := exec.Command("ip", "-4", "route", "get", target).Output()
+	if err != nil {
+		return "", err
+	}
+	if m := viaRe.FindStringSubmatch(string(out)); m != nil {
+		return m[1], nil
+	}
+	return "", errors.New("gateway: прямой маршрут без шлюза")
+}
+
+func ipRouteDefault() (string, error) {
+	out, err := exec.Command("ip", "-4", "route", "show", "default").Output()
+	if err != nil {
+		return "", err
+	}
+	if m := viaRe.FindStringSubmatch(string(out)); m != nil {
+		return m[1], nil
+	}
+	return "", errors.New("gateway: default без шлюза")
+}
+
+func procRouteDefault() (string, error) {
 	data, err := os.ReadFile("/proc/net/route")
 	if err != nil {
 		return "", err
@@ -135,12 +176,8 @@ func tempFromThermalZones() (int, bool) {
 			return v, true
 		}
 	}
-	// зоны с CPU-меткой нет — берём первую читаемую
-	for _, z := range zones {
-		if v, ok := readMilliDegrees(filepath.Join(z, "temp")); ok {
-			return v, true
-		}
-	}
+	// зоны с CPU-меткой нет — честно «нет данных»: первая попавшаяся
+	// зона может измерять что угодно (аккумулятор, NVMe, кожух)
 	return 0, false
 }
 

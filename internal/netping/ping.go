@@ -4,10 +4,12 @@ package netping
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -16,7 +18,7 @@ const unreachable = 999
 
 // timeRe понимает и локализованный вывод ping (например, «время=45мс»
 // в русской Windows).
-var timeRe = regexp.MustCompile(`(?:time|время)[=<]([0-9]+(?:\.[0-9]+)?)`)
+var timeRe = regexp.MustCompile(`(?:time|время)[=<]([0-9]+(?:[.,][0-9]+)?)`)
 
 // Latency возвращает время отклика до host в миллисекундах (усечённое до
 // целого). Отправляются два пакета: первый часто только «будит» Wi-Fi-радио,
@@ -39,7 +41,13 @@ func ping(ctx context.Context, args []string) int {
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 
-	out, _ := exec.CommandContext(ctx, "ping", args...).Output()
+	out, err := exec.CommandContext(ctx, "ping", args...).Output()
+	// сам ping не запустился (нет бинарника) или цикл отменён —
+	// измерение невозможно: -1 («·»), а не «хост недоступен»
+	var execErr *exec.Error
+	if errors.As(err, &execErr) || ctx.Err() != nil {
+		return -1
+	}
 	if times := parseTimes(string(out)); len(times) > 0 {
 		return int(times[len(times)-1])
 	}
@@ -73,7 +81,7 @@ func parseTimes(out string) []float64 {
 	ms := timeRe.FindAllStringSubmatch(out, -1)
 	times := make([]float64, 0, len(ms))
 	for _, m := range ms {
-		if v, err := strconv.ParseFloat(m[1], 64); err == nil {
+		if v, err := strconv.ParseFloat(strings.ReplaceAll(m[1], ",", "."), 64); err == nil {
 			times = append(times, v)
 		}
 	}

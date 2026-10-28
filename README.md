@@ -8,8 +8,8 @@ load average, memory pressure and CPU temperature — colored green / yellow /
 red so you can spot trouble at a glance.
 
 ```
-  N   G   L  M%   T°
---- --- --- --- ----
+NET  GW AVG MEM TMP
+--- --- --- --- ---
  12   2   1  62  55°
  11   2   1  63  55°
 118   3   1  63  56°   ← Wi-Fi hiccup, gateway is fine → it's the uplink
@@ -94,18 +94,26 @@ lmon --version          # version
 
 The base set is always shown; extra columns are enabled with flags:
 
-| Col | Meaning | Flag | Green | Yellow | Red |
-|-----|---------|------|-------|--------|-----|
-| `N` | ping to an external host (`--target`, default `8.8.8.8`), ms | — | ≤ 50 | ≤ 150 | > 150 |
-| `G` | ping to your gateway (`--gw`, auto-detected by default), ms | — | ≤ 10 | ≤ 50 | > 50 |
-| `L` | load average (integer part) | — | ≤ 4 | ≤ 8 | > 8 |
-| `M` | used memory, % | — | ≤ 60 | ≤ 85 | > 85 |
-| `T` | CPU temperature, °C | — | ≤ 60 | ≤ 75 | > 75 |
-| `C` | CPU usage, % | `--cpu` | ≤ 50 | ≤ 80 | > 80 |
-| `I` | iowait, % (Linux only, `·` on macOS) | `--iowait` | ≤ 5 | ≤ 20 | > 20 |
-| `S` | swap used, % | `--swap` | ≤ 30 | ≤ 70 | > 70 |
-| `U` | root disk used, % | `--disk` | ≤ 80 | ≤ 90 | > 90 |
-| `B` | battery charge, % (inverted: more is better) | `--batt` | ≥ 50 | ≥ 20 | < 20 |
+Column letters are used in `--cols`; headers are three letters wide and
+align exactly with the values:
+
+| Id / header | Meaning | Flag | Green | Yellow | Red |
+|-------------|---------|------|-------|--------|-----|
+| `N` NET | ping to an external host (`--target`, default `8.8.8.8`), ms | — | ≤ 50 | ≤ 150 | > 150 |
+| `G` GW | ping to your gateway (`--gw`, auto-detected: `route`/`netstat`/`ipconfig` on macOS, `ip route`/`/proc/net/route` on Linux, `route print` on Windows), ms | — | ≤ 10 | ≤ 50 | > 50 |
+| `L` AVG | load average (integer part) | — | ≤ 4 | ≤ 8 | > 8 |
+| `M` MEM | used memory, % | — | ≤ 60 | ≤ 85 | > 85 |
+| `T` TMP | CPU temperature, °C | — | ≤ 60 | ≤ 75 | > 75 |
+| `C` CPU | CPU usage, % | `--cpu` | ≤ 50 | ≤ 80 | > 80 |
+| `I` IOW | iowait, % (Linux only) | `--iowait` | ≤ 5 | ≤ 20 | > 20 |
+| `S` SWP | swap used, % | `--swap` | ≤ 30 | ≤ 70 | > 70 |
+| `U` DSK | system disk used, % | `--disk` | ≤ 80 | ≤ 90 | > 90 |
+| `B` BAT | battery charge, % (inverted: more is better) | `--batt` | ≥ 50 | ≥ 20 | < 20 |
+
+A dot `·` (or a dim block) means the reading genuinely does not exist on
+this machine — no `smctemp` on macOS, no load average on Windows, gateway
+not detected, `ping` missing. `999` means the host is unreachable, `+++`
+means the value overflowed the column.
 
 ### Blocks mode
 
@@ -136,11 +144,14 @@ machine; `999` means the host is unreachable.
 | `--gw` | `LMON_GW` | auto-detect | your gateway |
 | `--interval` | `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
 | `-b`, `--blocks` | — | off | color blocks instead of digits |
+| `--cols` | `LMON_COLS` | base set | column set and order, one letter each (e.g. `NG,CSB`); flags add more |
+| `--once` | — | off | print one plain line of values and exit (tmux status bar) |
 | `--cpu` `--iowait` `--swap` `--disk` `--batt` | — | off | add extra columns |
 
 ```sh
 lmon --target 1.1.1.1 --interval 2 10
-lmon -b --cpu --batt 30
+lmon -b --cols TNGC --cpu          # own set and order, flags add more
+tmux: set -g status-right '#(lmon --once --cols=NGMC)'
 ```
 
 The first line after start may show an inflated ping: the Wi-Fi radio

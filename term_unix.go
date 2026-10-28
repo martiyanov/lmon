@@ -16,5 +16,13 @@ func termRows() int {
 	return int(ws.Row)
 }
 
+func termCols() int {
+	ws, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
+	if err != nil {
+		return 0
+	}
+	return int(ws.Col)
+}
+
 func termSetup()   {}
 func termRestore() {}
