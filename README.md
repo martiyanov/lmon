@@ -2,8 +2,8 @@
 
 **English** · [По-русски / Russian](README.ru.md)
 
-A minimal one-line system monitor for your terminal. A fixed header row,
-then a stream of measurements — ping to the internet, ping to your gateway,
+A minimal one-line system monitor for your terminal. A stream of
+measurements with a header pinned to the bottom — ping to the internet, ping to your gateway,
 load average, memory pressure and CPU temperature — colored green / yellow /
 red so you can spot trouble at a glance.
 
@@ -15,7 +15,7 @@ readable even in a 2-line window:
  12   2   1  62  55°      ← values stream upward
  11   2   1  63  55°
 118   3   1  63  56°      ← Wi-Fi hiccup, gateway is fine → it's the uplink
-NET  GW AVG MEM CPU       ← pinned header, label background = state color
+NET  GW AVG MEM  C°       ← pinned header, label background = state color
 ```
 
 Single static binary for **macOS**, **Linux** and **Windows 10+**
