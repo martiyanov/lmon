@@ -7,12 +7,15 @@ then a stream of measurements — ping to the internet, ping to your gateway,
 load average, memory pressure and CPU temperature — colored green / yellow /
 red so you can spot trouble at a glance.
 
+The header is pinned to the bottom; each label sits on a background
+colored by that column's current state, so the status line stays
+readable even in a 2-line window:
+
 ```
-NET  GW AVG MEM TMP
---- --- --- --- ---
- 12   2   1  62  55°
+ 12   2   1  62  55°      ← values stream upward
  11   2   1  63  55°
-118   3   1  63  56°   ← Wi-Fi hiccup, gateway is fine → it's the uplink
+118   3   1  63  56°      ← Wi-Fi hiccup, gateway is fine → it's the uplink
+NET  GW AVG MEM CPU       ← pinned header, label background = state color
 ```
 
 Single static binary for **macOS**, **Linux** and **Windows 10+**
@@ -103,7 +106,7 @@ align exactly with the values:
 | `G` GW | ping to your gateway (`--gw`, auto-detected: `route`/`netstat`/`ipconfig` on macOS, `ip route`/`/proc/net/route` on Linux, `route print` on Windows), ms | — | ≤ 10 | ≤ 50 | > 50 |
 | `L` AVG | load average (integer part) | — | ≤ 4 | ≤ 8 | > 8 |
 | `M` MEM | used memory, % | — | ≤ 60 | ≤ 85 | > 85 |
-| `T` TMP | CPU temperature, °C | — | ≤ 60 | ≤ 75 | > 75 |
+| `T` C° | CPU temperature, °C | — | ≤ 60 | ≤ 75 | > 75 |
 | `C` CPU | CPU usage, % | `--cpu` | ≤ 50 | ≤ 80 | > 80 |
 | `I` IOW | iowait, % (Linux only) | `--iowait` | ≤ 5 | ≤ 20 | > 20 |
 | `S` SWP | swap used, % | `--swap` | ≤ 30 | ≤ 70 | > 70 |

@@ -22,13 +22,14 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.4.0"
+const version = "1.5.0"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
-Заголовок закреплён вверху окна, ниже идут строки значений.
-При изменении размера терминала число строк подстраивается,
-а заголовок остаётся на месте.
+Заголовок закреплён внизу окна, значения стекаются над ним.
+Подписи колонок залиты цветом текущего состояния — статус читается
+по «ленте» внизу даже в окне высотой 2 строки. При изменении размера
+терминала число строк подстраивается, заголовок остаётся на месте.
 
 Колонки (в скобках — буква для --cols):
   NET (N)  — пинг до внешнего хоста (--target / LMON_TARGET, по умолчанию
@@ -142,7 +143,7 @@ func run(args []string, w io.Writer) int {
 	if len(args) > 0 {
 		switch args[0] {
 		case "help", "-h", "--help":
-			fmt.Fprint(w, helpText)
+			io.WriteString(w, helpText) // не fmt: в тексте есть %en0, vet примет за формат-директиву
 			return 0
 		case "--version":
 			fmt.Fprintf(w, "lmon %s\n", version)
@@ -318,7 +319,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	// разовый вывод значений одной строкой — для tmux-статусбара и скриптов:
 	// без ANSI, без заголовка, без изменения режима терминала
 	if cfg.once {
-		fmt.Fprintln(w, (&ui{w: w}).sampleRow(ctx, cfg))
+		fmt.Fprintln(w, (&ui{w: w}).dataRow(measure(ctx, cfg)))
 		return 0
 	}
 
@@ -354,7 +355,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		default:
 		}
 		u.maybeResize()
-		u.row(u.sampleRow(ctx, cfg))
+		u.emit(measure(ctx, cfg))
 		if cfg.iters > 0 && it >= cfg.iters {
 			return 0
 		}
@@ -407,7 +408,7 @@ type reading struct {
 // colRegistry — все известные колонки; ключ — однобуквенный id из --cols.
 var colRegistry = map[string]reading{
 	"N": {id: "N", head: "NET", green: 50, yellow: 150, red: 300},
-	"G": {id: "G", head: "GW", green: 10, yellow: 50, red: 100},
+	"G": {id: "G", head: " GW", green: 10, yellow: 50, red: 100},
 	"L": {id: "L", head: "AVG", green: 4, yellow: 8, red: 16},
 	"M": {id: "M", head: "MEM", green: 60, yellow: 85, red: 97},
 	"T": {id: "T", head: "TMP", green: 60, yellow: 75, red: 90, deg: true},
@@ -472,7 +473,7 @@ func (r reading) severity() float64 {
 	return 0.5 + 0.5*float64(r.v-r.yellow)/float64(r.red-r.yellow)
 }
 
-func (u *ui) sampleRow(ctx context.Context, cfg config) string {
+func measure(ctx context.Context, cfg config) []reading {
 	rs := layout(cfg)
 	need := func(id string) bool {
 		for _, r := range rs {
@@ -541,6 +542,11 @@ func (u *ui) sampleRow(ctx context.Context, cfg config) string {
 		rs[i].v = vals[rs[i].id] // отсутствует в map → 0 не бывает: need() покрыл все
 	}
 
+	return rs
+}
+
+// dataRow — строка значений (цифры или квадраты) без служебных символов.
+func (u *ui) dataRow(rs []reading) string {
 	cells := make([]string, len(rs))
 	for j, r := range rs {
 		if u.blocks && u.color {
@@ -584,11 +590,13 @@ type ui struct {
 	rows   int
 	head   string
 	sep    string
+	lastRS []reading
 }
 
 func (u *ui) setup() {
 	if !u.tty {
-		u.printHeader()
+		// вне терминала заголовок обычный, сверху
+		fmt.Fprintf(u.w, "%s\n%s\n", u.head, u.sep)
 		return
 	}
 	fmt.Fprint(u.w, "\x1b[?25l") // спрятать курсор — не мелькает
@@ -615,15 +623,22 @@ func (u *ui) maybeResize() {
 }
 
 func (u *ui) redraw(rows int) {
-	if rows < 4 {
-		rows = 4
+	if rows < 2 {
+		rows = 2 // минимум: одна строка данных + заголовок
 	}
 	fmt.Fprint(u.w, "\x1b[2J\x1b[H")
-	u.printHeader()
-	// прокрутка только области под заголовком
-	fmt.Fprintf(u.w, "\x1b[3;%dr", rows)
-	fmt.Fprintf(u.w, "\x1b[%d;1H", rows)
+	// прокрутка — всё окно, кроме нижней строки заголовка:
+	// заголовок закреплён снизу и виден даже в окне высотой 2 строки
+	fmt.Fprintf(u.w, "\x1b[1;%dr", rows-1)
+	u.paintHeader(rows)
+	fmt.Fprintf(u.w, "\x1b[%d;1H", rows-1)
 	u.rows = rows
+}
+
+// paintHeader перекрашивает нижний заголовок текущими состояниями колонок.
+func (u *ui) paintHeader(rows int) {
+	fmt.Fprintf(u.w, "\x1b[%d;1H", rows)
+	fmt.Fprint(u.w, u.headerRow(u.lastRS))
 }
 
 // headerOf строит строки заголовка и разделителя из списка колонок.
@@ -631,26 +646,41 @@ func headerOf(rs []reading) (head, sep string) {
 	hs := make([]string, len(rs))
 	ss := make([]string, len(rs))
 	for i, r := range rs {
-		hs[i] = fmt.Sprintf("%3s", r.head)
+		hs[i] = r.head // головы в реестре уже выровнены до 3 символов
 		ss[i] = "---"
 	}
 	return strings.Join(hs, " "), strings.Join(ss, " ")
 }
 
-func (u *ui) printHeader() {
-	if u.color {
-		fmt.Fprintf(u.w, "%s%s%s\n%s%s%s\n", dim, u.head, reset, dim, u.sep, reset)
-	} else {
-		fmt.Fprintf(u.w, "%s\n%s\n", u.head, u.sep)
+// emit выводит строку значений и обновляет цвет нижнего заголовка.
+func (u *ui) emit(rs []reading) {
+	u.lastRS = rs
+	if !u.tty {
+		fmt.Fprintln(u.w, u.dataRow(rs))
+		return
 	}
+	fmt.Fprint(u.w, "\r\n") // прокрутка области данных
+	fmt.Fprint(u.w, u.dataRow(rs))
+	u.paintHeader(u.rows)
+	fmt.Fprintf(u.w, "\x1b[%d;1H", u.rows-1)
 }
 
-func (u *ui) row(s string) {
-	if u.tty {
-		fmt.Fprintf(u.w, "\r\n%s", s)
-	} else {
-		fmt.Fprintln(u.w, s)
+// headerRow — подписи колонок на подложке цвета текущего состояния:
+// даже при окне в одну строку данных видно, какая колонка каким цветом.
+func (u *ui) headerRow(rs []reading) string {
+	if len(rs) == 0 {
+		return u.head // до первого измерения — просто подписи
 	}
+	cells := make([]string, len(rs))
+	for i, r := range rs {
+		label := r.head
+		if r.v < 0 { // датчика нет — нейтральная тусклая подпись
+			cells[i] = dim + label + reset
+			continue
+		}
+		cells[i] = "\x1b[1;30;48;5;" + gradient256(r.severity()) + "m" + label + reset
+	}
+	return strings.Join(cells, " ")
 }
 
 // restore возвращает нормальный режим терминала (в т.ч. после Ctrl+C).

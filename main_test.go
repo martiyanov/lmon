@@ -84,9 +84,9 @@ func TestDigitCellWidth(t *testing.T) {
 }
 
 func TestHeaderOf(t *testing.T) {
-	rs := []reading{{head: "NET"}, {head: "MEM"}, {head: "TMP"}}
+	rs := []reading{{head: "NET"}, {head: "MEM"}, {head: " C°"}}
 	head, sep := headerOf(rs)
-	if head != "NET MEM TMP" {
+	if head != "NET MEM  C°" {
 		t.Errorf("headerOf head = %q", head)
 	}
 	if sep != "--- --- ---" {
@@ -132,7 +132,7 @@ func TestOnceNoANSI(t *testing.T) {
 	// --cols M — только память: без пингов, мгновенно
 	var b bytes.Buffer
 	u := &ui{w: &b}
-	row := u.sampleRow(context.Background(), config{cols: []string{"M"}})
+	row := u.dataRow(measure(context.Background(), config{cols: []string{"M"}}))
 	if strings.ContainsRune(row, '\x1b') {
 		t.Errorf("вывод содержит ESC: %q", row)
 	}
