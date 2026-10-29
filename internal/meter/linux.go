@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -73,6 +74,9 @@ func parseMemInfo(s string) (total, available int64, ok bool) {
 //  2. ip -4 route show default;
 //  3. /proc/net/route (учитывается флаг шлюза RTF_GATEWAY).
 func DefaultGateway(target string) (string, error) {
+	if isV6(target) {
+		return gateway6(target)
+	}
 	if gw, err := ipRouteGet(target); err == nil {
 		return gw, nil
 	}
@@ -85,7 +89,36 @@ func DefaultGateway(target string) (string, error) {
 	return "", errors.New("gateway: не найден")
 }
 
-var viaRe = regexp.MustCompile(`\bvia\s+(\d{1,3}(?:\.\d{1,3}){3})\b`)
+var (
+	viaRe  = regexp.MustCompile(`\bvia\s+(\d{1,3}(?:\.\d{1,3}){3})\b`)
+	via6Re = regexp.MustCompile(`\bvia\s+([0-9a-fA-F:]+)\s+dev\s+(\S+)`)
+)
+
+func isV6(host string) bool {
+	a, err := netip.ParseAddr(host)
+	return err == nil && a.Is6() && !a.Is4In6()
+}
+
+// gateway6: ip -6 route get <target> → default. Шлюзы IPv6 — link-local,
+// зона берётся из dev (fe80::1 + eth0 → fe80::1%eth0), иначе ping -6
+// не знает, через какой интерфейс слать.
+func gateway6(target string) (string, error) {
+	for _, argv := range [][]string{
+		{"ip", "-6", "route", "get", target},
+		{"ip", "-6", "route", "show", "default"},
+	} {
+		out, err := runCmd(argv[0], argv[1:]...)
+		if err != nil {
+			continue
+		}
+		if m := via6Re.FindStringSubmatch(string(out)); m != nil {
+			if a, err := netip.ParseAddr(m[1]); err == nil && a.Is6() {
+				return m[1] + "%" + m[2], nil
+			}
+		}
+	}
+	return "", errors.New("gateway: IPv6-шлюз не найден")
+}
 
 // runCmd выполняет системную команду с таймаутом, чтобы зависший процесс
 // не останавливал цикл монитора.

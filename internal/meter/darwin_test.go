@@ -125,3 +125,34 @@ func TestParseVMStatCompressor(t *testing.T) {
 		t.Errorf("MEM с compressor = %d, want 71", got)
 	}
 }
+
+const netstat6Sample = `Routing tables
+
+Internet6:
+Destination                             Gateway                         Flags               Netif Expire
+default                                 fe80::%utun0                     UGcIg               utun0
+default                                 fe80::1%en0                      UGcg                  en0
+::1                                     ::1                             UHL                   lo0
+`
+
+func TestParseNetstat6(t *testing.T) {
+	// неполный fe80::%utun0 (без идентификатора в адресе) пропускается
+	if gw := parseNetstat6(netstat6Sample); gw != "fe80::1%en0" {
+		t.Errorf("parseNetstat6 = %q, want fe80::1%%en0", gw)
+	}
+	if gw := parseNetstat6("default                                 fe80::%utun0                            UGcIg               utun0"); gw != "" {
+		t.Errorf("parseNetstat6 с одним мусорным = %q, want пусто", gw)
+	}
+}
+
+func TestParseRouteGatewayV6(t *testing.T) {
+	out := `   route to: default
+destination: default
+       mask: default
+    gateway: fe80::1%en0
+  interface: en0`
+	gw, err := parseRouteGateway(out)
+	if err != nil || gw != "fe80::1%en0" {
+		t.Errorf("parseRouteGateway v6 = (%q, %v)", gw, err)
+	}
+}

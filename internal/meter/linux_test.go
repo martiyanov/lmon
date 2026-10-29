@@ -50,3 +50,14 @@ docker0	000011AC	00000000	0001	0	0	0	00FFFFFF	0	0	0
 		t.Error("parseProcRoute: ожидалась ошибка при отсутствии маршрута")
 	}
 }
+
+func TestVia6ZoneAppend(t *testing.T) {
+	// ip -6 route get 2001:db8::1 → via fe80::1 dev eth0 → зона из dev
+	m := via6Re.FindStringSubmatch("2001:db8::1 from :: via fe80::1 dev eth0 proto kernel src 2001:db8::a:1 metric 1024")
+	if m == nil {
+		t.Fatal("via6Re не нашёл via/dev")
+	}
+	if got := m[1] + "%" + m[2]; got != "fe80::1%eth0" {
+		t.Errorf("шлюз = %q, want fe80::1%%eth0", got)
+	}
+}

@@ -5,6 +5,7 @@ package meter
 import (
 	"context"
 	"errors"
+	"net/netip"
 	"os"
 	"os/exec"
 	"regexp"
@@ -132,7 +133,39 @@ func BatteryPercent() int {
 	return int(ps.BatteryLifePercent)
 }
 
+func isV6(host string) bool {
+	a, err := netip.ParseAddr(host)
+	return err == nil && a.Is6() && !a.Is4In6()
+}
+
+// gateway6: route print -6; шлюз с числовой зоной вида fe80::1%12
+// (индекс интерфейса Windows), минимальная метрика.
+func gateway6() (string, error) {
+	out, err := runCmd("route", "print", "-6")
+	if err != nil {
+		return "", err
+	}
+	best, bestMetric := "", -1
+	for _, m := range route6Re.FindAllStringSubmatch(string(out), -1) {
+		metric, err := strconv.Atoi(strings.TrimSpace(m[2]))
+		if err != nil || metric < 0 {
+			metric = 999999
+		}
+		if bestMetric < 0 || metric < bestMetric {
+			best, bestMetric = m[1], metric
+		}
+	}
+	if best == "" {
+		return "", errors.New("gateway: IPv6-шлюз не найден")
+	}
+	return best, nil
+}
+
+// routeRe: default-маршруты IPv4 (таблица не локализована); группа 2 — метрика.
 var routeRe = regexp.MustCompile(`(?m)^\s*0\.0\.0\.0\s+0\.0\.0\.0\s+(\d{1,3}(?:\.\d{1,3}){3})\s+\S+\s+(\d+)`)
+
+// route6Re: default-маршруты IPv6; шлюз с зоной вида fe80::1%12.
+var route6Re = regexp.MustCompile(`(?m)^\s*::/0\s+::/0\s+(fe80:[^\s]+|\S+::\S+)\s+\S+\s+(\d+)`)
 
 // DefaultGateway разбирает вывод route print (таблица маршрутов не локализована).
 // Из нескольких default-маршрутов берётся маршрут с наименьшей метрикой;
@@ -145,6 +178,9 @@ func runCmd(name string, args ...string) ([]byte, error) {
 }
 
 func DefaultGateway(target string) (string, error) {
+	if isV6(target) {
+		return gateway6()
+	}
 	out, err := runCmd("route", "print", "-4", "0.0.0.0")
 	if err != nil {
 		return "", err

@@ -22,7 +22,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.3.2"
+const version = "1.4.0"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -32,7 +32,8 @@ const helpText = `lmon ` + version + ` — минимальный монитор
 
 Колонки (в скобках — буква для --cols):
   NET (N)  — пинг до внешнего хоста (--target / LMON_TARGET, по умолчанию
-             8.8.8.8), мс. Качество канала до интернета.
+             8.8.8.8), мс. Поддерживается IPv6-литерал, в том числе
+             link-local с зоной: fe80::1%%en0. Качество канала до интернета.
   GW  (G)  — пинг до шлюза (--gw / LMON_GW; по умолчанию определяется
              автоматически: route/netstat/ipconfig на macOS, ip route и
              /proc/net/route на Linux, route print на Windows).
@@ -91,8 +92,9 @@ const helpText = `lmon ` + version + ` — минимальный монитор
   lmon --version     — версия
 
 Настройки (флаги и переменные окружения):
-  --target    LMON_TARGET     внешний хост (по умолчанию 8.8.8.8)
-  --gw        LMON_GW         шлюз (по умолчанию — автоопределение)
+  --target    LMON_TARGET     внешний хост: IPv4, DNS-имя или IPv6-литерал
+  --gw        LMON_GW         шлюз (по умолчанию — автоопределение;
+                              семейство адресов — как у --target)
   --interval  LMON_INTERVAL   пауза между циклами, сек (0 < x ≤ 3600)
 
 Примеры:
@@ -210,6 +212,10 @@ func parseConfig(args []string) (config, error) {
 		if err := checkHost(gwHost); err != nil {
 			return config{}, fmt.Errorf("--gw: %w", err)
 		}
+		// NET и GW работают в одном семействе адресов
+		if isV6(*target) != isV6(gwHost) {
+			return config{}, errors.New("--target и --gw должны быть оба IPv4 или оба IPv6")
+		}
 	}
 
 	// --cols / LMON_COLS: свой набор и порядок колонок; перекрывает флаги.
@@ -255,10 +261,13 @@ func checkHost(h string) error {
 		return fmt.Errorf("%q начинается с дефиса", h)
 	}
 	if ip, err := netip.ParseAddr(h); err == nil {
-		if ip.Is4() {
+		switch {
+		case ip.Is4():
 			return nil
+		case ip.Is4In6():
+			return errors.New("IPv4-mapped IPv6 не поддерживается — укажи обычный IPv4")
 		}
-		return errors.New("поддерживаются только IPv4-адреса")
+		return nil // IPv6-литерал, в том числе с зоной: fe80::1%en0
 	}
 	for _, r := range h {
 		switch {
@@ -269,6 +278,11 @@ func checkHost(h string) error {
 		}
 	}
 	return nil
+}
+
+func isV6(host string) bool {
+	a, err := netip.ParseAddr(host)
+	return err == nil && a.Is6() && !a.Is4In6()
 }
 
 func envStr(name, def string) string {

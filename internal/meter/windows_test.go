@@ -2,7 +2,11 @@
 
 package meter
 
-import "testing"
+import (
+	"strconv"
+	"strings"
+	"testing"
+)
 
 func TestCPUSample(t *testing.T) {
 	if c, i := CPUSample(); c != -1 || i != -1 {
@@ -31,5 +35,25 @@ func TestSensors(t *testing.T) {
 	}
 	if _, err := LoadAvg(); err == nil {
 		t.Error("LoadAvg: на Windows ожидается ошибка")
+	}
+}
+
+const routePrint6Sample = `===========================================================================
+Active Routes:
+  If Metric Network Destination      Gateway        Interface Metric
+          1    306 ::/0                 fe80::1%12     ...        306
+          1    306 ::/0                 fe80::9%7      ...        500
+===========================================================================`
+
+func TestGateway6Windows(t *testing.T) {
+	best, bestMetric := "", -1
+	for _, m := range route6Re.FindAllStringSubmatch(routePrint6Sample, -1) {
+		metric, _ := strconv.Atoi(strings.TrimSpace(m[2]))
+		if bestMetric < 0 || metric < bestMetric {
+			best, bestMetric = m[1], metric
+		}
+	}
+	if best != "fe80::1%12" {
+		t.Errorf("лучший v6-шлюз = %q, want fe80::1%%12 (минимальная метрика)", best)
 	}
 }

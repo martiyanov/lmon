@@ -86,6 +86,9 @@ func parseVMStat(out string) map[string]int64 {
 //  3. ipconfig getoption <iface> router — DHCP-шлюз интерфейса, даже
 //     если default-маршрут перекрыт VPN.
 func DefaultGateway(target string) (string, error) {
+	if isV6(target) {
+		return gateway6()
+	}
 	if gw, err := routeGetDefault(); err == nil {
 		return gw, nil
 	}
@@ -99,6 +102,54 @@ func DefaultGateway(target string) (string, error) {
 		}
 	}
 	return "", errors.New("gateway: не найден")
+}
+
+func isV6(host string) bool {
+	a, err := netip.ParseAddr(host)
+	return err == nil && a.Is6() && !a.Is4In6()
+}
+
+// gateway6 ищет IPv6-шлюз: route get -inet6, затем netstat -f inet6
+// (неполные зоны вроде fe80::%utun0 пропускаются). DHCP-fallback
+// не применяется: в IPv6 адрес приносит RA, а не DHCP.
+func gateway6() (string, error) {
+	if out, err := runCmd("route", "-n", "get", "-inet6", "default"); err == nil {
+		if gw, err := parseRouteGateway(string(out)); err == nil {
+			if isV6(gw) {
+				return gw, nil
+			}
+		}
+	}
+	if out, err := runCmd("netstat", "-rn", "-f", "inet6"); err == nil {
+		if gw := parseNetstat6(string(out)); gw != "" {
+			return gw, nil
+		}
+	}
+	return "", errors.New("gateway: IPv6-шлюз не найден")
+}
+
+// parseNetstat6 берёт первый default-маршрут с полным IPv6-шлюзом.
+// Строки вида «fe80::%utun0» — мусор без идентификатора интерфейса
+// в самом адресе (заканчивается на «::») — пропускаются.
+func parseNetstat6(out string) string {
+	for _, line := range strings.Split(out, "\n") {
+		f := strings.Fields(line)
+		if len(f) < 4 || f[0] != "default" {
+			continue
+		}
+		addr := f[1]
+		base := addr
+		if i := strings.IndexByte(addr, '%'); i > 0 {
+			base = addr[:i]
+		}
+		if strings.HasSuffix(base, "::") {
+			continue // неполный link-local без идентификатора
+		}
+		if a, err := netip.ParseAddr(addr); err == nil && a.Is6() {
+			return addr
+		}
+	}
+	return ""
 }
 
 func routeGetDefault() (string, error) {
@@ -158,10 +209,13 @@ func runCmd(name string, args ...string) ([]byte, error) {
 }
 
 func parseRouteGateway(out string) (string, error) {
-	// строка вида "    gateway: 192.168.1.1"
-	m := regexp.MustCompile(`(?m)^\s*gateway:\s+([0-9.]+)`).FindStringSubmatch(out)
+	// строка вида "    gateway: 192.168.1.1" или "gateway: fe80::1%en0"
+	m := regexp.MustCompile(`(?m)^\s*gateway:\s+(\S+)`).FindStringSubmatch(out)
 	if m == nil {
 		return "", errors.New("gateway: маршрут по умолчанию не найден")
+	}
+	if _, err := netip.ParseAddr(m[1]); err != nil && !isV6(m[1]) {
+		return "", errors.New("gateway: не IP-адрес")
 	}
 	return m[1], nil
 }

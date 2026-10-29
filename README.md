@@ -140,7 +140,7 @@ machine; `999` means the host is unreachable.
 
 | Flag | Env | Default | Description |
 |------|-----|---------|-------------|
-| `--target` | `LMON_TARGET` | `8.8.8.8` | external host to ping |
+| `--target` | `LMON_TARGET` | `8.8.8.8` | external host: IPv4, DNS name or an IPv6 literal (e.g. `fe80::1%en0`; the gateway follows the same address family) |
 | `--gw` | `LMON_GW` | auto-detect | your gateway |
 | `--interval` | `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
 | `-b`, `--blocks` | — | off | color blocks instead of digits |

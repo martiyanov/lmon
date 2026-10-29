@@ -11,7 +11,8 @@ import (
 )
 
 func TestCheckHost(t *testing.T) {
-	ok := []string{"8.8.8.8", "1.1.1.1", "example.com", "my-host.example.org", "192.168.1.1"}
+	ok := []string{"8.8.8.8", "1.1.1.1", "example.com", "my-host.example.org", "192.168.1.1",
+		"2606:4700:4700::1111", "fe80::1%en0", "::1"}
 	for _, h := range ok {
 		if err := checkHost(h); err != nil {
 			t.Errorf("checkHost(%q) = %v, want nil", h, err)
@@ -152,5 +153,15 @@ func TestPingValue(t *testing.T) {
 	}
 	if got := pingValue(netping.Result{ValueMS: 42, State: netping.StateValid}); got != 42 {
 		t.Errorf("valid = значение, got %d", got)
+	}
+}
+
+func TestFamilyMismatch(t *testing.T) {
+	_, err := parseConfig([]string{"--target", "2606:4700::1111", "--gw", "192.168.1.1"})
+	if err == nil || !strings.Contains(err.Error(), "IPv4 или оба IPv6") {
+		t.Errorf("смешение семейств: err = %v, want ошибка семейства", err)
+	}
+	if _, err := parseConfig([]string{"--target", "2606:4700::1111"}); err != nil {
+		t.Errorf("v6-таргет без gw: err = %v, want nil", err)
 	}
 }
