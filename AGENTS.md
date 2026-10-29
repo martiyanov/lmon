@@ -27,9 +27,29 @@
 go vet ./... && go test ./...     # проверка
 go build -o lmon .                # сборка
 ./lmon --cpu --swap -b 5          # быстрая проверка руками
-docker run --rm -v "$PWD":/src -w /src golang:1.22-alpine go test ./...
-                                  # прогон Linux-тестов с макa
+./scripts/test-all.sh             # полная локальная матрица (см. ниже)
 ```
+
+## Тесты и релизы без GitHub Actions
+
+GitHub Actions отключён за нехватой оплаченных минут (воркфлоу
+переименованы в `*.yml.disabled`; вернуть — переименовать обратно).
+
+Вместо CI — `scripts/test-all.sh`: gofmt/vet/test/-race на маке,
+vet+test в `golang:1.22-alpine` через colima (реальный Linux),
+кросс-сборка всех шести платформ. Единственное, что потеряли из
+прежнего CI, — запуск тестов на настоящей Windows (кросс-сборка остаётся).
+
+Релиз без Actions:
+1. `scripts/test-all.sh` — зелёное.
+2. Поднять `const version`, коммит, пуш, локальный тег `vX.Y.Z`.
+3. `goreleaser release --clean --skip=publish` (brew install goreleaser,
+   если нет) — артефакты в `dist/`.
+4. Владелец создаёт Release на GitHub и загружает файлы из `dist/`
+   через веб (имена вида lmon_<os>_<arch>.tar.gz / .zip и checksums.txt —
+   ссылки стабильны, README не устареет).
+5. `scripts/update-tap.sh vX.Y.Z` — как обычно (читает checksums из релиза).
+
 
 `go.mod` держит `go 1.22` — не поднимай без причины (совместимость).
 CGO всегда выключен (`CGO_ENABLED=0` в goreleaser).
