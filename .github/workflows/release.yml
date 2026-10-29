@@ -1,5 +1,9 @@
 name: Release
 
+# Публикация релиза: тесты на ubuntu (бесплатно для публичного репо),
+# затем goreleaser — он кросс-компилирует darwin/linux/windows сам,
+# macOS-раннер не нужен. macOS/Windows runtime-тесты — локально
+# (scripts/test-all.sh), CI их не запускает из-за биллинга.
 on:
   push:
     tags: ['v*']
@@ -8,14 +12,8 @@ permissions:
   contents: write
 
 jobs:
-  # Публикация возможна только после зелёных тестов того же коммита:
-  # раньше goreleaser запускался сразу по тегу и мог опубликовать сборки
-  # при красном CI.
   test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
