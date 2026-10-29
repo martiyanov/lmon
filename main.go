@@ -22,7 +22,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.5.0"
+const version = "1.5.1"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -411,7 +411,7 @@ var colRegistry = map[string]reading{
 	"G": {id: "G", head: " GW", green: 10, yellow: 50, red: 100},
 	"L": {id: "L", head: "AVG", green: 4, yellow: 8, red: 16},
 	"M": {id: "M", head: "MEM", green: 60, yellow: 85, red: 97},
-	"T": {id: "T", head: "TMP", green: 60, yellow: 75, red: 90, deg: true},
+	"T": {id: "T", head: " C°", green: 60, yellow: 75, red: 90, deg: true},
 	"C": {id: "C", head: "CPU", green: 50, yellow: 80, red: 100},
 	"I": {id: "I", head: "IOW", green: 5, yellow: 20, red: 50},
 	"S": {id: "S", head: "SWP", green: 30, yellow: 70, red: 100},
