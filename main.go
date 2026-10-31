@@ -544,8 +544,8 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	u.setup()
 	u.warnIfNarrow()
 
-	// тикер отсчитывает интервал от начала цикла, а не от конца:
-	// долгие измерения не накапливают задержку, потерянные тики пропускаются
+	// интервал — от строки к строке (nextTick): долгое измерение замедляет
+	// каденс, но «задолженные» тики не отдаются пачкой — каденс ровный
 	ticker := time.NewTicker(cfg.interval)
 	defer ticker.Stop()
 
@@ -569,11 +569,29 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		if cfg.iters > 0 && it >= cfg.iters {
 			return 0
 		}
-		select {
-		case <-ctx.Done():
+		if err := nextTick(ctx, ticker, cfg.interval); err != nil {
 			return 130
-		case <-ticker.C:
 		}
+	}
+}
+
+// nextTick перезапускает тикер после выведенной строки: интервал
+// отсчитывается от строки к строке. За долгое измерение (таймаут пинга)
+// тикер успевает натикать «задолженные» тики — без перезапуска они
+// отдаются сразу, и строки догоняют друг друга пачками.
+func nextTick(ctx context.Context, t *time.Ticker, d time.Duration) error {
+	t.Reset(d)
+	// Reset не выбрасывает тик, накопившийся в буфере канала за время
+	// долгого измерения (поймано тестом TestNextTickSpacing) — выкидываем сами
+	select {
+	case <-t.C:
+	default:
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
 	}
 }
 

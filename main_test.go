@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/martiyanov/lmon/internal/netping"
 )
@@ -88,6 +89,24 @@ func TestLang(t *testing.T) {
 	}
 	if !strings.Contains(helpTextFor("ru"), "Буквы колонок") {
 		t.Error("helpTextFor(ru): нет шпаргалки букв")
+	}
+}
+
+func TestNextTickSpacing(t *testing.T) {
+	// пока «измерение» спало, тикер натикал с запасом; nextTick обязан
+	// перезапустить интервал от текущего момента, а не вернуть накопленный
+	// тик мгновенно — иначе строки идут пачками
+	tk := time.NewTicker(100 * time.Millisecond)
+	defer tk.Stop()
+	time.Sleep(250 * time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	start := time.Now()
+	if err := nextTick(ctx, tk, 100*time.Millisecond); err != nil {
+		t.Fatalf("nextTick: %v", err)
+	}
+	if el := time.Since(start); el < 50*time.Millisecond {
+		t.Errorf("nextTick вернулся через %v — отдал накопленный тик, будет пачка строк", el)
 	}
 }
 
