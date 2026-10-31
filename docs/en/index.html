@@ -51,10 +51,10 @@
   .screen { font: 15px/1.55 var(--mono); padding: 14px 16px 16px; height: 262px;
             display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
   .row { white-space: pre; height: 1.55em; }
-  .cell { display: inline-block; width: 3ch; text-align: center; border-radius: 3px; color: #04120a; font-weight: 700; }
+  .cell { display: inline-block; width: 3ch; text-align: center; color: #04120a; font-weight: 700; }
   .gap { display: inline-block; width: 1ch; }
   .ribbon { white-space: pre; margin-top: 6px; }
-  .lbl { display: inline-block; width: 3ch; text-align: center; border-radius: 3px 3px 0 0; color: #04120a; font-weight: 800; }
+  .lbl { display: inline-block; width: 3ch; text-align: center; color: #04120a; font-weight: 800; }
   .hint { font: 13px var(--mono); color: var(--dim); margin-top: 10px; }
   .hint b { color: #9ea79f; font-weight: 600; }
   .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin: 0 2px 0 6px; }
@@ -162,142 +162,12 @@
 
 <script>
 // цвета — та же градация, что в lmon: зелёный → жёлтый → красный
-function ramp(s) { // квантуем в терминальную 256-цветную палитру, как настоящий lmon
+function ramp(s) { // цвета квантуются в терминальную 256-палитру, как в lmon
   s = Math.max(0, Math.min(1, s));
   var t = s * 511 | 0;
   var r = t < 256 ? t : 255, g = t < 256 ? 220 : 220 - (t - 256) * 180 / 255 | 0, b = t < 256 ? 0 : 40;
   var q = function (v) { return Math.round(v * 5 / 255) * 51; };
   return 'rgb(' + q(r) + ',' + q(g) + ',' + q(b) + ')';
-}
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--ink); font: 16px/1.65 -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 880px; margin: 0 auto; padding: 48px 20px 80px; }
-  h1 { font-size: 40px; letter-spacing: -0.5px; }
-  h1 .u { color: #2ea043; }
-  .tag { color: var(--dim); margin: 14px 0 8px; font-size: 18px; }
-  .os { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 34px; }
-  .os span { border: 1px solid #30363d; border-radius: 999px; padding: 3px 12px; font-size: 13px; color: var(--dim); }
-  section { margin: 44px 0; }
-  h2 { font-size: 22px; margin-bottom: 14px; }
-  p.lead { color: #b6bec8; max-width: 640px; }
-
-  /* — терминал — */
-  .term { background: #0a0e14; border: 1px solid #30363d; border-radius: 10px; overflow: hidden;
-          box-shadow: 0 12px 40px rgba(0,0,0,.45); }
-  .bar { display: flex; gap: 7px; padding: 10px 12px; background: #161b22; border-bottom: 1px solid #21262d; }
-  .bar i { width: 11px; height: 11px; border-radius: 50%; background: #30363d; }
-  .bar i:nth-child(1){background:#ff5f57}.bar i:nth-child(2){background:#febc2e}.bar i:nth-child(3){background:#28c840}
-  .bar span { margin-left: 10px; font: 12px var(--mono); color: var(--dim); align-self: center; }
-  .screen { font: 15px/1.55 var(--mono); padding: 14px 16px 16px; height: 262px;
-            display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
-  .row { white-space: pre; height: 1.55em; }
-  .cell { display: inline-block; width: 3ch; text-align: center; border-radius: 3px; color: #04120a; font-weight: 700; }
-  .gap { display: inline-block; width: 1ch; }
-  .ribbon { white-space: pre; margin-top: 6px; }
-  .lbl { display: inline-block; width: 3ch; text-align: center; border-radius: 3px 3px 0 0; color: #04120a; font-weight: 800; }
-  .hint { font: 13px var(--mono); color: var(--dim); margin-top: 10px; }
-  .hint b { color: #9ea79f; font-weight: 600; }
-  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin: 0 2px 0 6px; }
-
-  /* — фичи — */
-  .cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
-  .col { background: var(--panel); border: 1px solid #21262d; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
-  .col b { font: 700 13px var(--mono); padding: 1px 7px; border-radius: 4px; color: #04120a; }
-  .col span { color: #9aa4af; display: block; margin-top: 6px; }
-  code.inl { font: 0.92em var(--mono); background: #1b2129; border: 1px solid #262d36; border-radius: 5px; padding: 1px 6px; }
-
-  /* — установка — */
-  .install { border: 1px solid #21262d; border-radius: 10px; overflow: hidden; }
-  .tabs { display: flex; background: #12181f; border-bottom: 1px solid #21262d; }
-  .tabs button { background: none; border: 0; color: var(--dim); padding: 10px 16px; font: 600 13px sans-serif; cursor: pointer; border-bottom: 2px solid transparent; }
-  .tabs button.on { color: var(--ink); border-bottom-color: #2ea043; }
-  .cmds { padding: 14px 16px; display: none; }
-  .cmds.on { display: block; }
-  .cmd { display: flex; gap: 10px; align-items: center; background: #0a0e14; border: 1px solid #262d36; border-radius: 7px; padding: 9px 12px; margin: 8px 0; font: 13.5px var(--mono); }
-  .cmd .c { white-space: pre-wrap; word-break: break-all; }
-  .cmd button { margin-left: auto; background: #21262d; color: var(--ink); border: 0; border-radius: 5px; padding: 4px 9px; font: 600 11px sans-serif; cursor: pointer; flex-shrink: 0; }
-  .note { color: var(--dim); font-size: 13px; margin-top: 8px; }
-
-  .foot { color: var(--dim); font-size: 14px; border-top: 1px solid #21262d; padding-top: 22px; margin-top: 56px; }
-  .foot a { color: var(--link); text-decoration: none; }
-  a { color: var(--link); }
-</style>
-</head>
-<body>
-<main>
-  <h1>l<span class="u">mon</span></h1>
-  <p class="tag">One line per second tells you whether your machine is okay. Color instead of digits: green means calm, red means look.</p>
-  <p style="margin:0 0 10px"><a href="https://martiyanov.github.io/lmon/" style="font-size:14px">По-русски</a> · English</p>
-  <div class="os"><span>macOS</span><span>Linux</span><span>Windows 10+</span><span>single ~1 MB binary</span><span>MIT</span></div>
-
-  <div class="term" id="term">
-    <div class="bar"><i></i><i></i><i></i><span>lmon --hybrid --cpu</span></div>
-    <div class="screen" id="screen">
-      <div class="ribbon" id="ribbon"></div>
-    </div>
-  </div>
-  <div class="hint">
-    A live rendering of actual <b>lmon --hybrid</b> output: digits on the state-colored background,
-    with the header ribbon pinned to the bottom.<span class="swatch" style="background:#00c800"></span>green — fine
-    <span class="swatch" style="background:#d8d800"></span>yellow — attention<span class="swatch" style="background:#f03000"></span>red — bad
-  </div>
-
-  <section>
-    <h2>What it shows</h2>
-    <div class="cols" id="cols"></div>
-    <p class="lead" style="margin-top:14px">A dot <code class="inl">·</code> means the machine has no such sensor (honest, no made-up numbers),
-    <code class="inl">999</code> — the host is not answering. Any column set and order: <code class="inl">lmon --cols NRMC</code>.
-    There is also the colored-squares mode <code class="inl">-b</code> and digits on a colored background <code class="inl">--hybrid</code> (as in the demo above).</p>
-  </section>
-
-  <section>
-    <h2>Install</h2>
-    <div class="install">
-      <div class="tabs" id="tabs">
-        <button data-t="mac" class="on">macOS</button>
-        <button data-t="lnx">Linux</button>
-        <button data-t="win">Windows</button>
-        <button data-t="brew">Homebrew</button>
-        <button data-t="go">go install</button>
-      </div>
-      <div class="cmds on" data-c="mac">
-        <div class="cmd"><span class="c">curl -fsSL https://github.com/martiyanov/lmon/releases/latest/download/lmon_darwin_arm64.tar.gz | tar -xz</span><button>copy</button></div>
-        <div class="cmd"><span class="c">sudo mv lmon /usr/local/bin/</span><button>copy</button></div>
-        <p class="note">Intel Mac: use lmon_darwin_amd64.tar.gz. The sudo password is invisible while typing — that is normal.</p>
-      </div>
-      <div class="cmds" data-c="lnx">
-        <div class="cmd"><span class="c">curl -fsSLO https://github.com/martiyanov/lmon/releases/latest/download/lmon_amd64.deb && sudo dpkg -i lmon_amd64.deb</span><button>copy</button></div>
-        <p class="note">Fedora/RHEL: pick the .rpm from the releases page; other distros — the tar.gz like on macOS.</p>
-      </div>
-      <div class="cmds" data-c="win">
-        <div class="cmd"><span class="c">curl.exe -fsSL -o lmon.zip https://github.com/martiyanov/lmon/releases/latest/download/lmon_windows_amd64.zip</span><button>copy</button></div>
-        <div class="cmd"><span class="c">Expand-Archive lmon.zip; Move-Item lmon\lmon.exe "$env:LOCALAPPDATA\Microsoft\WindowsApps" -Force</span><button>copy</button></div>
-        <p class="note">SmartScreen will warn about an unknown program: "More info" → "Run anyway".</p>
-      </div>
-      <div class="cmds" data-c="brew">
-        <div class="cmd"><span class="c">brew install martiyanov/tap/lmon</span><button>copy</button></div>
-      </div>
-      <div class="cmds" data-c="go">
-        <div class="cmd"><span class="c">go install github.com/martiyanov/lmon@latest</span><button>copy</button></div>
-      </div>
-    </div>
-    <p class="note">Check it: <code class="inl">lmon 5</code> prints five lines and exits. Built-in reference: <code class="inl">lmon help</code>.</p>
-  </section>
-
-  <div class="foot">
-    Code and releases: <a href="https://github.com/martiyanov/lmon">github.com/martiyanov/lmon</a> ·
-    principles: <a href="https://github.com/martiyanov/lmon/blob/main/CONCEPT.md">легко, мало ресурсов, честно</a> ·
-    beginner-friendly install in Russian: <a href="https://github.com/martiyanov/lmon/blob/main/README.ru.md">README.ru</a>
-  </div>
-</main>
-
-<script>
-// цвета — та же градация, что в lmon: зелёный → жёлтый → красный
-function ramp(s) {
-  s = Math.max(0, Math.min(1, s));
-  var t = s * 511 | 0;
-  if (t < 256) return 'rgb(' + t + ',220,0)';
-  return 'rgb(255,' + (220 - (t - 256) * 180 / 255 | 0) + ',40)';
 }
 function severity(v, g, y, r) {
   if (v <= g) return 0;
