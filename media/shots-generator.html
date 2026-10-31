@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>lmon — кадры режимов</title>
+<style>
+  :root { --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { background: #0d1017; display: flex; align-items: center; justify-content: center;
+         font-family: var(--mono); }
+
+  .term { background: #0a0e14; border: 1px solid #30363d; border-radius: 10px;
+          overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,.45); }
+  .bar { display: flex; gap: 7px; padding: 10px 12px; background: #161b22;
+         border-bottom: 1px solid #21262d; }
+  .bar i { width: 11px; height: 11px; border-radius: 50%; }
+  .bar i:nth-child(1){background:#ff5f57}.bar i:nth-child(2){background:#febc2e}.bar i:nth-child(3){background:#28c840}
+  .bar span { margin-left: 10px; font: 13px var(--mono); color: #6e7681; align-self: center; }
+  .screen { font: 19px/1.55 var(--mono); padding: 14px 16px 16px;
+            display: flex; flex-direction: column; justify-content: flex-end; }
+  .row { white-space: pre; height: 1.55em; }
+  .cell { display: inline-block; width: 3ch; text-align: center; }
+  .ribbon { white-space: pre; margin-top: 6px; }
+  .lbl { display: inline-block; width: 3ch; text-align: center; font-weight: 700; color: #101418; }
+
+  /* цифровой режим: трёхступенчатый цвет текста, как ANSI 1;32 / 1;33 / 1;31 */
+  .d-grn { color: #37d16b; font-weight: 700; }
+  .d-yel { color: #f5c518; font-weight: 700; }
+  .d-red { color: #fa4d56; font-weight: 700; }
+  /* блочный режим: ███ цветом градиента, без цифр */
+  .b-blk { font-weight: 400; }
+  /* гибрид: цифры жирным тёмным на градиентной подложке */
+  .h-val { font-weight: 700; color: #101418; }
+</style>
+</head>
+<body>
+  <div class="term">
+    <div class="bar"><i></i><i></i><i></i><span id="title">lmon</span></div>
+    <div class="screen" id="screen">
+      <div class="ribbon" id="ribbon"></div>
+    </div>
+  </div>
+
+<script>
+function ramp(s) { // квантование в терминальную 256-палитру, как gradient256 в lmon
+  s = Math.max(0, Math.min(1, s));
+  var t = s * 511 | 0;
+  var r = t < 256 ? t : 255, g = t < 256 ? 220 : 220 - (t - 256) * 180 / 255 | 0, b = t < 256 ? 0 : 40;
+  var q = function (v) { return Math.round(v * 5 / 255) * 51; };
+  return [q(r), q(g), q(b)];
+}
+function rgb(s) { var c = ramp(s); return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; }
+function severity(v, g, y, r) {
+  if (v <= g) return 0;
+  if (v <= y) return 0.5 * (v - g) / (y - g);
+  if (v >= r) return 1;
+  return 0.5 + 0.5 * (v - y) / (r - y);
+}
+var COLS = [
+  { h: 'NET', g: 50, y: 150, r: 300 },
+  { h: 'GW',  g: 10, y: 50,  r: 100 },
+  { h: 'RUN', g: 4,  y: 8,   r: 16  },
+  { h: 'MEM', g: 60, y: 85,  r: 97  },
+  { h: 'C\u00B0', g: 60, y: 75, r: 90, deg: true },
+  { h: 'CPU', g: 50, y: 80, r: 100 }
+];
+// реальные значения lmon --hybrid --cpu, снятые на macOS 31.10.2026
+var DATA = [
+  [48,  4, 4, 70, 59, 24],
+  [47,  3, 4, 70, 59, 24],
+  [46,  4, 4, 69, 58, 27],
+  [48,  3, 4, 69, 58, 23],
+  [49, 18, 4, 70, 58, 38],
+  [79,  3, 4, 70, 59, 26],
+  [47,  3, 4, 70, 58, 27],
+  [50,  4, 4, 69, 59, 37],
+  [46,  4, 4, 73, 58, 25],
+  [49,  5, 4, 72, 58, 26],
+  [181,129,4, 72, 58, 31],
+  [54,  7, 4, 73, 58, 28],
+  [118, 66, 4, 72, 58, 33],
+  [46, 91, 4, 73, 58, 25]
+];
+var screen = document.getElementById('screen'), ribbon = document.getElementById('ribbon');
+
+function text(v, c) {
+  return c.deg && v < 100 ? '\u00A0' + v + '\u00B0' : String(v).padStart(3, '\u00A0');
+}
+function cls(v, c) {
+  return v <= c.g ? 'd-grn' : (v <= c.y ? 'd-yel' : 'd-red');
+}
+function draw(vals, mode) {
+  var row = document.createElement('div'); row.className = 'row';
+  COLS.forEach(function (c, i) {
+    var v = vals[i], sp = document.createElement('span');
+    var sev = severity(v, c.g, c.y, c.r);
+    if (mode === 'digits') {
+      sp.className = 'cell ' + cls(v, c);
+      sp.textContent = text(v, c);
+    } else if (mode === 'blocks') {
+      sp.className = 'cell b-blk';
+      sp.textContent = '\u2588\u2588\u2588';
+      sp.style.color = rgb(sev);
+    } else { // hybrid
+      sp.className = 'cell h-val';
+      sp.textContent = text(v, c);
+      sp.style.background = rgb(sev);
+    }
+    row.appendChild(sp);
+    row.appendChild(document.createTextNode(' '));
+  });
+  screen.insertBefore(row, ribbon);
+  ribbon.innerHTML = '';
+  COLS.forEach(function (c, i) {
+    var l = document.createElement('span'); l.className = 'lbl';
+    l.textContent = c.h === 'C\u00B0' ? '\u00A0C\u00B0' : c.h;
+    l.style.background = rgb(severity(vals[i], c.g, c.y, c.r));
+    ribbon.appendChild(l);
+    ribbon.appendChild(document.createTextNode(' '));
+  });
+}
+var mode = new URLSearchParams(location.search).get('mode') || (location.hash || '#hybrid').slice(1);
+var titles = { digits: 'lmon', blocks: 'lmon -b', hybrid: 'lmon --hybrid --cpu', corner: 'lmon --hybrid --cpu' };
+document.getElementById('title').textContent = titles[mode] || 'lmon';
+var n = mode === 'corner' ? 3 : 7;   // строк: виджет — компактно, режимы — с историей
+var off = mode === 'corner' ? 3 : 4; // у виджета — свежий «спокойный» кусок
+for (var k = 0; k < n; k++) draw(DATA[(off + k) % DATA.length], mode);
+if (mode === 'corner') {
+  document.querySelector('.term').style.width = '330px';
+  screen.style.fontSize = '18px';
+}
+</script>
+</body>
+</html>

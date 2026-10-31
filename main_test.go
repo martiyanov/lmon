@@ -165,3 +165,23 @@ func TestFamilyMismatch(t *testing.T) {
 		t.Errorf("v6-таргет без gw: err = %v, want nil", err)
 	}
 }
+
+func TestColsLetters(t *testing.T) {
+	// D — понятный алиас диска (историческая буква U); регистр не важен.
+	cfg, err := parseConfig([]string{"--cols", "n,d"})
+	if err != nil {
+		t.Fatalf("--cols n,d: err = %v", err)
+	}
+	if got := strings.Join(cfg.cols, ""); got != "NU" {
+		t.Errorf("--cols n,d = %q, want NU", got)
+	}
+	if _, err := parseConfig([]string{"--cols", "NX"}); err == nil || !strings.Contains(err.Error(), "неизвестная колонка") {
+		t.Errorf("--cols NX: err = %v, want ошибка с перечнем букв", err)
+	}
+	// в шпаргалке help перечислены все буквы реестра
+	for _, id := range []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "P", "H"} {
+		if !strings.Contains(helpText, "\n    "+id+" ") && !strings.Contains(helpText, id+" —") {
+			t.Errorf("help: буква %s не упомянута в шпаргалке", id)
+		}
+	}
+}

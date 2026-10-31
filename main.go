@@ -64,8 +64,17 @@ const helpText = `lmon ` + version + ` — минимальный монитор
 
 Набор колонок:
   --cols NG,CSB  — свой набор и порядок (каждая буква — колонка,
-                   разделители запятая/пробел/плюс; LMON_COLS).
-                   Флаги --cpu и др. добавляют колонки справа.
+                   разделители запятая/пробел/плюс, регистр не важен;
+                   LMON_COLS). Флаги --cpu и др. добавляют колонки справа.
+
+  Буквы колонок (все двенадцать):
+    N — сеть      G — шлюз       L — очередь CPU  M — память
+    T — t°C CPU   C — загрузка CPU (%)
+    I — iowait    S — swap       U — диск (можно D)  B — батарея
+    P — загрузка GPU (%)         H — t°GPU
+
+  Примеры: только сеть и память — lmon --cols NM
+           swap перед памятью  — lmon --cols N,SG,M
   --once         — одна строка значений без заголовка и без ANSI —
                    для tmux-статусбара и скриптов:
                    set -g status-right '#(lmon --once --cols=NGMC)'
@@ -244,12 +253,15 @@ func parseConfig(args []string) (config, error) {
 	if spec := *colsFlag; spec != "" {
 		seen := map[string]bool{}
 		for _, r := range strings.ToUpper(spec) {
-			id := string(r)
 			if r == ',' || r == ' ' || r == '+' {
 				continue
 			}
+			if r == 'D' { // D — понятная буква для диска, U — историческая
+				r = 'U'
+			}
+			id := string(r)
 			if _, ok := colRegistry[id]; !ok {
-				return config{}, fmt.Errorf("--cols: неизвестная колонка %q (есть: N G L M T C I S U B)", id)
+				return config{}, fmt.Errorf("--cols: неизвестная колонка %q (есть: N G L M T C I S U B P H)", id)
 			}
 			if seen[id] {
 				return config{}, fmt.Errorf("--cols: колонка %q указана дважды", id)
