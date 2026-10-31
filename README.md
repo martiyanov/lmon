@@ -2,8 +2,14 @@
 
 **English** · [По-русски / Russian](README.ru.md)
 
-A minimal one-line system monitor for your terminal. A stream of
-measurements with a header pinned to the bottom — ping to the internet, ping to your gateway,
+Ever want to just know your machine is okay — without opening a task
+manager or giving half your screen to graphs? lmon answers that with
+one line per second. Color carries the status: green means calm,
+red means look. You don't even need to read the numbers — a glance is
+enough, which is why the header ribbon is pinned to the bottom and
+painted with each column's current state.
+
+A stream of measurements — ping to the internet, ping to your gateway,
 load average, memory pressure and CPU temperature — colored green / yellow /
 red so you can spot trouble at a glance.
 
@@ -98,27 +104,46 @@ lmon --version          # version
 The base set is always shown; extra columns are enabled with flags:
 
 Column letters are used in `--cols`; headers are three letters wide and
-align exactly with the values:
+align exactly with the values. In plain words:
 
-| Id / header | Meaning | Flag | Green | Yellow | Red |
-|-------------|---------|------|-------|--------|-----|
-| `N` NET | ping to an external host (`--target`, default `8.8.8.8`), ms | — | ≤ 50 | ≤ 150 | > 150 |
-| `G` GW | ping to your gateway (`--gw`, auto-detected: `route`/`netstat`/`ipconfig` on macOS, `ip route`/`/proc/net/route` on Linux, `route print` on Windows), ms | — | ≤ 10 | ≤ 50 | > 50 |
-| `L` AVG | load average (integer part) | — | ≤ 4 | ≤ 8 | > 8 |
-| `M` MEM | used memory, % | — | ≤ 60 | ≤ 85 | > 85 |
-| `T` C° | CPU temperature, °C | — | ≤ 60 | ≤ 75 | > 75 |
-| `C` CPU | CPU usage, % | `--cpu` | ≤ 50 | ≤ 80 | > 80 |
-| `I` IOW | iowait, % (Linux only) | `--iowait` | ≤ 5 | ≤ 20 | > 20 |
-| `S` SWP | swap used, % | `--swap` | ≤ 30 | ≤ 70 | > 70 |
-| `U` DSK | system disk used, % | `--disk` | ≤ 80 | ≤ 90 | > 90 |
-| `B` BAT | battery charge, % (inverted: more is better) | `--batt` | ≥ 50 | ≥ 20 | < 20 |
-| `P` GPU | GPU utilization, % (macOS via `ioreg` no sudo, Linux via nvidia-smi/sysfs; `·` on Windows) | `--gpu` | ≤ 50 | ≤ 85 | > 85 |
-| `H` G° | GPU temperature, °C (Linux; `·` on macOS/Windows — needs admin there) | `--gputemp` | ≤ 60 | ≤ 80 | > 80 |
+- **NET** — how fast the internet answers (ping to 8.8.8.8), ms.
+- **GW** — how fast your router answers. Both NET and GW red — trouble at
+  home (Wi-Fi, router, cable); only NET red — trouble at the provider.
+- **RUN** — how many programs on average are queuing for the CPU (the
+  classic "load average"). Up to 4 is calm, more means the machine is
+  overloaded with work. Absent on Windows (shown as a dot).
+- **MEM** — used memory, %. Red MEM with a growing SWP — memory is short,
+  things start to slow down.
+- **C°** — CPU temperature. Above 80–90 °C it is overheating.
+- **CPU** — how busy the processor is right now, % (`--cpu`).
+- **IOW** — how much the CPU idles waiting for the disk (`--iowait`,
+  Linux only; high — the disk is the bottleneck).
+- **SWP** — swap in use (`--swap`; grows when memory runs out).
+- **DSK** — how full the system disk is (`--disk`; above 90% — time to clean).
+- **BAT** — battery charge (`--batt`; red below 20%).
+- **GPU** — how busy the video card is, % (`--gpu`).
+- **G°** — GPU temperature (`--gputemp`; not available without admin
+  rights on macOS/Windows — an honest dot).
 
-A dot `·` (or a dim block) means the reading genuinely does not exist on
-this machine — no `smctemp` on macOS, no load average on Windows, gateway
-not detected, `ping` missing. `999` means the host is unreachable, `+++`
-means the value overflowed the column.
+`999` — the host is not answering, `·` — no such sensor on this machine,
+`+++` — the value did not fit the column.
+
+Thresholds (green ≤ / yellow ≤ / red beyond):
+
+| Id | Green | Yellow | Red |
+|----|-------|--------|-----|
+| `N` NET | ≤ 50 ms | ≤ 150 ms | > 150 |
+| `G` GW | ≤ 10 ms | ≤ 50 ms | > 50 |
+| `L` RUN | ≤ 4 | ≤ 8 | > 8 |
+| `M` MEM | ≤ 60 | ≤ 85 | > 85 |
+| `T` C° | ≤ 60 | ≤ 75 | > 75 |
+| `C` CPU | ≤ 50 | ≤ 80 | > 80 |
+| `I` IOW | ≤ 5 | ≤ 20 | > 20 |
+| `S` SWP | ≤ 30 | ≤ 70 | > 70 |
+| `U` DSK | ≤ 80 | ≤ 90 | > 90 |
+| `B` BAT | ≥ 50 | ≥ 20 | < 20 |
+| `P` GPU | ≤ 50 | ≤ 85 | > 85 |
+| `H` G° | ≤ 60 | ≤ 80 | > 80 |
 
 ### Blocks mode
 
@@ -133,16 +158,16 @@ machine; `999` means the host is unreachable.
 
 ### Reading bad numbers
 
-- `N` and `G` red together — local problem: Wi-Fi, router, cable.
-  Only `N` red — the uplink or your provider.
-- `L` high while `C` is low — the system waits (disk, network, locks)
-  rather than computes; high `I` confirms it's the disk (Linux).
-- `M` red and `S` growing — out of memory, swapping started; everything
+- NET and GW red together — local problem: Wi-Fi, router, cable.
+  Only NET red — the uplink or your provider.
+- RUN high while CPU is low — the system waits (disk, network, locks)
+  rather than computes; high IOW confirms it's the disk (Linux).
+- MEM red and SWP growing — out of memory, swapping started; everything
   slows down.
-- `C` ≈ 100 for a long time — a process is eating the CPU; find it
+- CPU ≈ 100 for a long time — a process is eating the CPU; find it
   with `top`.
-- `T` > 80–90 °C — overheating/throttling: dust, fans, sustained load.
-- `U` > 90 — the disk is nearly full; the system misbehaves.
+- C° > 80–90 °C — overheating/throttling: dust, fans, sustained load.
+- DSK > 90 — the disk is nearly full; the system misbehaves.
 
 ### Options (flags and environment variables)
 
@@ -171,7 +196,12 @@ needs to wake up. Values settle after that.
 Ping runs through the system `ping` binary (flags adapted per OS), so no
 privileges are required. Load average comes from the kernel (`sysctl` on
 macOS, `/proc/loadavg` on Linux). Memory: `vm_stat` on macOS,
-`/proc/meminfo` on Linux. Colors respect `NO_COLOR`.
+`/proc/meminfo` on Linux. GPU: `ioreg` on macOS, `nvidia-smi`/sysfs on
+Linux. Colors respect `NO_COLOR`.
+
+## A beginner-friendly Russian README
+
+Установка и объяснения для тех, кому проще по-русски: [README.ru.md](README.ru.md).
 
 ## License
 

@@ -22,7 +22,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.7.0"
+const version = "1.7.1"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -39,7 +39,8 @@ const helpText = `lmon ` + version + ` — минимальный монитор
              автоматически: route/netstat/ipconfig на macOS, ip route и
              /proc/net/route на Linux, route print на Windows).
              Не определился — «·».
-  AVG (L)  — load average, целая часть. На Windows отсутствует («·»).
+  RUN (L)  — сколько программ в среднем ждёт процессора (классический
+             load average, целая часть). На Windows показателя нет («·»).
   MEM (M)  — занятая память, %.
   TMP (T)  — температура CPU, °C. На macOS нужен smctemp (без него «·»);
              на Linux читается из sysfs; на Windows нет датчика («·»).
@@ -71,7 +72,7 @@ const helpText = `lmon ` + version + ` — минимальный монитор
 
 Цвета: зелёный — норма, жёлтый — внимание, красный — плохо.
 Пороги (зелёный ≤ / жёлтый ≤ / дальше красный):
-  NET: 50/150 мс   GW: 10/50 мс    AVG: 4/8     MEM: 60/85
+  NET: 50/150 мс   GW: 10/50 мс    RUN: 4/8     MEM: 60/85
   TMP: 60/75       CPU: 50/80      IOW: 5/20    SWP: 30/70
   DSK: 80/90       BAT: наоборот — ≥50 зелёный, ≥20 жёлтый, ниже красный
 Значения крупнее 999 показываются как +++.
@@ -428,7 +429,7 @@ type reading struct {
 var colRegistry = map[string]reading{
 	"N": {id: "N", head: "NET", green: 50, yellow: 150, red: 300},
 	"G": {id: "G", head: " GW", green: 10, yellow: 50, red: 100},
-	"L": {id: "L", head: "AVG", green: 4, yellow: 8, red: 16},
+	"L": {id: "L", head: "RUN", green: 4, yellow: 8, red: 16},
 	"M": {id: "M", head: "MEM", green: 60, yellow: 85, red: 97},
 	"T": {id: "T", head: " C°", green: 60, yellow: 75, red: 90, deg: true},
 	"C": {id: "C", head: "CPU", green: 50, yellow: 80, red: 100},
