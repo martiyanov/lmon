@@ -1,6 +1,8 @@
 # lmon
 
-**English** · [По-русски / Russian](README.ru.md)
+**English** · [По-русски / Russian](README.ru.md) · [Website](https://martiyanov.github.io/lmon/)
+
+<p align="center"><a href="https://martiyanov.github.io/lmon/"><img src="docs/img/preview.svg" alt="lmon: rows of values on state-colored backgrounds with a pinned bottom header ribbon"></a></p>
 
 Ever want to just know your machine is okay — without opening a task
 manager or giving half your screen to graphs? lmon answers that with

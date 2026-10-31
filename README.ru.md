@@ -1,6 +1,8 @@
 # lmon — монитор компьютера в терминале
 
-**[English](README.md)** · Русский
+**[English](README.md)** · Русский · [Сайт с живой демкой](https://martiyanov.github.io/lmon/)
+
+<p align="center"><a href="https://martiyanov.github.io/lmon/"><img src="docs/img/preview.svg" alt="lmon: поток значений на цветных подложках и закреплённая снизу лента заголовка"></a></p>
 
 Хочется просто видеть, всё ли с компьютером в порядке — не открывая
 диспетчер задач и не отдавая полэкрана графикам. lmon показывает это
