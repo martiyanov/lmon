@@ -2,7 +2,13 @@
 
 **[English](README.md)** · Русский · [Сайт с живой демкой](https://martiyanov.github.io/lmon/)
 
-<p align="center"><a href="https://martiyanov.github.io/lmon/"><img src="docs/img/preview.svg" alt="lmon: поток значений на цветных подложках и закреплённая снизу лента заголовка"></a></p>
+<p align="center">
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-digits.png" width="640" alt="lmon: настоящий терминал, значения стекаются над закреплённой снизу цветной лентой заголовка"></a>
+</p>
+<p align="center"><sub>Настоящий терминал, <code>lmon --cols NGLMTCSUB</code>; режим <code>--hybrid</code> печатает цифры на цветной подложке:</sub></p>
+<p align="center">
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-hybrid.png" width="360" alt="lmon --hybrid: цифры на цветных подложках"></a>
+</p>
 
 Хочется просто видеть, всё ли с компьютером в порядке — не открывая
 диспетчер задач и не отдавая полэкрана графикам. lmon показывает это

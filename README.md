@@ -2,7 +2,13 @@
 
 **English** · [По-русски / Russian](README.ru.md) · [Website](https://martiyanov.github.io/lmon/)
 
-<p align="center"><a href="https://martiyanov.github.io/lmon/"><img src="docs/img/preview.svg" alt="lmon: rows of values on state-colored backgrounds with a pinned bottom header ribbon"></a></p>
+<p align="center">
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-digits.png" width="640" alt="lmon: a real terminal, values stream above the pinned colored header ribbon"></a>
+</p>
+<p align="center"><sub>Real terminal, <code>lmon --cols NGLMTCSUB</code>; the <code>--hybrid</code> mode prints the digits on the state-colored background:</sub></p>
+<p align="center">
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-hybrid.png" width="360" alt="lmon --hybrid: digits on state-colored backgrounds"></a>
+</p>
 
 Ever want to just know your machine is okay — without opening a task
 manager or giving half your screen to graphs? lmon answers that with
