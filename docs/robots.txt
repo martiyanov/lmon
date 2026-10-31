@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://martiyanov.github.io/lmon/sitemap.xml
