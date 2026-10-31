@@ -13,6 +13,7 @@ import (
 	"net/netip"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -35,7 +36,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   NET (N)  — пинг до внешнего хоста (--target / LMON_TARGET, по умолчанию
              8.8.8.8), мс. Поддерживается IPv6-литерал, в том числе
              link-local с зоной: fe80::1%en0. Качество канала до интернета.
-  GW  (G)  — пинг до шлюза (--gw / LMON_GW; по умолчанию определяется
+  GTW (G)  — пинг до шлюза (--gw / LMON_GW; по умолчанию определяется
              автоматически: route/netstat/ipconfig на macOS, ip route и
              /proc/net/route на Linux, route print на Windows).
              Не определился — «·».
@@ -81,13 +82,15 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
 
 Цвета: зелёный — норма, жёлтый — внимание, красный — плохо.
 Пороги (зелёный ≤ / жёлтый ≤ / дальше красный):
-  NET: 50/150 мс   GW: 10/50 мс    RUN: 4/8     MEM: 60/85
+  NET: 50/150 мс   GTW: 10/50 мс   RUN: по ядрам* MEM: 60/85
   TMP: 60/75       CPU: 50/80      IOW: 5/20    SWP: 30/70
   DSK: 80/90       BAT: наоборот — ≥50 зелёный, ≥20 жёлтый, ниже красный
 Значения крупнее 999 показываются как +++.
+* RUN: зелёный — пока очередь не длиннее числа ядер,
+  жёлтый — до двух ядер очереди, дальше красный.
 
 Диагностика: что значат плохие цифры
-  • NET и GW красные вместе — проблема локальная: Wi-Fi, роутер, кабель.
+  • NET и GTW красные вместе — проблема локальная: Wi-Fi, роутер, кабель.
     Только NET красный — внешний маршрут или провайдер.
   • AVG высокий, а CPU низкий — система не считает, а ждёт: диск, сеть,
     локи. Высокий IOW подтверждает: ждём диск (Linux).
@@ -108,6 +111,9 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
   lmon --cols TNGC   — свой набор и порядок колонок
+  lmon --thresholds NET=100/200/500
+                     — свои пороги цвета (например, для мобильного
+                       интернета); колонка=зелёный/жёлтый/красный
   lmon --once        — одна строка значений (tmux/скрипты)
   lmon help          — эта справка
   lmon --version     — версия
@@ -116,10 +122,13 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --target    LMON_TARGET     внешний хост: IPv4, DNS-имя или IPv6-литерал
   --gw        LMON_GW         шлюз (по умолчанию — автоопределение;
                               семейство адресов — как у --target)
-  --interval  LMON_INTERVAL   период обновления, сек (0 < x ≤ 3600).
+  --interval    LMON_INTERVAL     период обновления, сек (0 < x ≤ 3600).
                               При таймаутах пинга строка идёт реже:
                               строка = измерение + интервал; бюджет пинга
                               ограничен двумя интервалами
+  --thresholds  LMON_THRESHOLDS   свои пороги цвета: КОЛОНКА=з/ж/к через
+                              запятую, числа через / — NET=100/200/500,
+                              RUN=8/16/32; LMON_THRESHOLDS
 
 Примеры:
   lmon --target 1.1.1.1
@@ -148,7 +157,7 @@ Columns (letter in parentheses is for --cols):
   NET (N)  — ping to an external host (--target / LMON_TARGET, default
              8.8.8.8), ms. IPv6 literals supported, including link-local
              with a zone: fe80::1%en0. Overall internet link quality.
-  GW  (G)  — ping to the gateway (--gw / LMON_GW; auto-detected by
+  GTW (G)  — ping to the gateway (--gw / LMON_GW; auto-detected by
              default: route/netstat/ipconfig on macOS, ip route and
              /proc/net/route on Linux, route print on Windows).
              Not detected — «·».
@@ -191,13 +200,15 @@ Column set:
 
 Colors: green — normal, yellow — attention, red — bad.
 Thresholds (green ≤ / yellow ≤ / then red):
-  NET: 50/150 ms   GW: 10/50 ms    RUN: 4/8     MEM: 60/85
+  NET: 50/150 ms   GTW: 10/50 ms   RUN: per cores* MEM: 60/85
   TMP: 60/75       CPU: 50/80      IOW: 5/20    SWP: 30/70
   DSK: 80/90       BAT: inverted — ≥50 green, ≥20 yellow, below red
 Values above 999 are shown as +++.
+* RUN: green while the queue fits within the core count,
+  yellow up to twice the cores, red above that.
 
 Diagnostics: what bad numbers mean
-  • NET and GW both red — the problem is local: Wi-Fi, router, cable.
+  • NET and GTW both red — the problem is local: Wi-Fi, router, cable.
     Only NET red — the route or the ISP.
   • RUN high while CPU is low — the system is waiting, not computing:
     disk, network, locks. High IOW confirms: waiting on the disk (Linux).
@@ -218,6 +229,9 @@ Usage:
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
   lmon --cols TNGC   — your own set and order of columns
+  lmon --thresholds NET=100/200/500
+                     — your own color thresholds (e.g. for mobile
+                       internet); column=green/yellow/red
   lmon --once        — one line of values (tmux/scripts)
   lmon help          — this help
   lmon --version     — version
@@ -226,10 +240,14 @@ Settings (flags and environment variables):
   --target    LMON_TARGET     external host: IPv4, DNS name or IPv6 literal
   --gw        LMON_GW         gateway (auto-detected by default; the address
                               family must match --target)
-  --interval  LMON_INTERVAL   refresh period, seconds (0 < x ≤ 3600).
+  --interval    LMON_INTERVAL   refresh period, seconds (0 < x ≤ 3600).
                               On ping timeouts rows come slower:
                               a row = measurement + interval; the ping
                               budget is capped at two intervals
+  --thresholds  LMON_THRESHOLDS   your own color thresholds:
+                              COL=g/y/r, comma-separated groups, numbers
+                              slashed — NET=100/200/500, RUN=8/16/32;
+                              LMON_THRESHOLDS
 
 Examples:
   lmon --target 1.1.1.1
@@ -265,23 +283,24 @@ const (
 )
 
 type config struct {
-	target   string
-	gw       string
-	gwAuto   bool // шлюз определён автоматически — можно переопределить позже
-	interval time.Duration
-	iters    int
-	once     bool
-	blocks   bool
-	hybrid   bool
-	cpu      bool
-	iowait   bool
-	swap     bool
-	disk     bool
-	batt     bool
-	gpu      bool
-	gputemp  bool
-	cols     []string
-	lang     string // язык help и сообщений: "en" (умолчание) или "ru"
+	target     string
+	gw         string
+	gwAuto     bool // шлюз определён автоматически — можно переопределить позже
+	interval   time.Duration
+	iters      int
+	once       bool
+	blocks     bool
+	hybrid     bool
+	cpu        bool
+	iowait     bool
+	swap       bool
+	disk       bool
+	batt       bool
+	gpu        bool
+	gputemp    bool
+	cols       []string
+	lang       string            // язык help и сообщений: "en" (умолчание) или "ru"
+	thresholds map[string][3]int // --thresholds: пороги цвета по колонкам
 }
 
 func main() {
@@ -337,6 +356,7 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&gpu, "gpu", false, "add GPU utilization column")
 	fs.BoolVar(&gputemp, "gputemp", false, "add GPU temperature column")
 	colsFlag := fs.String("cols", os.Getenv("LMON_COLS"), "base column set and order, e.g. NG,CSB (flags add more)")
+	thrFlag := fs.String("thresholds", os.Getenv("LMON_THRESHOLDS"), "per-column color thresholds COL=green/yellow/red (e.g. NET=100/200/500)")
 	var once bool
 	fs.BoolVar(&once, "once", false, "print one line of values and exit (for tmux/status bars)")
 
@@ -412,13 +432,88 @@ func parseConfig(args []string) (config, error) {
 		}
 	}
 
+	// --thresholds / LMON_THRESHOLDS: свои пороги цвета, «NET=100,200,500».
+	// Для обычных колонок числа растут (зелёный < жёлтый < красный),
+	// для перевёрнутых (батарея) — убывают.
+	thr, err := parseThresholds(*thrFlag, lg)
+	if err != nil {
+		return config{}, err
+	}
+
 	d := time.Duration(*interval * float64(time.Second))
 	if d <= 0 {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
 		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt,
-		gpu: gpu, gputemp: gputemp, lang: lg}, nil
+		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr}, nil
+}
+
+// parseThresholds разбирает «NET=100,200,500,RUN=8,16,32»: колонка и три
+// порога — зелёный, жёлтый, красный. D принимается как алиас U (диск).
+func parseThresholds(spec, lang string) (map[string][3]int, error) {
+	none := map[string][3]int{}
+	if spec == "" {
+		return none, nil
+	}
+	thr := map[string][3]int{}
+	for _, part := range strings.Split(spec, ",") {
+		part = strings.TrimSpace(part)
+		eq := strings.SplitN(part, "=", 2)
+		if len(eq) != 2 {
+			return none, fmt.Errorf(lmsg(lang,
+				"--thresholds: expected COL=green,yellow,red, got %q",
+				"--thresholds: ожидается КОЛОНКА=зелёный,жёлтый,красный, получено %q"), part)
+		}
+		id := strings.ToUpper(strings.TrimSpace(eq[0]))
+		if id == "D" {
+			id = "U"
+		}
+		if _, ok := colRegistry[id]; !ok {
+			// можно и имя колонки (NET, GTW, RUN…), не только букву
+			for k, r := range colRegistry {
+				if strings.ToUpper(strings.TrimSpace(r.head)) == id {
+					id = k
+					break
+				}
+			}
+		}
+		base, ok := colRegistry[id]
+		if !ok {
+			return none, fmt.Errorf(lmsg(lang,
+				"--thresholds: unknown column %q (available: N G L M T C I S U B P H)",
+				"--thresholds: неизвестная колонка %q (есть: N G L M T C I S U B P H)"), eq[0])
+		}
+		var t [3]int
+		ns := strings.Split(eq[1], "/")
+		if len(ns) != 3 {
+			return none, fmt.Errorf(lmsg(lang,
+				"--thresholds: %s: expected three numbers green/yellow/red",
+				"--thresholds: %s: ожидается три числа через / — зелёный/жёлтый/красный"), id)
+		}
+		for i, sv := range ns {
+			n, err := strconv.Atoi(strings.TrimSpace(sv))
+			if err != nil || n < 0 {
+				return none, fmt.Errorf(lmsg(lang,
+					"--thresholds: %s: %q is not a non-negative number",
+					"--thresholds: %s: %q — не неотрицательное число"), id, sv)
+			}
+			t[i] = n
+		}
+		if base.invert {
+			if !(t[0] > t[1] && t[1] > t[2]) {
+				return none, fmt.Errorf(lmsg(lang,
+					"--thresholds: %s is inverted (battery): numbers must decrease",
+					"--thresholds: %s перевёрнута (батарея): числа должны убывать"), id)
+			}
+		} else if !(t[0] < t[1] && t[1] < t[2]) {
+			return none, fmt.Errorf(lmsg(lang,
+				"--thresholds: %s: numbers must increase (green < yellow < red)",
+				"--thresholds: %s: числа должны расти (зелёный < жёлтый < красный)"), id)
+		}
+		thr[id] = t
+	}
+	return thr, nil
 }
 
 // checkHost допускает IPv4-адрес или DNS-имя; остальное (пустая строка,
@@ -649,24 +744,23 @@ type reading struct {
 	head               string
 	v                  int
 	green, yellow, red int
-	deg                bool // приписать ° (температура)
 	invert             bool // больше — лучше (батарея)
 }
 
 // colRegistry — все известные колонки; ключ — однобуквенный id из --cols.
 var colRegistry = map[string]reading{
 	"N": {id: "N", head: "NET", green: 50, yellow: 150, red: 300},
-	"G": {id: "G", head: " GW", green: 10, yellow: 50, red: 100},
+	"G": {id: "G", head: "GTW", green: 10, yellow: 50, red: 100},
 	"L": {id: "L", head: "RUN", green: 4, yellow: 8, red: 16},
 	"M": {id: "M", head: "MEM", green: 60, yellow: 85, red: 97},
-	"T": {id: "T", head: " C°", green: 60, yellow: 75, red: 90, deg: true},
+	"T": {id: "T", head: " C°", green: 60, yellow: 75, red: 90},
 	"C": {id: "C", head: "CPU", green: 50, yellow: 80, red: 100},
 	"I": {id: "I", head: "IOW", green: 5, yellow: 20, red: 50},
 	"S": {id: "S", head: "SWP", green: 30, yellow: 70, red: 100},
 	"U": {id: "U", head: "DSK", green: 80, yellow: 90, red: 100},
 	"B": {id: "B", head: "BAT", green: 50, yellow: 20, red: 0, invert: true},
 	"P": {id: "P", head: "GPU", green: 50, yellow: 85, red: 100},
-	"H": {id: "H", head: " G°", green: 60, yellow: 80, red: 90, deg: true},
+	"H": {id: "H", head: " G°", green: 60, yellow: 80, red: 90},
 }
 
 // layout возвращает колонки в порядке вывода; значения заполнит sampleRow.
@@ -700,7 +794,31 @@ func layout(cfg config) []reading {
 	add("B", cfg.batt)
 	add("P", cfg.gpu)
 	add("H", cfg.gputemp)
+	applyThresholds(rs, runtime.NumCPU(), cfg.thresholds)
 	return rs
+}
+
+// applyThresholds подгоняет пороги цвета под конкретную машину и владельца:
+//   - RUN (load average) красится по числу ядер: load — это длина очереди,
+//     поэтому «все ядра заняты» — ещё норма (практика мониторинга:
+//     предупреждают при 0.7–1.0×ядер, критично при 1.5–2×ядер;
+//     мы берём зелёный ≤ ядер, жёлтый ≤ 2×ядер, красный выше);
+//   - явное --thresholds перекрывает любые умолчания, включая ядра.
+func applyThresholds(rs []reading, cores int, thr map[string][3]int) {
+	if cores < 1 {
+		cores = 1
+	}
+	for i := range rs {
+		if t, ok := thr[rs[i].id]; ok {
+			rs[i].green, rs[i].yellow, rs[i].red = t[0], t[1], t[2]
+			continue
+		}
+		if rs[i].id == "L" {
+			rs[i].green = cores
+			rs[i].yellow = 2 * cores
+			rs[i].red = 4 * cores
+		}
+	}
 }
 
 // severity нормирует значение в 0..1 (0 — зелёный, 1 — красный) для блоков.
@@ -979,10 +1097,8 @@ func valueText(r reading) string {
 	switch {
 	case r.v > 999: // слишком большое — индикатор переполнения, ширина сохраняется
 		return "+++"
-	case r.deg && r.v < 100:
-		return fmt.Sprintf("%2d°", r.v) // ровно 3 позиции; при ≥100 ° уже в заголовке
 	}
-	return fmt.Sprintf("%3d", r.v)
+	return fmt.Sprintf("%3d", r.v) // ° живёт в заголовке колонки, не в значениях
 }
 
 // digitCell — классическое цифровое представление с трёхступенчатым цветом.

@@ -30,10 +30,10 @@ colored by that column's current state, so the status line stays
 readable even in a 2-line window:
 
 ```
- 12   2   1  62  55°      ← values stream upward
- 11   2   1  63  55°
-118   3   1  63  56°      ← Wi-Fi hiccup, gateway is fine → it's the uplink
-NET  GW AVG MEM  C°       ← pinned header, label background = state color
+ 12   2   1  62  55       ← values stream upward
+ 11   2   1  63  55
+118   3   1  63  56       ← Wi-Fi hiccup, gateway is fine → it's the uplink
+NET  GTW RUN MEM  C°       ← pinned header, label background = state color
 ```
 
 Single static binary for **macOS**, **Linux** and **Windows 10+**
@@ -120,7 +120,7 @@ Column letters are used in `--cols`; headers are three letters wide and
 align exactly with the values. In plain words:
 
 - **NET** — how fast the internet answers (ping to 8.8.8.8), ms.
-- **GW** — how fast your router answers. Both NET and GW red — trouble at
+- **GTW** — how fast your router answers. Both NET and GTW red — trouble at
   home (Wi-Fi, router, cable); only NET red — trouble at the provider.
 - **RUN** — how many programs on average are queuing for the CPU (the
   classic "load average"). Up to 4 is calm, more means the machine is
@@ -146,8 +146,8 @@ Thresholds (green ≤ / yellow ≤ / red beyond):
 | Id | Green | Yellow | Red |
 |----|-------|--------|-----|
 | `N` NET | ≤ 50 ms | ≤ 150 ms | > 150 |
-| `G` GW | ≤ 10 ms | ≤ 50 ms | > 50 |
-| `L` RUN | ≤ 4 | ≤ 8 | > 8 |
+| `G` GTW | ≤ 10 ms | ≤ 50 ms | > 50 |
+| `L` RUN | ≤ cores | ≤ 2× cores | > 2× cores |
 | `M` MEM | ≤ 60 | ≤ 85 | > 85 |
 | `T` C° | ≤ 60 | ≤ 75 | > 75 |
 | `C` CPU | ≤ 50 | ≤ 80 | > 80 |
@@ -157,6 +157,10 @@ Thresholds (green ≤ / yellow ≤ / red beyond):
 | `B` BAT | ≥ 50 | ≥ 20 | < 20 |
 | `P` GPU | ≤ 50 | ≤ 85 | > 85 |
 | `H` G° | ≤ 60 | ≤ 80 | > 80 |
+
+RUN thresholds scale with the machine's core count (load average is a queue
+length: "all cores busy" is still green). Override any column with
+`--thresholds NET=100/200/500,RUN=8/16/32` — handy on mobile internet.
 
 ### Blocks mode
 
@@ -171,7 +175,7 @@ machine; `999` means the host is unreachable.
 
 ### Reading bad numbers
 
-- NET and GW red together — local problem: Wi-Fi, router, cable.
+- NET and GTW red together — local problem: Wi-Fi, router, cable.
   Only NET red — the uplink or your provider.
 - RUN high while CPU is low — the system waits (disk, network, locks)
   rather than computes; high IOW confirms it's the disk (Linux).

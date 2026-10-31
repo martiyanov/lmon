@@ -59,8 +59,8 @@ function severity(v, g, y, r) {
 }
 var COLS = [
   { h: 'NET', g: 50, y: 150, r: 300 },
-  { h: 'GW',  g: 10, y: 50,  r: 100 },
-  { h: 'RUN', g: 4,  y: 8,   r: 16  },
+  { h: 'GTW',  g: 10, y: 50,  r: 100 },
+  { h: 'RUN', g: 8,  y: 16,  r: 32  },
   { h: 'MEM', g: 60, y: 85,  r: 97  },
   { h: 'C\u00B0', g: 60, y: 75, r: 90, deg: true },
   { h: 'CPU', g: 50, y: 80, r: 100 }
@@ -85,7 +85,7 @@ var DATA = [
 var screen = document.getElementById('screen'), ribbon = document.getElementById('ribbon');
 
 function text(v, c) {
-  return c.deg && v < 100 ? '\u00A0' + v + '\u00B0' : String(v).padStart(3, '\u00A0');
+  return String(v).padStart(3, '\u00A0');
 }
 function cls(v, c) {
   return v <= c.g ? 'd-grn' : (v <= c.y ? 'd-yel' : 'd-red');

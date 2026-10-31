@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -92,6 +93,81 @@ func TestLang(t *testing.T) {
 	}
 }
 
+func TestBatchUI(t *testing.T) {
+	// GW стал трёхбуквенным GTW — лента ровная
+	var gtw string
+	for _, r := range layout(config{}) {
+		if r.id == "G" {
+			gtw = r.head
+		}
+	}
+	if gtw != "GTW" {
+		t.Errorf("head GW = %q, want GTW", gtw)
+	}
+
+	// значения температуры — без градуса, он в заголовке C°
+	if got := valueText(reading{v: 59}); got != " 59" {
+		t.Errorf("valueText(59) = %q, want \" 59\" без градуса", got)
+	}
+
+	// RUN красится по числу ядер: зелёный ≤ ядер, жёлтый ≤ 2×ядер
+	cores := runtime.NumCPU()
+	var l reading
+	for _, r := range layout(config{}) {
+		if r.id == "L" {
+			l = r
+		}
+	}
+	if l.green != cores || l.yellow != 2*cores || l.red != 4*cores {
+		t.Errorf("RUN thresholds = %d/%d/%d, want %d/%d/%d (по ядрам)",
+			l.green, l.yellow, l.red, cores, 2*cores, 4*cores)
+	}
+
+	// явные --thresholds перекрывают умолчания, включая ядра
+	// (карта ключуется id-буквой; имена NET/RUN парсер переводит в буквы)
+	thr := map[string][3]int{"L": {3, 6, 12}, "N": {100, 200, 500}}
+	rs := []reading{colRegistry["L"], colRegistry["N"]}
+	applyThresholds(rs, 8, thr)
+	if rs[0].green != 3 || rs[0].yellow != 6 || rs[0].red != 12 {
+		t.Errorf("пороги L после --thresholds = %d/%d/%d, want 3/6/12", rs[0].green, rs[0].yellow, rs[0].red)
+	}
+	if rs[1].green != 100 || rs[1].yellow != 200 || rs[1].red != 500 {
+		t.Errorf("пороги NET после --thresholds = %d/%d/%d, want 100/200/500", rs[1].green, rs[1].yellow, rs[1].red)
+	}
+}
+
+func TestParseThresholds(t *testing.T) {
+	thr, err := parseThresholds("NET=100/200/500,d=90/95/99", "en")
+	if err != nil {
+		t.Fatalf("parseThresholds: %v", err)
+	}
+	if thr["N"] != [3]int{100, 200, 500} { // имена переводятся в буквы
+		t.Errorf("NET = %v (по ключу N)", thr["N"])
+	}
+	if _, ok := thr["U"]; !ok { // D — алиас диска
+		t.Error("алиас D не сработал")
+	}
+	if _, err := parseThresholds("NET=100,200", "en"); err == nil {
+		t.Error("запятая внутри группы: want ошибка (числа через /)")
+	}
+	if _, err := parseThresholds("NET=300/200/100", "en"); err == nil {
+		t.Error("убывающие числа: want ошибка")
+	}
+	if _, err := parseThresholds("BAT=60/80/90", "en"); err == nil {
+		t.Error("батарея перевёрнута: растущие числа — ошибка")
+	}
+	if _, err := parseThresholds("XX=1/2/3", "en"); err == nil {
+		t.Error("неизвестная колонка: want ошибка")
+	}
+	cfg, err := parseConfig([]string{"--thresholds", "RUN=2/4/8"})
+	if err != nil {
+		t.Fatalf("parseConfig --thresholds: %v", err)
+	}
+	if cfg.thresholds["L"] != [3]int{2, 4, 8} {
+		t.Errorf("cfg.thresholds = %v (по ключу L)", cfg.thresholds)
+	}
+}
+
 func TestPingBudget(t *testing.T) {
 	cases := []struct {
 		interval time.Duration
@@ -160,13 +236,13 @@ func TestLayoutAdditiveCols(t *testing.T) {
 func TestDigitCellWidth(t *testing.T) {
 	u := &ui{color: false}
 	cases := map[int]string{
-		9:    " 9°",
-		75:   "75°",
+		9:    "  9",
+		75:   " 75",
 		100:  "100",
 		1500: "+++",
 	}
 	for v, want := range cases {
-		if got := u.digitCell(reading{id: "T", head: "T°", deg: true, v: v}); got != want {
+		if got := u.digitCell(reading{id: "T", head: " C°", v: v}); got != want {
 			t.Errorf("digitCell(T,%d) = %q, want %q", v, got, want)
 		}
 	}

@@ -193,8 +193,8 @@ function severity(v, g, y, r) {
 // колонки демо: подпись, пороги, реалистичный генератор значения
 var COLS = [
   { h: 'NET', gen: function () { return Math.random() < .08 ? 110 + Math.random() * 200 | 0 : 42 + Math.random() * 14 | 0; }, g: 50, y: 150, r: 300 },
-  { h: 'GW',  gen: function () { return 2 + Math.random() * 4 | 0; }, g: 10, y: 50, r: 100 },
-  { h: 'RUN', gen: function () { return 2 + Math.random() * 3 | 0; }, g: 4, y: 8, r: 16 },
+  { h: 'GTW',  gen: function () { return 2 + Math.random() * 4 | 0; }, g: 10, y: 50, r: 100 },
+  { h: 'RUN', gen: function () { return 2 + Math.random() * 3 | 0; }, g: 8, y: 16, r: 32 },
   { h: 'MEM', gen: function () { return 68 + Math.random() * 6 | 0; }, g: 60, y: 85, r: 97 },
   { h: 'C\u00B0', gen: function () { return 54 + Math.random() * 10 | 0; }, g: 60, y: 75, r: 90, deg: true },
   { h: 'CPU', gen: function () { return Math.random() < .06 ? 92 : 18 + Math.random() * 22 | 0; }, g: 50, y: 80, r: 100 }
@@ -207,7 +207,7 @@ function tick() {
   COLS.forEach(function (c, i) {
     var sp = document.createElement('span'); sp.className = 'cell';
     var v = vals[i];
-    sp.textContent = v > 999 ? '+++' : (c.deg && v < 100 ? '\u00A0' + v + '\u00B0' : String(v).padStart(3, '\u00A0'));
+    sp.textContent = v > 999 ? '+++' : String(v).padStart(3, '\u00A0');
     sp.style.background = ramp(severity(v, c.g, c.y, c.r));
     row.appendChild(sp);
     row.appendChild(document.createTextNode(' '));
