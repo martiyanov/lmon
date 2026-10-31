@@ -122,6 +122,9 @@ means the value overflowed the column.
 
 ### Blocks mode
 
+`lmon --hybrid` combines both: exact digits printed on the state-colored
+background (the bottom ribbon look, but in the data stream).
+
 `lmon -b` (`--blocks`) replaces digits with colored squares `███` —
 one per column, with a continuous green → yellow → red gradient along
 each column's scale. You read the status with peripheral vision instead
@@ -149,6 +152,7 @@ machine; `999` means the host is unreachable.
 | `--gw` | `LMON_GW` | auto-detect | your gateway |
 | `--interval` | `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
 | `-b`, `--blocks` | — | off | color blocks instead of digits |
+| `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order, one letter each (e.g. `NG,CSB`); flags add more |
 | `--once` | — | off | print one plain line of values and exit (tmux status bar) |
 | `--cpu` `--iowait` `--swap` `--disk` `--batt` `--gpu` `--gputemp` | — | off | add extra columns |

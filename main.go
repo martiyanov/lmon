@@ -22,7 +22,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.6.0"
+const version = "1.7.0"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -53,10 +53,13 @@ const helpText = `lmon ` + version + ` — минимальный монитор
    G° (H)  — температура GPU, °C (--gputemp; Linux — nvidia-smi/hwmon,
              macOS/Windows — «·», датчика без прав администратора нет).
 
-Режим квадратов:
-  -b, --blocks — вместо цифр цветные квадраты ███, градация цвета
-  от зелёного через жёлтый к красному по шкале каждой колонки.
-  Статус видно боковым зрением. Тусклый квадрат — датчика нет.
+Режимы отображения:
+  -b, --blocks  — вместо цифр цветные квадраты ███, градация цвета
+                  от зелёного через жёлтый к красному по шкале каждой
+                  колонки. Статус видно боковым зрением. Тусклый
+                  квадрат — датчика нет.
+  --hybrid      — смешанный режим: точные цифры на подложке цвета
+                  состояния (как нижняя лента, но в потоке данных).
 
 Набор колонок:
   --cols NG,CSB  — свой набор и порядок (каждая буква — колонка,
@@ -90,6 +93,7 @@ const helpText = `lmon ` + version + ` — минимальный монитор
   lmon               — бесконечно, примерно раз в секунду
   lmon 20            — 20 строк и выход
   lmon -b            — режим цветных квадратов
+  lmon --hybrid      — цифры на цветной подложке
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
   lmon --cols TNGC   — свой набор и порядок колонок
@@ -132,6 +136,7 @@ type config struct {
 	iters    int
 	once     bool
 	blocks   bool
+	hybrid   bool
 	cpu      bool
 	iowait   bool
 	swap     bool
@@ -176,9 +181,13 @@ func parseConfig(args []string) (config, error) {
 	target := fs.String("target", envStr("LMON_TARGET", "8.8.8.8"), "external host")
 	gw := fs.String("gw", envStr("LMON_GW", ""), "gateway (auto-detected by default)")
 	interval := fs.Float64("interval", envFloat("LMON_INTERVAL", 1), "seconds between lines")
-	var blocks bool
+	var blocks, hybrid bool
 	fs.BoolVar(&blocks, "blocks", false, "colored blocks instead of digits")
 	fs.BoolVar(&blocks, "b", false, "shorthand for --blocks")
+	fs.BoolVar(&hybrid, "hybrid", false, "digits on the state-colored background")
+	if blocks && hybrid {
+		return config{}, errors.New("--blocks и --hybrid взаимоисключающи")
+	}
 	var cpu, iowait, swap, disk, batt, gpu, gputemp bool
 	fs.BoolVar(&cpu, "cpu", false, "add CPU usage column")
 	fs.BoolVar(&iowait, "iowait", false, "add iowait column (Linux only)")
@@ -257,7 +266,7 @@ func parseConfig(args []string) (config, error) {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
-		blocks: blocks, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt,
+		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt,
 		gpu: gpu, gputemp: gputemp}, nil
 }
 
@@ -337,7 +346,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	defer termRestore()
 
 	tty := stdoutIsTTY()
-	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks}
+	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid}
 	u.head, u.sep = headerOf(cols)
 
 	defer u.restore()
@@ -569,9 +578,12 @@ func measure(ctx context.Context, cfg config) []reading {
 func (u *ui) dataRow(rs []reading) string {
 	cells := make([]string, len(rs))
 	for j, r := range rs {
-		if u.blocks && u.color {
+		switch {
+		case u.hybrid && u.color: // цифры на подложке цвета состояния
+			cells[j] = u.hybridCell(r)
+		case u.blocks && u.color:
 			cells[j] = u.blockCell(r)
-		} else {
+		default:
 			cells[j] = u.digitCell(r)
 		}
 	}
@@ -607,6 +619,7 @@ type ui struct {
 	tty    bool
 	color  bool
 	blocks bool
+	hybrid bool
 	rows   int
 	head   string
 	sep    string
@@ -636,10 +649,25 @@ func (u *ui) warnIfNarrow() {
 
 func (u *ui) maybeResize() {
 	if u.tty {
-		if r := termRows(); r != u.rows {
-			u.redraw(r)
+		// -1 = размер неизвестен (ошибка ioctl) — не трогаем экран,
+		// иначе фейковое «24» вызывало полную перерисовку и мелькание
+		if r := termRows(); r > 0 && r != u.rows {
+			u.resize(r)
 		}
 	}
+}
+
+// resize меняет область и перекрашивает заголовок БЕЗ очистки экрана:
+// содержимое остаётся, никакой вспышки.
+func (u *ui) resize(rows int) {
+	if rows < 2 {
+		rows = 2
+	}
+	fmt.Fprint(u.w, "\x1b[r") // сброс прежней области прокрутки
+	fmt.Fprintf(u.w, "\x1b[1;%dr", rows-1)
+	u.paintHeader(rows)
+	fmt.Fprintf(u.w, "\x1b[%d;1H", rows-1)
+	u.rows = rows
 }
 
 func (u *ui) redraw(rows int) {
@@ -710,27 +738,29 @@ func (u *ui) restore() {
 	}
 }
 
-// digitCell — классическое цифровое представление с трёхступенчатым цветом.
-func (u *ui) digitCell(r reading) string {
+// valueText — текст значения фиксированной ширины 3 (без цвета).
+func valueText(r reading) string {
 	if r.v < 0 { // датчика нет
-		s := fmt.Sprintf("%3s", "·")
-		if u.color {
-			return dim + s + reset
-		}
-		return s
+		return fmt.Sprintf("%3s", "·")
 	}
-	var s string
 	switch {
 	case r.v > 999: // слишком большое — индикатор переполнения, ширина сохраняется
-		s = "+++"
-	case r.deg && r.v >= 0 && r.v < 100:
-		s = fmt.Sprintf("%2d°", r.v) // ровно 3 позиции; при ≥100 ° уже в заголовке
-	default:
-		s = fmt.Sprintf("%3d", r.v)
+		return "+++"
+	case r.deg && r.v < 100:
+		return fmt.Sprintf("%2d°", r.v) // ровно 3 позиции; при ≥100 ° уже в заголовке
 	}
+	return fmt.Sprintf("%3d", r.v)
+}
+
+// digitCell — классическое цифровое представление с трёхступенчатым цветом.
+func (u *ui) digitCell(r reading) string {
 	if !u.color {
-		return s
+		return valueText(r)
 	}
+	if r.v < 0 {
+		return dim + valueText(r) + reset
+	}
+	s := valueText(r)
 	var c string
 	if r.invert {
 		switch {
@@ -754,13 +784,22 @@ func (u *ui) digitCell(r reading) string {
 	return c + s + reset
 }
 
-// blockCell — квадрат-индикатор с непрерывной градацией цвета.
+// blockCell — квадрат-индикатор с непррерывной градацией цвета.
 // В блочном режиме градусы не приписываются: цвет несёт весь смысл.
 func (u *ui) blockCell(r reading) string {
 	if r.v < 0 { // датчика нет
 		return dim + "███" + reset
 	}
 	return "\x1b[38;5;" + gradient256(r.severity()) + "m███" + reset
+}
+
+// hybridCell — смешанный режим: точные цифры на подложке цвета состояния
+// (как нижняя лента заголовка, но в потоке данных).
+func (u *ui) hybridCell(r reading) string {
+	if r.v < 0 {
+		return dim + valueText(r) + reset
+	}
+	return "\x1b[1;30;48;5;" + gradient256(r.severity()) + "m" + valueText(r) + reset
 }
 
 func stdoutIsTTY() bool {

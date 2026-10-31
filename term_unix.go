@@ -8,10 +8,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func termRows() int {
+func termRows() int { // -1: размер неизвестен
 	ws, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
 	if err != nil || ws.Row == 0 {
-		return 24
+		return -1
 	}
 	return int(ws.Row)
 }

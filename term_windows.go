@@ -8,14 +8,14 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func termRows() int {
+func termRows() int { // -1: размер неизвестен
 	var csbi windows.ConsoleScreenBufferInfo
 	if err := windows.GetConsoleScreenBufferInfo(windows.Handle(os.Stdout.Fd()), &csbi); err != nil {
-		return 24
+		return -1
 	}
 	rows := int(csbi.Window.Bottom - csbi.Window.Top + 1)
 	if rows < 1 {
-		return 24
+		return -1
 	}
 	return rows
 }
