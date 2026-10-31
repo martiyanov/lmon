@@ -92,6 +92,23 @@ func TestLang(t *testing.T) {
 	}
 }
 
+func TestPingBudget(t *testing.T) {
+	cases := []struct {
+		interval time.Duration
+		want     time.Duration
+	}{
+		{500 * time.Millisecond, 1500 * time.Millisecond}, // минимум 1.5с
+		{time.Second, 2 * time.Second},                    // два интервала
+		{2 * time.Second, 4 * time.Second},                // максимум 4с
+		{10 * time.Second, 4 * time.Second},               // дальше не растёт
+	}
+	for _, c := range cases {
+		if got := pingBudget(c.interval); got != c.want {
+			t.Errorf("pingBudget(%v) = %v, want %v", c.interval, got, c.want)
+		}
+	}
+}
+
 func TestNextTickSpacing(t *testing.T) {
 	// пока «измерение» спало, тикер натикал с запасом; nextTick обязан
 	// перезапустить интервал от текущего момента, а не вернуть накопленный

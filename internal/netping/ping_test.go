@@ -3,6 +3,7 @@ package netping
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 const macPingOut = `PING 8.8.8.8 (8.8.8.8): 56 data bytes
@@ -100,5 +101,15 @@ func TestIsV6(t *testing.T) {
 		if isV6(h) {
 			t.Errorf("isV6(%q) = true, want false", h)
 		}
+	}
+}
+
+func TestRetryAllowed(t *testing.T) {
+	// ретрай разрешён, только когда в бюджете есть ~1с на ещё один таймаут
+	if !retryAllowed(1050*time.Millisecond, 2050*time.Millisecond) {
+		t.Error("retryAllowed(1.05с, 2.05с) = false, want true")
+	}
+	if retryAllowed(1050*time.Millisecond, 2*time.Second) {
+		t.Error("retryAllowed(1.05с, 2с) = true, want false — ретрай не уложится")
 	}
 }

@@ -102,6 +102,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
 Использование:
   lmon               — бесконечно, примерно раз в секунду
   lmon 20            — 20 строк и выход
+  lmon --interval 5  — период обновления 5 секунд (по умолчанию 1)
   lmon -b            — режим цветных квадратов
   lmon --hybrid      — цифры на цветной подложке
   lmon --cpu --swap  — добавить колонки CPU и swap
@@ -115,7 +116,10 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --target    LMON_TARGET     внешний хост: IPv4, DNS-имя или IPv6-литерал
   --gw        LMON_GW         шлюз (по умолчанию — автоопределение;
                               семейство адресов — как у --target)
-  --interval  LMON_INTERVAL   пауза между циклами, сек (0 < x ≤ 3600)
+  --interval  LMON_INTERVAL   период обновления, сек (0 < x ≤ 3600).
+                              При таймаутах пинга строка идёт реже:
+                              строка = измерение + интервал; бюджет пинга
+                              ограничен двумя интервалами
 
 Примеры:
   lmon --target 1.1.1.1
@@ -208,6 +212,7 @@ Diagnostics: what bad numbers mean
 Usage:
   lmon               — forever, about once per second
   lmon 20            — 20 lines, then exit
+  lmon --interval 5  — refresh period of 5 seconds (default 1)
   lmon -b            — colored blocks mode
   lmon --hybrid      — digits on the state-colored background
   lmon --cpu --swap  — add CPU and swap columns
@@ -221,7 +226,10 @@ Settings (flags and environment variables):
   --target    LMON_TARGET     external host: IPv4, DNS name or IPv6 literal
   --gw        LMON_GW         gateway (auto-detected by default; the address
                               family must match --target)
-  --interval  LMON_INTERVAL   pause between cycles, seconds (0 < x ≤ 3600)
+  --interval  LMON_INTERVAL   refresh period, seconds (0 < x ≤ 3600).
+                              On ping timeouts rows come slower:
+                              a row = measurement + interval; the ping
+                              budget is capped at two intervals
 
 Examples:
   lmon --target 1.1.1.1
@@ -595,6 +603,18 @@ func nextTick(ctx context.Context, t *time.Ticker, d time.Duration) error {
 	}
 }
 
+// pingBudget ограничивает одно измерение пинга в зависимости от периода
+// обновления: удвоенный интервал, но не меньше 1.5с и не больше 4с
+// (4с — внешний предел exec-контекста в netping). При --interval 5
+// и больше ограничение фактически не действует.
+func pingBudget(interval time.Duration) time.Duration {
+	b := 2 * interval
+	if b < 1500*time.Millisecond {
+		b = 1500 * time.Millisecond
+	}
+	return min(b, 4*time.Second)
+}
+
 // pingValue переводит состояние измерения в значение колонки:
 // valid — задержка, unreachable — 999, unavailable — «·» (-1).
 func pingValue(r netping.Result) int {
@@ -718,18 +738,21 @@ func measure(ctx context.Context, cfg config) []reading {
 
 	// Медленные измерения — параллельно, каждый со своим каналом,
 	// чтобы значения не перепутались, а цикл не длился сумму задержек.
+	// Бюджет пинга привязан к периоду обновления: при коротком интервале
+	// мёртвый хост быстрее помечается 999, строка не ждёт полных таймаутов.
+	budget := pingBudget(cfg.interval)
 	vals := make(map[string]int, len(rs))
 	var netCh, gwCh chan netping.Result
 	if need("N") {
 		netCh = make(chan netping.Result, 1)
-		go func() { netCh <- netping.Latency(ctx, cfg.target) }()
+		go func() { netCh <- netping.Latency(ctx, cfg.target, budget) }()
 	}
 	if need("G") {
 		if cfg.gw == "" { // шлюз не определился — датчика нет
 			vals["G"] = -1
 		} else {
 			gwCh = make(chan netping.Result, 1)
-			go func() { gwCh <- netping.Latency(ctx, cfg.gw) }()
+			go func() { gwCh <- netping.Latency(ctx, cfg.gw, budget) }()
 		}
 	}
 	var cpuCh chan int

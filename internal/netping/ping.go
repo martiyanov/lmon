@@ -41,15 +41,21 @@ var timeRe = regexp.MustCompile(`(?:time|время)[=<]([0-9]+(?:[.,][0-9]+)?)`
 // целого). Отправляются два пакета: первый часто только «будит» Wi-Fi-радио,
 // поэтому честной задержкой считается последний ответ. Если оба пакета
 // потеряны (частая история — ICMP rate-limit), делается один ретрай
-// одиночным пакетом.
-func Latency(ctx context.Context, host string) Result {
+// одиночным пакетом. budget ограничивает всё измерение (0 — умолчание 3с,
+// максимум 4с): ретрай запускается, только если укладывается в бюджет —
+// при коротком периоде обновления строка не ждёт два полных таймаута.
+func Latency(ctx context.Context, host string, budget time.Duration) Result {
+	if budget <= 0 {
+		budget = 3 * time.Second
+	}
+	budget = min(budget, 4*time.Second)
 	goos := runtime.GOOS
 	primary, fallback := pingCmds(goos, host, "2")
 	start := time.Now()
 	if r := ping(ctx, primary, fallback); r.State != StateUnreachable {
 		return r
 	}
-	if time.Since(start) > 3*time.Second {
+	if !retryAllowed(time.Since(start), budget) {
 		return Result{State: StateUnreachable}
 	}
 	select {
@@ -57,10 +63,14 @@ func Latency(ctx context.Context, host string) Result {
 		return Result{State: StateUnavailable}
 	case <-time.After(300 * time.Millisecond):
 	}
-	// ретрай одиночным пакетом — только если бюджет измерения
-	// ещё позволяет, чтобы строка не ждала два полных таймаута
 	retry, retryAlt := pingCmds(goos, host, "1")
 	return ping(ctx, retry, retryAlt)
+}
+
+// retryAllowed: ретрай одиночным пакетом стоит ~1с ожидания таймаута —
+// запускаем его, только если бюджет измерения это позволяет.
+func retryAllowed(elapsed, budget time.Duration) bool {
+	return elapsed+time.Second <= budget
 }
 
 func ping(parent context.Context, argv, fallback []string) Result {
