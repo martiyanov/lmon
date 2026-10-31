@@ -107,7 +107,8 @@ lmon                    # run forever, one line per second
 lmon 20                 # print 20 lines and exit
 lmon -b                 # color blocks instead of digits
 lmon --cpu --swap       # add extra columns
-lmon help               # built-in reference (Russian)
+lmon help               # built-in reference (English; Russian via --lang ru
+                        # or automatically on a Russian locale)
 lmon --version          # version
 ```
 

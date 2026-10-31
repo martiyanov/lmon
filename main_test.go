@@ -14,7 +14,7 @@ func TestCheckHost(t *testing.T) {
 	ok := []string{"8.8.8.8", "1.1.1.1", "example.com", "my-host.example.org", "192.168.1.1",
 		"2606:4700:4700::1111", "fe80::1%en0", "::1"}
 	for _, h := range ok {
-		if err := checkHost(h); err != nil {
+		if err := checkHost(h, "en"); err != nil {
 			t.Errorf("checkHost(%q) = %v, want nil", h, err)
 		}
 	}
@@ -26,9 +26,68 @@ func TestCheckHost(t *testing.T) {
 		"h\x01":    "управляющий",
 	}
 	for h, why := range bad {
-		if err := checkHost(h); err == nil {
+		if err := checkHost(h, "en"); err == nil {
 			t.Errorf("checkHost(%q) = nil, want error (%s)", h, why)
 		}
+	}
+	// сообщения локализуются
+	if err := checkHost("", "ru"); err == nil || !strings.Contains(err.Error(), "пустое значение") {
+		t.Errorf("checkHost ru: err = %v, want русское сообщение", err)
+	}
+	if err := checkHost("", "en"); err == nil || !strings.Contains(err.Error(), "empty value") {
+		t.Errorf("checkHost en: err = %v, want english message", err)
+	}
+}
+
+func TestLang(t *testing.T) {
+	// автоопределение по локали: LC_ALL важнее LANG
+	t.Setenv("LC_ALL", "")
+	t.Setenv("LC_MESSAGES", "")
+	t.Setenv("LANG", "ru_RU.UTF-8")
+	if got := langAuto(); got != "ru" {
+		t.Errorf("langAuto(ru_RU) = %q, want ru", got)
+	}
+	t.Setenv("LANG", "en_US.UTF-8")
+	if got := langAuto(); got != "en" {
+		t.Errorf("langAuto(en_US) = %q, want en", got)
+	}
+	t.Setenv("LC_ALL", "ru_RU.UTF-8")
+	t.Setenv("LANG", "en_US.UTF-8")
+	if got := langAuto(); got != "ru" {
+		t.Errorf("langAuto(LC_ALL=ru) = %q, want ru", got)
+	}
+
+	// --lang перекрывает локаль;help и ошибки соответствуют языку
+	t.Setenv("LC_ALL", "en_US.UTF-8")
+	_, err := parseConfig([]string{"--lang", "ru", "--target", "2606:4700::1111", "--gw", "192.168.1.1"})
+	if err == nil || !strings.Contains(err.Error(), "IPv4 или оба IPv6") {
+		t.Errorf("--lang ru: err = %v, want русская ошибка", err)
+	}
+	cfg, err := parseConfig([]string{"--lang", "ru"})
+	if err != nil {
+		t.Fatalf("--lang ru (валидный): err = %v", err)
+	}
+	if cfg.lang != "ru" {
+		t.Errorf("cfg.lang = %q, want ru", cfg.lang)
+	}
+	if _, err := parseConfig([]string{"--target", "2606:4700::1111", "--gw", "192.168.1.1"}); err == nil ||
+		!strings.Contains(err.Error(), "both IPv4 or both IPv6") {
+		t.Errorf("en по локали: err = %v, want english error", err)
+	}
+	if _, err := parseConfig([]string{"--lang", "xx"}); err == nil || !strings.Contains(err.Error(), "en or ru") {
+		t.Errorf("--lang xx: err = %v, want ошибка языка", err)
+	}
+	if _, err := parseConfig([]string{"-b", "--hybrid"}); err == nil ||
+		!strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("-b --hybrid: err = %v, want взаимоисключение", err)
+	}
+
+	// справки на месте у обоих языков
+	if !strings.Contains(helpTextFor("en"), "Column letters") {
+		t.Error("helpTextFor(en): нет шпаргалки букв")
+	}
+	if !strings.Contains(helpTextFor("ru"), "Буквы колонок") {
+		t.Error("helpTextFor(ru): нет шпаргалки букв")
 	}
 }
 
@@ -157,7 +216,7 @@ func TestPingValue(t *testing.T) {
 }
 
 func TestFamilyMismatch(t *testing.T) {
-	_, err := parseConfig([]string{"--target", "2606:4700::1111", "--gw", "192.168.1.1"})
+	_, err := parseConfig([]string{"--lang", "ru", "--target", "2606:4700::1111", "--gw", "192.168.1.1"})
 	if err == nil || !strings.Contains(err.Error(), "IPv4 или оба IPv6") {
 		t.Errorf("смешение семейств: err = %v, want ошибка семейства", err)
 	}
@@ -175,12 +234,12 @@ func TestColsLetters(t *testing.T) {
 	if got := strings.Join(cfg.cols, ""); got != "NU" {
 		t.Errorf("--cols n,d = %q, want NU", got)
 	}
-	if _, err := parseConfig([]string{"--cols", "NX"}); err == nil || !strings.Contains(err.Error(), "неизвестная колонка") {
+	if _, err := parseConfig([]string{"--cols", "NX"}); err == nil || !strings.Contains(err.Error(), "unknown column") {
 		t.Errorf("--cols NX: err = %v, want ошибка с перечнем букв", err)
 	}
-	// в шпаргалке help перечислены все буквы реестра
+	// в шпаргалке help перечислены все буквы реестра — в обоих языках
 	for _, id := range []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "P", "H"} {
-		if !strings.Contains(helpText, "\n    "+id+" ") && !strings.Contains(helpText, id+" —") {
+		if !strings.Contains(helpTextRu, id+" —") || !strings.Contains(helpTextEn, id+" —") {
 			t.Errorf("help: буква %s не упомянута в шпаргалке", id)
 		}
 	}

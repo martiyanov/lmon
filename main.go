@@ -24,7 +24,7 @@ import (
 
 const version = "1.7.2"
 
-const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
+const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
 Заголовок закреплён внизу окна, значения стекаются над ним.
 Подписи колонок залиты цветом текущего состояния — статус читается
@@ -34,7 +34,7 @@ const helpText = `lmon ` + version + ` — минимальный монитор
 Колонки (в скобках — буква для --cols):
   NET (N)  — пинг до внешнего хоста (--target / LMON_TARGET, по умолчанию
              8.8.8.8), мс. Поддерживается IPv6-литерал, в том числе
-             link-local с зоной: fe80::1%%en0. Качество канала до интернета.
+             link-local с зоной: fe80::1%en0. Качество канала до интернета.
   GW  (G)  — пинг до шлюза (--gw / LMON_GW; по умолчанию определяется
              автоматически: route/netstat/ipconfig на macOS, ip route и
              /proc/net/route на Linux, route print на Windows).
@@ -128,7 +128,125 @@ const helpText = `lmon ` + version + ` — минимальный монитор
 Пинг выполняется системной утилитой ping (нет утилиты — «·»).
 Интервал отсчитывается от начала цикла, поэтому долгие измерения
 не накапливают задержку.
+
+Язык сообщений: lmon --lang ru|en — иначе автоматически по локали
+(LANG/LC_ALL). Эта справка: lmon --lang ru help.
 `
+
+const helpTextEn = `lmon ` + version + ` — a minimal network and system load monitor.
+
+The header ribbon is pinned to the bottom of the window; values stream
+above it. Header cells carry the color of the current state, so the
+status is readable at a glance even in a 2-line window. On resize the
+number of lines adapts; the header stays in place.
+
+Columns (letter in parentheses is for --cols):
+  NET (N)  — ping to an external host (--target / LMON_TARGET, default
+             8.8.8.8), ms. IPv6 literals supported, including link-local
+             with a zone: fe80::1%en0. Overall internet link quality.
+  GW  (G)  — ping to the gateway (--gw / LMON_GW; auto-detected by
+             default: route/netstat/ipconfig on macOS, ip route and
+             /proc/net/route on Linux, route print on Windows).
+             Not detected — «·».
+  RUN (L)  — average number of programs waiting for the CPU (the classic
+             load average, integer part). Not available on Windows («·»).
+  MEM (M)  — memory in use, %.
+  TMP (T)  — CPU temperature, °C. On macOS requires smctemp (otherwise «·»);
+             on Linux read from sysfs; on Windows there is no sensor («·»).
+  CPU (C)  — CPU usage, % (--cpu).
+  IOW (I)  — CPU iowait, % (--iowait; Linux only, otherwise «·»).
+  SWP (S)  — swap in use, % (--swap; «·» on Windows).
+  DSK (U)  — root disk usage, % (--disk).
+  BAT (B)  — battery charge, % (--batt; inverted scale: less is worse).
+  GPU (P)  — GPU utilization, % (--gpu; on macOS via ioreg without sudo,
+             on Linux via nvidia-smi or sysfs, on Windows — «·»).
+   G° (H)  — GPU temperature, °C (--gputemp; on Linux via nvidia-smi/hwmon,
+             macOS/Windows — «·», no sensor without admin rights).
+
+Display modes:
+  -b, --blocks  — colored blocks ███ instead of digits; color grades from
+                  green through yellow to red along each column's scale.
+                  Status is visible with peripheral vision. A dim block
+                  means no sensor.
+  --hybrid      — mixed mode: exact digits on the state-colored background
+                  (like the bottom ribbon, but in the data stream).
+
+Column set:
+  --cols NG,CSB  — your own set and order (each letter is a column;
+                   separators comma/space/plus, case-insensitive;
+                   LMON_COLS). Flags like --cpu add columns on the right.
+
+  Column letters (all twelve):
+    N — network   G — gateway    L — CPU queue  M — memory
+    T — CPU °C    C — CPU usage (%)
+    I — iowait    S — swap       U — disk (D works too)  B — battery
+    P — GPU usage (%)            H — GPU °C
+
+  Examples: network and memory only — lmon --cols NM
+            swap before memory    — lmon --cols N,SG,M
+
+Colors: green — normal, yellow — attention, red — bad.
+Thresholds (green ≤ / yellow ≤ / then red):
+  NET: 50/150 ms   GW: 10/50 ms    RUN: 4/8     MEM: 60/85
+  TMP: 60/75       CPU: 50/80      IOW: 5/20    SWP: 30/70
+  DSK: 80/90       BAT: inverted — ≥50 green, ≥20 yellow, below red
+Values above 999 are shown as +++.
+
+Diagnostics: what bad numbers mean
+  • NET and GW both red — the problem is local: Wi-Fi, router, cable.
+    Only NET red — the route or the ISP.
+  • RUN high while CPU is low — the system is waiting, not computing:
+    disk, network, locks. High IOW confirms: waiting on the disk (Linux).
+  • MEM red and SWP growing — memory is exhausted, everything went to
+    swap and will get slow. Close memory hogs or add RAM.
+  • CPU ≈ 100 for a long time — a process is eating the CPU; top will
+    name the culprit.
+  • TMP > 80–90 — overheating/throttling: clogged fans, dust,
+    or a sustained peak load.
+  • DSK > 90 — the disk is running out of space; things start to break.
+
+Usage:
+  lmon               — forever, about once per second
+  lmon 20            — 20 lines, then exit
+  lmon -b            — colored blocks mode
+  lmon --hybrid      — digits on the state-colored background
+  lmon --cpu --swap  — add CPU and swap columns
+  lmon --gpu         — add the GPU utilization column
+  lmon --cols TNGC   — your own set and order of columns
+  lmon --once        — one line of values (tmux/scripts)
+  lmon help          — this help
+  lmon --version     — version
+
+Settings (flags and environment variables):
+  --target    LMON_TARGET     external host: IPv4, DNS name or IPv6 literal
+  --gw        LMON_GW         gateway (auto-detected by default; the address
+                              family must match --target)
+  --interval  LMON_INTERVAL   pause between cycles, seconds (0 < x ≤ 3600)
+
+Examples:
+  lmon --target 1.1.1.1
+  lmon -b --cpu --batt 30
+  LMON_COLS=NGMC lmon --once
+
+The first line after start may be inflated: the Wi-Fi radio is waking
+up. Values settle after that.
+
+Ping uses the system ping utility (no utility — «·»).
+The interval is counted from the start of the cycle, so slow
+measurements do not accumulate delay.
+
+Message language: lmon --lang en|ru — otherwise detected automatically
+from the locale (LANG/LC_ALL). This help: lmon --lang en help.
+`
+
+// helpTextFor выбирает справку по языку сообщений (en — международный
+// по умолчанию, ru — русский).
+func helpTextFor(lang string) string {
+	if lang == "ru" {
+		return helpTextRu
+	}
+	return helpTextEn
+}
 
 const (
 	reset = "\x1b[0m"
@@ -155,6 +273,7 @@ type config struct {
 	gpu      bool
 	gputemp  bool
 	cols     []string
+	lang     string // язык help и сообщений: "en" (умолчание) или "ru"
 }
 
 func main() {
@@ -162,10 +281,14 @@ func main() {
 }
 
 func run(args []string, w io.Writer) int {
-	if len(args) > 0 {
-		switch args[0] {
+	// help/version ловим в любом месте аргументов: и «help», и «--lang ru help»
+	for _, a := range args {
+		switch a {
 		case "help", "-h", "--help":
-			io.WriteString(w, helpText) // не fmt: в тексте есть %en0, vet примет за формат-директиву
+			// язык справки: токен ru/en среди аргументов (--lang ru help,
+			// help ru), иначе — автоопределение по локали
+			lang := langFromArgs(args)
+			io.WriteString(w, helpTextFor(lang)) // не fmt: в тексте есть %en0, vet примет за формат-директиву
 			return 0
 		case "--version":
 			fmt.Fprintf(w, "lmon %s\n", version)
@@ -175,7 +298,8 @@ func run(args []string, w io.Writer) int {
 
 	cfg, err := parseConfig(args)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "lmon: %v (см. lmon help)\n", err)
+		fmt.Fprintf(os.Stderr, "lmon: %v %s\n", err,
+			lmsg(langFromArgs(args), "(see lmon help)", "(см. lmon help)"))
 		return 2
 	}
 
@@ -195,9 +319,7 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&blocks, "blocks", false, "colored blocks instead of digits")
 	fs.BoolVar(&blocks, "b", false, "shorthand for --blocks")
 	fs.BoolVar(&hybrid, "hybrid", false, "digits on the state-colored background")
-	if blocks && hybrid {
-		return config{}, errors.New("--blocks и --hybrid взаимоисключающи")
-	}
+	lang := fs.String("lang", langAuto(), "message language: en or ru")
 	var cpu, iowait, swap, disk, batt, gpu, gputemp bool
 	fs.BoolVar(&cpu, "cpu", false, "add CPU usage column")
 	fs.BoolVar(&iowait, "iowait", false, "add iowait column (Linux only)")
@@ -214,22 +336,30 @@ func parseConfig(args []string) (config, error) {
 		return config{}, err
 	}
 
+	lg := *lang
+	if lg != "en" && lg != "ru" {
+		return config{}, fmt.Errorf(lmsg(lg, "--lang=%q: expected en or ru", "--lang=%q: ожидается en или ru"), lg)
+	}
+	if blocks && hybrid {
+		return config{}, errors.New(lmsg(lg, "--blocks and --hybrid are mutually exclusive", "--blocks и --hybrid взаимоисключающи"))
+	}
+
 	var iters int
 	if fs.NArg() > 1 {
-		return config{}, errors.New("ожидается не более одного позиционного аргумента (число строк)")
+		return config{}, errors.New(lmsg(lg, "expected at most one positional argument (line count)", "ожидается не более одного позиционного аргумента (число строк)"))
 	}
 	if fs.NArg() == 1 {
 		n, err := strconv.Atoi(fs.Arg(0))
 		if err != nil || n < 0 {
-			return config{}, fmt.Errorf("аргумент %q: ожидается число строк", fs.Arg(0))
+			return config{}, fmt.Errorf(lmsg(lg, "argument %q: expected a line count", "аргумент %q: ожидается число строк"), fs.Arg(0))
 		}
 		iters = n
 	}
 
 	if math.IsNaN(*interval) || math.IsInf(*interval, 0) || *interval <= 0 || *interval > 3600 {
-		return config{}, fmt.Errorf("--interval=%v: нужно число секунд в (0; 3600]", *interval)
+		return config{}, fmt.Errorf(lmsg(lg, "--interval=%v: expected seconds in (0; 3600]", "--interval=%v: нужно число секунд в (0; 3600]"), *interval)
 	}
-	if err := checkHost(*target); err != nil {
+	if err := checkHost(*target, lg); err != nil {
 		return config{}, fmt.Errorf("--target: %w", err)
 	}
 
@@ -238,12 +368,12 @@ func parseConfig(args []string) (config, error) {
 	gwHost := *gw
 	gwAuto := gwHost == ""
 	if !gwAuto {
-		if err := checkHost(gwHost); err != nil {
+		if err := checkHost(gwHost, lg); err != nil {
 			return config{}, fmt.Errorf("--gw: %w", err)
 		}
 		// NET и GW работают в одном семействе адресов
 		if isV6(*target) != isV6(gwHost) {
-			return config{}, errors.New("--target и --gw должны быть оба IPv4 или оба IPv6")
+			return config{}, errors.New(lmsg(lg, "--target and --gw must be both IPv4 or both IPv6", "--target и --gw должны быть оба IPv4 или оба IPv6"))
 		}
 	}
 
@@ -261,16 +391,16 @@ func parseConfig(args []string) (config, error) {
 			}
 			id := string(r)
 			if _, ok := colRegistry[id]; !ok {
-				return config{}, fmt.Errorf("--cols: неизвестная колонка %q (есть: N G L M T C I S U B P H)", id)
+				return config{}, fmt.Errorf(lmsg(lg, "--cols: unknown column %q (available: N G L M T C I S U B P H)", "--cols: неизвестная колонка %q (есть: N G L M T C I S U B P H)"), id)
 			}
 			if seen[id] {
-				return config{}, fmt.Errorf("--cols: колонка %q указана дважды", id)
+				return config{}, fmt.Errorf(lmsg(lg, "--cols: column %q listed twice", "--cols: колонка %q указана дважды"), id)
 			}
 			seen[id] = true
 			cols = append(cols, id)
 		}
 		if len(cols) == 0 {
-			return config{}, errors.New("--cols: пустой набор колонок")
+			return config{}, errors.New(lmsg(lg, "--cols: empty column set", "--cols: пустой набор колонок"))
 		}
 	}
 
@@ -280,25 +410,25 @@ func parseConfig(args []string) (config, error) {
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
 		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt,
-		gpu: gpu, gputemp: gputemp}, nil
+		gpu: gpu, gputemp: gputemp, lang: lg}, nil
 }
 
 // checkHost допускает IPv4-адрес или DNS-имя; остальное (пустая строка,
 // аргумент, начинающийся с «-», пробелы, управляющие символы) — ошибка:
 // значение попадает в argv системного ping.
-func checkHost(h string) error {
+func checkHost(h, lang string) error {
 	if h == "" {
-		return errors.New("пустое значение")
+		return errors.New(lmsg(lang, "empty value", "пустое значение"))
 	}
 	if strings.HasPrefix(h, "-") {
-		return fmt.Errorf("%q начинается с дефиса", h)
+		return fmt.Errorf(lmsg(lang, "%q starts with a hyphen", "%q начинается с дефиса"), h)
 	}
 	if ip, err := netip.ParseAddr(h); err == nil {
 		switch {
 		case ip.Is4():
 			return nil
 		case ip.Is4In6():
-			return errors.New("IPv4-mapped IPv6 не поддерживается — укажи обычный IPv4")
+			return errors.New(lmsg(lang, "IPv4-mapped IPv6 is not supported — use a plain IPv4", "IPv4-mapped IPv6 не поддерживается — укажи обычный IPv4"))
 		}
 		return nil // IPv6-литерал, в том числе с зоной: fe80::1%en0
 	}
@@ -307,10 +437,58 @@ func checkHost(h string) error {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
 		case r == '.' || r == '-' || r == '_':
 		default:
-			return fmt.Errorf("недопустимый символ %q", r)
+			return fmt.Errorf(lmsg(lang, "invalid character %q", "недопустимый символ %q"), r)
 		}
 	}
 	return nil
+}
+
+// langAuto определяет язык сообщений по локали пользователя
+// (LC_ALL → LC_MESSAGES → LANG): начинается с "ru" — русский,
+// иначе английский.
+func langAuto() string {
+	for _, k := range []string{"LC_ALL", "LC_MESSAGES", "LANG"} {
+		if v := os.Getenv(k); v != "" {
+			if strings.HasPrefix(strings.ToLower(v), "ru") {
+				return "ru"
+			}
+			return "en"
+		}
+	}
+	return "en"
+}
+
+// lmsg выбирает сообщение по языку: en — международное умолчание, ru — русское.
+func lmsg(lang, en, ru string) string {
+	if lang == "ru" {
+		return ru
+	}
+	return en
+}
+
+// langFromArgs ищет язык до разбора флагов: --lang=en | --lang en | голый
+// токен ru/en («help ru»), чтобы help и сообщения об ошибках звучали
+// на выбранном пользователем языке.
+func langFromArgs(args []string) string {
+	bare := ""
+	for i, a := range args {
+		v := strings.TrimLeft(a, "-")
+		if eq := strings.TrimPrefix(v, "lang="); eq != v {
+			if eq == "ru" || eq == "en" {
+				return eq
+			}
+		}
+		if v == "lang" && i+1 < len(args) && (args[i+1] == "ru" || args[i+1] == "en") {
+			return args[i+1]
+		}
+		if (a == "ru" || a == "en") && bare == "" {
+			bare = a
+		}
+	}
+	if bare != "" {
+		return bare
+	}
+	return langAuto()
 }
 
 func isV6(host string) bool {
@@ -359,7 +537,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	defer termRestore()
 
 	tty := stdoutIsTTY()
-	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid}
+	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid, lang: cfg.lang}
 	u.head, u.sep = headerOf(cols)
 
 	defer u.restore()
@@ -633,6 +811,7 @@ type ui struct {
 	color  bool
 	blocks bool
 	hybrid bool
+	lang   string
 	rows   int
 	head   string
 	sep    string
@@ -656,7 +835,7 @@ func (u *ui) warnIfNarrow() {
 		return
 	}
 	if cols := termCols(); cols > 0 && len([]rune(u.head)) > cols {
-		fmt.Fprintln(os.Stderr, "lmon: терминал уже набора колонок — строки будут переноситься")
+		fmt.Fprintln(os.Stderr, "lmon: "+lmsg(u.lang, "terminal is narrower than the column set — lines will wrap", "терминал уже набора колонок — строки будут переноситься"))
 	}
 }
 

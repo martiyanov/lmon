@@ -84,7 +84,8 @@ Debian/Ubuntu: `curl -fsSLO .../lmon_amd64.deb && sudo dpkg -i lmon_amd64.deb`
 
 ```sh
 lmon 5      # пять строк и выход — значит, работает
-lmon help   # вся справка, по-русски
+lmon help   # вся справка: при русской локали — по-русски,
+            # иначе lmon --lang ru help (или lmon help ru)
 ```
 
 ## Что означают колонки
