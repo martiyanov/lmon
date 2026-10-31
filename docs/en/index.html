@@ -14,7 +14,7 @@
 <meta property="og:url" content="https://martiyanov.github.io/lmon/">
 <meta property="og:title" content="lmon — a one-line system monitor for your terminal">
 <meta property="og:description" content="One line per second: ping, memory, CPU and GPU temperatures — as color. macOS, Linux, Windows.">
-<meta property="og:image" content="https://martiyanov.github.io/lmon/img/screenshot-hybrid.png">
+<meta property="og:image" content="https://martiyanov.github.io/lmon/img/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"lmon",
@@ -103,11 +103,26 @@
   </div>
 
   <section>
-    <h2>How it really looks</h2>
-    <p class="lead">Screenshots of a real terminal: the plain mode and <code class="inl">--hybrid</code>.</p>
+    <h2>How it looks</h2>
+    <p class="lead">Three display modes — plus a compact corner widget.
+    Values are real, captured by <code class="inl">lmon</code> on macOS.</p>
     <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
-      <img src="../img/screenshot-digits.png" width="420" style="border-radius:8px;border:1px solid #30363d" alt="lmon в терминале">
-      <img src="../img/screenshot-hybrid.png" width="230" style="border-radius:8px;border:1px solid #30363d" alt="lmon --hybrid в терминале">
+      <figure style="margin:0;text-align:center">
+        <img src="../img/screenshot-digits.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon: numbers colored by state">
+        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon</b> — numbers</figcaption>
+      </figure>
+      <figure style="margin:0;text-align:center">
+        <img src="../img/screenshot-blocks.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon -b: colored blocks without numbers">
+        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon -b</b> — color only</figcaption>
+      </figure>
+      <figure style="margin:0;text-align:center">
+        <img src="../img/screenshot-hybrid.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --hybrid: numbers on colored background">
+        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --hybrid</b> — numbers on color</figcaption>
+      </figure>
+      <figure style="margin:0;text-align:center">
+        <img src="../img/screenshot-corner.png" width="330" style="border-radius:8px;border:1px solid #30363d" alt="compact lmon window sized to the indicators">
+        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px">window shrunk to the indicators — tucked into a corner</figcaption>
+      </figure>
     </div>
   </section>
 

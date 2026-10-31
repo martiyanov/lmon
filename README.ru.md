@@ -3,11 +3,15 @@
 **[English](README.md)** · Русский · [Сайт с живой демкой](https://martiyanov.github.io/lmon/)
 
 <p align="center">
-  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-digits.png" width="640" alt="lmon: настоящий терминал, значения стекаются над закреплённой снизу цветной лентой заголовка"></a>
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-digits.png" width="340" alt="lmon: цифры цветом состояния над закреплённой снизу цветной лентой"></a>
+  &nbsp;
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-blocks.png" width="340" alt="lmon -b: цветные квадраты без цифр"></a>
+  &nbsp;
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-hybrid.png" width="340" alt="lmon --hybrid: цифры на цветной подложке"></a>
 </p>
-<p align="center"><sub>Настоящий терминал, <code>lmon --cols NGLMTCSUB</code>; режим <code>--hybrid</code> печатает цифры на цветной подложке:</sub></p>
+<p align="center"><sub>Три режима — цифры, цветные квадраты (<code>-b</code>) и гибрид (<code>--hybrid</code>); значения настоящие, снятые на macOS. Окно можно ужать до ширины индикаторов:</sub></p>
 <p align="center">
-  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-hybrid.png" width="360" alt="lmon --hybrid: цифры на цветных подложках"></a>
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-corner.png" width="330" alt="компактное окно lmon по ширине индикаторов, в углу экрана"></a>
 </p>
 
 Хочется просто видеть, всё ли с компьютером в порядке — не открывая

@@ -3,11 +3,15 @@
 **English** · [По-русски / Russian](README.ru.md) · [Website](https://martiyanov.github.io/lmon/)
 
 <p align="center">
-  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-digits.png" width="640" alt="lmon: a real terminal, values stream above the pinned colored header ribbon"></a>
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-digits.png" width="340" alt="lmon: digits colored by state above the pinned colored header ribbon"></a>
+  &nbsp;
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-blocks.png" width="340" alt="lmon -b: colored blocks, no digits"></a>
+  &nbsp;
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-hybrid.png" width="340" alt="lmon --hybrid: digits on state-colored backgrounds"></a>
 </p>
-<p align="center"><sub>Real terminal, <code>lmon --cols NGLMTCSUB</code>; the <code>--hybrid</code> mode prints the digits on the state-colored background:</sub></p>
+<p align="center"><sub>Three display modes — plain digits, color blocks (<code>-b</code>) and hybrid (<code>--hybrid</code>) — real values captured on macOS. The window can shrink to the width of the indicators:</sub></p>
 <p align="center">
-  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-hybrid.png" width="360" alt="lmon --hybrid: digits on state-colored backgrounds"></a>
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-corner.png" width="330" alt="compact lmon window sized to the indicators, tucked into a screen corner"></a>
 </p>
 
 Ever want to just know your machine is okay — without opening a task
