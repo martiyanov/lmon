@@ -31,6 +31,23 @@ else
   echo "НЕТ DOCKER: запусти colima start"; fail=1
 fi
 
+step "сайт docs/: синтаксис JS и целостность HTML"
+if command -v node >/dev/null 2>&1; then
+  for f in docs/index.html docs/en/index.html; do
+    node -e "
+      const fs = require('fs');
+      const html = fs.readFileSync(process.argv[1], 'utf8');
+      const scripts = [...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
+      if (scripts.length === 0) { console.error('нет script-блоков: ' + process.argv[1]); process.exit(1); }
+      for (const m of scripts) { try { new Function(m[1]); } catch (e) { console.error(process.argv[1] + ': ' + e.message); process.exit(1); } }
+    " "$f" || fail=1
+    grep -q 'id="screen"' "$f" && grep -q 'function tick' "$f" || { echo "НЕТ ДЕМКИ: $f"; fail=1; }
+    echo "ok: $f"
+  done
+else
+  echo "нет node — проверка сайта пропущена"
+fi
+
 step "кросс-сборка (статика, все платформы)"
 for target in \
   darwin/arm64 darwin/amd64 \
