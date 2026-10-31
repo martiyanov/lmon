@@ -112,6 +112,8 @@ align exactly with the values:
 | `S` SWP | swap used, % | `--swap` | ≤ 30 | ≤ 70 | > 70 |
 | `U` DSK | system disk used, % | `--disk` | ≤ 80 | ≤ 90 | > 90 |
 | `B` BAT | battery charge, % (inverted: more is better) | `--batt` | ≥ 50 | ≥ 20 | < 20 |
+| `P` GPU | GPU utilization, % (macOS via `ioreg` no sudo, Linux via nvidia-smi/sysfs; `·` on Windows) | `--gpu` | ≤ 50 | ≤ 85 | > 85 |
+| `H` G° | GPU temperature, °C (Linux; `·` on macOS/Windows — needs admin there) | `--gputemp` | ≤ 60 | ≤ 80 | > 80 |
 
 A dot `·` (or a dim block) means the reading genuinely does not exist on
 this machine — no `smctemp` on macOS, no load average on Windows, gateway
@@ -149,7 +151,7 @@ machine; `999` means the host is unreachable.
 | `-b`, `--blocks` | — | off | color blocks instead of digits |
 | `--cols` | `LMON_COLS` | base set | column set and order, one letter each (e.g. `NG,CSB`); flags add more |
 | `--once` | — | off | print one plain line of values and exit (tmux status bar) |
-| `--cpu` `--iowait` `--swap` `--disk` `--batt` | — | off | add extra columns |
+| `--cpu` `--iowait` `--swap` `--disk` `--batt` `--gpu` `--gputemp` | — | off | add extra columns |
 
 ```sh
 lmon --target 1.1.1.1 --interval 2 10

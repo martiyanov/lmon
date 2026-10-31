@@ -13,6 +13,8 @@ func CPUSample() (int, int) { return -1, -1 }
 func SwapPercent() int      { return 0 }
 func DiskPercent() int      { return -1 }
 func BatteryPercent() int   { return -1 }
+func GPUPercent() int       { return -1 }
+func GPUTempC() int         { return -1 }
 
 func DefaultGateway(target string) (string, error) {
 	return "", errors.New("gateway: платформа не поддерживается")

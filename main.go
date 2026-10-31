@@ -22,7 +22,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.5.1"
+const version = "1.6.0"
 
 const helpText = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -48,6 +48,10 @@ const helpText = `lmon ` + version + ` — минимальный монитор
   SWP (S)  — занятый swap, % (--swap; на Windows «·»).
   DSK (U)  — занято на системном диске, % (--disk).
   BAT (B)  — заряд батареи, % (--batt; шкала перевёрнута: меньше — хуже).
+  GPU (P)  — загрузка GPU, % (--gpu; macOS — ioreg без sudo,
+             Linux — nvidia-smi или sysfs, Windows — «·»).
+   G° (H)  — температура GPU, °C (--gputemp; Linux — nvidia-smi/hwmon,
+             macOS/Windows — «·», датчика без прав администратора нет).
 
 Режим квадратов:
   -b, --blocks — вместо цифр цветные квадраты ███, градация цвета
@@ -87,6 +91,7 @@ const helpText = `lmon ` + version + ` — минимальный монитор
   lmon 20            — 20 строк и выход
   lmon -b            — режим цветных квадратов
   lmon --cpu --swap  — добавить колонки CPU и swap
+  lmon --gpu         — добавить колонку загрузки GPU
   lmon --cols TNGC   — свой набор и порядок колонок
   lmon --once        — одна строка значений (tmux/скрипты)
   lmon help          — эта справка
@@ -132,6 +137,8 @@ type config struct {
 	swap     bool
 	disk     bool
 	batt     bool
+	gpu      bool
+	gputemp  bool
 	cols     []string
 }
 
@@ -172,12 +179,14 @@ func parseConfig(args []string) (config, error) {
 	var blocks bool
 	fs.BoolVar(&blocks, "blocks", false, "colored blocks instead of digits")
 	fs.BoolVar(&blocks, "b", false, "shorthand for --blocks")
-	var cpu, iowait, swap, disk, batt bool
+	var cpu, iowait, swap, disk, batt, gpu, gputemp bool
 	fs.BoolVar(&cpu, "cpu", false, "add CPU usage column")
 	fs.BoolVar(&iowait, "iowait", false, "add iowait column (Linux only)")
 	fs.BoolVar(&swap, "swap", false, "add swap usage column")
 	fs.BoolVar(&disk, "disk", false, "add root disk usage column")
 	fs.BoolVar(&batt, "batt", false, "add battery charge column")
+	fs.BoolVar(&gpu, "gpu", false, "add GPU utilization column")
+	fs.BoolVar(&gputemp, "gputemp", false, "add GPU temperature column")
 	colsFlag := fs.String("cols", os.Getenv("LMON_COLS"), "base column set and order, e.g. NG,CSB (flags add more)")
 	var once bool
 	fs.BoolVar(&once, "once", false, "print one line of values and exit (for tmux/status bars)")
@@ -248,7 +257,8 @@ func parseConfig(args []string) (config, error) {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
-		blocks: blocks, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt}, nil
+		blocks: blocks, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt,
+		gpu: gpu, gputemp: gputemp}, nil
 }
 
 // checkHost допускает IPv4-адрес или DNS-имя; остальное (пустая строка,
@@ -417,6 +427,8 @@ var colRegistry = map[string]reading{
 	"S": {id: "S", head: "SWP", green: 30, yellow: 70, red: 100},
 	"U": {id: "U", head: "DSK", green: 80, yellow: 90, red: 100},
 	"B": {id: "B", head: "BAT", green: 50, yellow: 20, red: 0, invert: true},
+	"P": {id: "P", head: "GPU", green: 50, yellow: 85, red: 100},
+	"H": {id: "H", head: " G°", green: 60, yellow: 80, red: 90, deg: true},
 }
 
 // layout возвращает колонки в порядке вывода; значения заполнит sampleRow.
@@ -448,6 +460,8 @@ func layout(cfg config) []reading {
 	add("S", cfg.swap)
 	add("U", cfg.disk)
 	add("B", cfg.batt)
+	add("P", cfg.gpu)
+	add("H", cfg.gputemp)
 	return rs
 }
 
@@ -537,6 +551,12 @@ func measure(ctx context.Context, cfg config) []reading {
 	}
 	if need("B") {
 		vals["B"] = meter.BatteryPercent()
+	}
+	if need("P") {
+		vals["P"] = meter.GPUPercent()
+	}
+	if need("H") {
+		vals["H"] = meter.GPUTempC()
 	}
 	for i := range rs {
 		rs[i].v = vals[rs[i].id] // отсутствует в map → 0 не бывает: need() покрыл все
