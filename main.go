@@ -114,6 +114,10 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --thresholds NET=100/200/500
                      — свои пороги цвета (например, для мобильного
                        интернета); колонка=зелёный/жёлтый/красный
+  lmon --ping VPN=10.8.0.1
+                     — своя колонка пинга до любого хоста (имя 2–3
+                       символа); VPN не подключён — будет 999.
+                       Повторяемо: несколько --ping; LMON_PING
   lmon --once        — одна строка значений (tmux/скрипты)
   lmon help          — эта справка
   lmon --version     — версия
@@ -232,6 +236,10 @@ Usage:
   lmon --thresholds NET=100/200/500
                      — your own color thresholds (e.g. for mobile
                        internet); column=green/yellow/red
+  lmon --ping VPN=10.8.0.1
+                     — your own ping column to any host (2-3 char
+                       name); VPN down — the column shows 999.
+                       Repeatable; LMON_PING
   lmon --once        — one line of values (tmux/scripts)
   lmon help          — this help
   lmon --version     — version
@@ -301,6 +309,14 @@ type config struct {
 	cols       []string
 	lang       string            // язык help и сообщений: "en" (умолчание) или "ru"
 	thresholds map[string][3]int // --thresholds: пороги цвета по колонкам
+	pings      []pingTarget      // --ping NAME=host: именованные пинги
+}
+
+// pingTarget — именованная пинг-колонка (--ping VPN=10.8.0.1):
+// имя из 2–3 символов становится заголовком колонки.
+type pingTarget struct {
+	name string
+	host string
 }
 
 func main() {
@@ -357,6 +373,14 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&gputemp, "gputemp", false, "add GPU temperature column")
 	colsFlag := fs.String("cols", os.Getenv("LMON_COLS"), "base column set and order, e.g. NG,CSB (flags add more)")
 	thrFlag := fs.String("thresholds", os.Getenv("LMON_THRESHOLDS"), "per-column color thresholds COL=green/yellow/red (e.g. NET=100/200/500)")
+	// --ping повторяемый: копим сырые строки, валидируем после разбора
+	var pingsRaw rawList
+	if env := os.Getenv("LMON_PING"); env != "" {
+		for _, part := range strings.Split(env, ",") {
+			_ = pingsRaw.Set(part)
+		}
+	}
+	fs.Var(&pingsRaw, "ping", "named ping column NAME=host, repeatable (e.g. --ping VPN=10.8.0.1)")
 	var once bool
 	fs.BoolVar(&once, "once", false, "print one line of values and exit (for tmux/status bars)")
 
@@ -440,13 +464,75 @@ func parseConfig(args []string) (config, error) {
 		return config{}, err
 	}
 
+	// --ping / LMON_PING: именованные пинг-колонки, «VPN=10.8.0.1».
+	pings, err := parsePings(pingsRaw, lg)
+	if err != nil {
+		return config{}, err
+	}
+
 	d := time.Duration(*interval * float64(time.Second))
 	if d <= 0 {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
 		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt,
-		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr}, nil
+		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings}, nil
+}
+
+// rawList — повторяемый флаг: каждое вхождение добавляет строку.
+type rawList []string
+
+func (r *rawList) String() string { return strings.Join(*r, ",") }
+func (r *rawList) Set(v string) error {
+	*r = append(*r, v)
+	return nil
+}
+
+// isPingName — подходит ли строка как имя именованного пинга:
+// 2–3 заглавные буквы/цифры (однобуквенные заняты встроенными колонками).
+func isPingName(s string) bool {
+	if n := len(s); n < 2 || n > 3 {
+		return false
+	}
+	for _, c := range s {
+		if !(c >= 'A' && c <= 'Z' || c >= '0' && c <= '9') {
+			return false
+		}
+	}
+	return true
+}
+
+// parsePings разбирает «VPN=10.8.0.1»: имя 2–3 символа (однобуквенные
+// заняты встроенными колонками), хост — как у --target.
+func parsePings(raw rawList, lang string) ([]pingTarget, error) {
+	var pings []pingTarget
+	seen := map[string]bool{}
+	for _, item := range raw {
+		kv := strings.SplitN(strings.TrimSpace(item), "=", 2)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf(lmsg(lang,
+				"--ping: expected NAME=host, got %q",
+				"--ping: ожидается ИМЯ=хост, получено %q"), item)
+		}
+		name := strings.ToUpper(strings.TrimSpace(kv[0]))
+		host := strings.TrimSpace(kv[1])
+		if !isPingName(name) {
+			return nil, fmt.Errorf(lmsg(lang,
+				"--ping: name %q must be 2-3 letters/digits (single letters are built-in columns)",
+				"--ping: имя %q должно быть из 2–3 букв/цифр (однобуквенные заняты встроенными колонками)"), kv[0])
+		}
+		if seen[name] {
+			return nil, fmt.Errorf(lmsg(lang,
+				"--ping: name %q given twice",
+				"--ping: имя %q указано дважды"), name)
+		}
+		if err := checkHost(host, lang); err != nil {
+			return nil, fmt.Errorf(lmsg(lang, "--ping %s: %v", "--ping %s: %v"), name, err)
+		}
+		seen[name] = true
+		pings = append(pings, pingTarget{name: name, host: host})
+	}
+	return pings, nil
 }
 
 // parseThresholds разбирает «NET=100,200,500,RUN=8,16,32»: колонка и три
@@ -479,7 +565,8 @@ func parseThresholds(spec, lang string) (map[string][3]int, error) {
 			}
 		}
 		base, ok := colRegistry[id]
-		if !ok {
+		if !ok && !isPingName(id) {
+			// не буква, не имя колонки и не имя именованного пинга
 			return none, fmt.Errorf(lmsg(lang,
 				"--thresholds: unknown column %q (available: N G L M T C I S U B P H)",
 				"--thresholds: неизвестная колонка %q (есть: N G L M T C I S U B P H)"), eq[0])
@@ -794,6 +881,11 @@ func layout(cfg config) []reading {
 	add("B", cfg.batt)
 	add("P", cfg.gpu)
 	add("H", cfg.gputemp)
+	// именованные пинги — справа, порогами как у NET
+	for _, p := range cfg.pings {
+		r := reading{id: p.name, head: fmt.Sprintf("%3s", p.name), green: 50, yellow: 150, red: 300}
+		rs = append(rs, r)
+	}
 	applyThresholds(rs, runtime.NumCPU(), cfg.thresholds)
 	return rs
 }
@@ -873,6 +965,15 @@ func measure(ctx context.Context, cfg config) []reading {
 			go func() { gwCh <- netping.Latency(ctx, cfg.gw, budget) }()
 		}
 	}
+	// именованные пинги (--ping VPN=10.8.0.1): каждый — своя колонка и канал
+	pingChs := make(map[string]chan netping.Result, len(cfg.pings))
+	for _, p := range cfg.pings {
+		if need(p.name) {
+			ch := make(chan netping.Result, 1)
+			pingChs[p.name] = ch
+			go func(ch chan netping.Result, host string) { ch <- netping.Latency(ctx, host, budget) }(ch, p.host)
+		}
+	}
 	var cpuCh chan int
 	if need("C") || need("I") {
 		cpuCh = make(chan int, 2)
@@ -885,6 +986,9 @@ func measure(ctx context.Context, cfg config) []reading {
 	}
 	if gwCh != nil {
 		vals["G"] = pingValue(<-gwCh)
+	}
+	for name, ch := range pingChs {
+		vals[name] = pingValue(<-ch)
 	}
 	if need("L") {
 		if load, err := meter.LoadAvg(); err == nil {

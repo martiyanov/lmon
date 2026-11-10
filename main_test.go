@@ -156,7 +156,7 @@ func TestParseThresholds(t *testing.T) {
 	if _, err := parseThresholds("BAT=60/80/90", "en"); err == nil {
 		t.Error("батарея перевёрнута: растущие числа — ошибка")
 	}
-	if _, err := parseThresholds("XX=1/2/3", "en"); err == nil {
+	if _, err := parseThresholds("XXXX=1/2/3", "en"); err == nil { // 4 символа — не имя пинга
 		t.Error("неизвестная колонка: want ошибка")
 	}
 	cfg, err := parseConfig([]string{"--thresholds", "RUN=2/4/8"})
@@ -165,6 +165,46 @@ func TestParseThresholds(t *testing.T) {
 	}
 	if cfg.thresholds["L"] != [3]int{2, 4, 8} {
 		t.Errorf("cfg.thresholds = %v (по ключу L)", cfg.thresholds)
+	}
+}
+
+func TestParsePings(t *testing.T) {
+	cfg, err := parseConfig([]string{"--ping", "vpn=10.8.0.1", "--ping", "NAS=192.168.1.50"})
+	if err != nil {
+		t.Fatalf("--ping: %v", err)
+	}
+	if len(cfg.pings) != 2 || cfg.pings[0].name != "VPN" || cfg.pings[0].host != "10.8.0.1" {
+		t.Errorf("pings = %+v", cfg.pings)
+	}
+	// колонка появляется в layout справа с заголовком из 3 символов
+	rs := layout(cfg)
+	if rs[len(rs)-2].id != "VPN" || rs[len(rs)-2].head != "VPN" || rs[len(rs)-1].id != "NAS" {
+		t.Errorf("layout с пингами: последние колонки %+v", rs[len(rs)-2:])
+	}
+	if rs[len(rs)-2].green != 50 || rs[len(rs)-2].yellow != 150 { // пороги как у NET
+		t.Errorf("пороги VPN = %d/%d, want 50/150", rs[len(rs)-2].green, rs[len(rs)-2].yellow)
+	}
+
+	t.Setenv("LMON_PING", "DNS=1.1.1.1") // через переменную окружения
+	cfg, err = parseConfig(nil)
+	if err != nil || len(cfg.pings) != 1 || cfg.pings[0].name != "DNS" {
+		t.Errorf("LMON_PING: cfg.pings = %+v, err = %v", cfg.pings, err)
+	}
+
+	for _, bad := range [][]string{
+		{"--ping", "V=1.1.1.1"},                            // однобуквенное занято встроенными
+		{"--ping", "НОС=1.1.1.1"},                          // не латиница/цифры
+		{"--ping", "VPN=1.1.1.1", "--ping", "vpn=2.2.2.2"}, // дубль
+		{"--ping", "нет-равно"},                            // без =
+	} {
+		if _, err := parseConfig(bad); err == nil {
+			t.Errorf("%v: want ошибка", bad)
+		}
+	}
+	// пороги именованного пинга принимаются --thresholds
+	thr, err := parseThresholds("VPN=100/200/500", "en")
+	if err != nil || thr["VPN"] != [3]int{100, 200, 500} {
+		t.Errorf("thresholds VPN: %v, err = %v", thr, err)
 	}
 }
 

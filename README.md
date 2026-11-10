@@ -162,6 +162,13 @@ RUN thresholds scale with the machine's core count (load average is a queue
 length: "all cores busy" is still green). Override any column with
 `--thresholds NET=100/200/500,RUN=8/16/32` — handy on mobile internet.
 
+### Ping any host as a column
+
+`--ping NAME=host` adds your own ping column (2–3 char name) — e.g. the
+server inside your VPN tunnel: `--ping VPN=10.8.0.1`. While the tunnel is
+up you get its latency; VPN down — the column shows `999`. Repeatable,
+or via `LMON_PING="VPN=10.8.0.1,DNS=1.1.1.1"`.
+
 ### Blocks mode
 
 `lmon --hybrid` combines both: exact digits printed on the state-colored
