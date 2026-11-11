@@ -119,6 +119,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                        символа); VPN не подключён — будет 999.
                        Повторяемо: несколько --ping; LMON_PING
   lmon --once        — одна строка значений (tmux/скрипты)
+  lmon --no-hints    — без подсказок о недоступных колонках
   lmon help          — эта справка
   lmon --version     — версия
 
@@ -138,6 +139,14 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --target 1.1.1.1
   lmon -b --cpu --batt 30
   LMON_COLS=NGMC lmon --once
+
+Колонки, которых в системе нет, скрываются автоматически (например,
+RUN и C° в Windows, iowait в macOS): вместо датчика не показывается «·».
+При старте lmon печатает, что скрыто и чем заменить (--cpu и т. п.).
+«·» остаётся только для датчиков, которые бывают, но сейчас недоступны
+(TMP без smctemp, GPU без nvidia-smi). 999 — ICMP-ответ не пришёл:
+хост, файрвол или сеть. Подсказки не блокируют запуск; отключить:
+--no-hints или LMON_NO_HINTS=1.
 
 Первая строка после запуска может быть завышена: Wi-Fi-радио
 просыпается. Дальше значения стабилизируются.
@@ -241,6 +250,7 @@ Usage:
                        name); VPN down — the column shows 999.
                        Repeatable; LMON_PING
   lmon --once        — one line of values (tmux/scripts)
+  lmon --no-hints    — start without hints about unavailable columns
   lmon help          — this help
   lmon --version     — version
 
@@ -261,6 +271,14 @@ Examples:
   lmon --target 1.1.1.1
   lmon -b --cpu --batt 30
   LMON_COLS=NGMC lmon --once
+
+Columns unsupported by the OS are hidden automatically (e.g. RUN and C°
+on Windows, iowait on macOS) instead of showing «·». At startup lmon
+prints what was hidden and what to use instead (--cpu etc.). «·» stays
+only for sensors that usually exist but are unavailable right now
+(TMP without smctemp, GPU without nvidia-smi). 999 — no ICMP reply:
+host, firewall or network. Hints never block the run; disable them
+with --no-hints or LMON_NO_HINTS=1.
 
 The first line after start may be inflated: the Wi-Fi radio is waking
 up. Values settle after that.
@@ -310,6 +328,7 @@ type config struct {
 	lang       string            // язык help и сообщений: "en" (умолчание) или "ru"
 	thresholds map[string][3]int // --thresholds: пороги цвета по колонкам
 	pings      []pingTarget      // --ping NAME=host: именованные пинги
+	noHints    bool              // --no-hints / LMON_NO_HINTS: без стартовых подсказок
 }
 
 // pingTarget — именованная пинг-колонка (--ping VPN=10.8.0.1):
@@ -383,6 +402,7 @@ func parseConfig(args []string) (config, error) {
 	fs.Var(&pingsRaw, "ping", "named ping column NAME=host, repeatable (e.g. --ping VPN=10.8.0.1)")
 	var once bool
 	fs.BoolVar(&once, "once", false, "print one line of values and exit (for tmux/status bars)")
+	noHints := fs.Bool("no-hints", envFlag("LMON_NO_HINTS"), "do not print startup hints about unavailable columns")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
@@ -476,7 +496,8 @@ func parseConfig(args []string) (config, error) {
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
 		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt,
-		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings}, nil
+		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
+		noHints: *noHints}, nil
 }
 
 // rawList — повторяемый флаг: каждое вхождение добавляет строку.
@@ -693,6 +714,15 @@ func envStr(name, def string) string {
 	return def
 }
 
+// envFlag читает булеву настройку из окружения: 1/true/yes/on — включено.
+func envFlag(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
 func envFloat(name string, def float64) float64 {
 	if v := os.Getenv(name); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
@@ -704,7 +734,7 @@ func envFloat(name string, def float64) float64 {
 
 func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	// шлюз нужен только если показывается колонка GW
-	cols := layout(cfg)
+	cols, dropped := layoutWithDropped(cfg, runtime.GOOS)
 	wantGW := false
 	for _, r := range cols {
 		if r.id == "G" {
@@ -717,9 +747,14 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	}
 
 	// разовый вывод значений одной строкой — для tmux-статусбара и скриптов:
-	// без ANSI, без заголовка, без изменения режима терминала
+	// без ANSI, без заголовка, без изменения режима терминала.
+	// Подсказки — в stderr, чтобы не засорять машиночитаемый stdout.
 	if cfg.once {
-		fmt.Fprintln(w, (&ui{w: w}).dataRow(measure(ctx, cfg)))
+		rs := measure(ctx, cfg)
+		if !cfg.noHints {
+			printHints(os.Stderr, startupHints(cfg, rs, runtime.GOOS, dropped))
+		}
+		fmt.Fprintln(w, (&ui{w: w}).dataRow(rs))
 		return 0
 	}
 
@@ -734,6 +769,24 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	u.setup()
 	u.warnIfNarrow()
 
+	// Первый замер — он же основа стартовых подсказок: какая колонка не
+	// дала данных, почему и что сделать. Подсказки печатаются один раз,
+	// не блокируют запуск и не мешают закреплённому заголовку.
+	first := measure(ctx, cfg)
+	if !cfg.noHints {
+		if hs := startupHints(cfg, first, runtime.GOOS, dropped); len(hs) > 0 {
+			if tty {
+				u.note(hs)
+			} else {
+				printHints(os.Stderr, hs)
+			}
+		}
+	}
+	u.emit(first)
+	if cfg.iters > 0 && cfg.iters <= 1 {
+		return 0
+	}
+
 	// интервал — от строки к строке (nextTick): долгое измерение замедляет
 	// каденс, но «задолженные» тики не отдаются пачкой — каденс ровный
 	ticker := time.NewTicker(cfg.interval)
@@ -743,7 +796,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	refreshGW := time.NewTicker(30 * time.Second)
 	defer refreshGW.Stop()
 
-	for it := 1; ; it++ {
+	for it := 2; ; it++ {
 		select {
 		case <-ctx.Done():
 			return 130
@@ -761,6 +814,17 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		}
 		if err := nextTick(ctx, ticker, cfg.interval); err != nil {
 			return 130
+		}
+	}
+}
+
+// printHints печатает стартовые подсказки вне TUI: в --once, при выводе в
+// пайп и в любой ситуации, когда stdout должен остаться машиночитаемым.
+func printHints(w io.Writer, hints []startupHint) {
+	for _, h := range hints {
+		fmt.Fprintf(w, "lmon: %s\n", h.title)
+		if h.detail != "" {
+			fmt.Fprintf(w, "      %s\n", h.detail)
 		}
 	}
 }
@@ -853,7 +917,7 @@ var colRegistry = map[string]reading{
 // layout возвращает колонки в порядке вывода; значения заполнит sampleRow.
 // --cols задаёт набор и порядок целиком; без него — базовые колонки
 // плюс включённые флагами.
-func layout(cfg config) []reading {
+func requestedLayout(cfg config) []reading {
 	base := []string{"N", "G", "L", "M", "T"}
 	if len(cfg.cols) > 0 {
 		base = cfg.cols
@@ -888,6 +952,33 @@ func layout(cfg config) []reading {
 	}
 	applyThresholds(rs, runtime.NumCPU(), cfg.thresholds)
 	return rs
+}
+
+// layout — колонки с учётом возможностей ОС: то, что в системе не
+// измерить (RUN/C° в Windows и т. п.), не показывается вовсе.
+func layout(cfg config) []reading {
+	rs, _ := layoutWithDropped(cfg, runtime.GOOS)
+	return rs
+}
+
+// layoutWithDropped возвращает видимые колонки и список скрытых: скрытые
+// объясняются стартовой подсказкой, чтобы «·» не выглядел поломкой.
+func layoutWithDropped(cfg config, goos string) ([]reading, []droppedColumn) {
+	rs := requestedLayout(cfg)
+	out := make([]reading, 0, len(rs))
+	var dropped []droppedColumn
+	for _, r := range rs {
+		if columnSupportedByOS(r.id, goos) {
+			out = append(out, r)
+			continue
+		}
+		dropped = append(dropped, droppedColumn{id: r.id, head: r.head, reason: supportedReason(r.id)})
+	}
+	if len(out) == 0 {
+		// все запрошенные колонки недоступны — не оставляем пустой экран
+		out = append(out, colRegistry["M"])
+	}
+	return out, dropped
 }
 
 // applyThresholds подгоняет пороги цвета под конкретную машину и владельца:

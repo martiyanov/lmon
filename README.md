@@ -83,8 +83,11 @@ Expand-Archive lmon.zip; Move-Item lmon\lmon.exe "$env:LOCALAPPDATA\Microsoft\Wi
 ```
 
 (then run `lmon` in Windows Terminal; on ARM use `lmon_windows_arm64.zip`).
-On Windows the `L` (load average) and `T` (temperature) columns show `·` —
-the OS does not expose those readings; everything else works.
+On Windows the `L` (load average), `T` (temperature), `I` (iowait), `S` (swap)
+and GPU columns are hidden automatically — the OS does not expose those
+readings. At startup lmon says what was hidden and what to use instead
+(`--cpu` for CPU load); hints never block the run and can be turned off
+with `--no-hints` or `LMON_NO_HINTS=1`.
 
 **If you have Go 1.22+**:
 
@@ -97,7 +100,8 @@ All binaries are static, no dependencies beyond the system `ping`.
 **Requirements:** the system `ping` utility (used as-is, no root needed).
 On macOS the temperature column additionally needs
 [`smctemp`](https://github.com/holtmann/osx/tree/master/smctemp)
-(optional — shows `·` without it). On Linux the temperature is read from
+(optional — without it the column shows `·` and lmon suggests installing it).
+On Linux the temperature is read from
 sysfs (`hwmon` / `thermal_zone`), no extra tools required.
 
 ## Usage
@@ -107,6 +111,7 @@ lmon                    # run forever, one line per second
 lmon 20                 # print 20 lines and exit
 lmon -b                 # color blocks instead of digits
 lmon --cpu --swap       # add extra columns
+lmon --no-hints         # start without hints about hidden columns
 lmon help               # built-in reference (English; Russian via --lang ru
                         # or automatically on a Russian locale)
 lmon --version          # version
@@ -124,22 +129,23 @@ align exactly with the values. In plain words:
   home (Wi-Fi, router, cable); only NET red — trouble at the provider.
 - **RUN** — how many programs on average are queuing for the CPU (the
   classic "load average"). Up to 4 is calm, more means the machine is
-  overloaded with work. Absent on Windows (shown as a dot).
+  overloaded with work. Hidden on Windows (no such reading).
 - **MEM** — used memory, %. Red MEM with a growing SWP — memory is short,
   things start to slow down.
 - **C°** — CPU temperature. Above 80–90 °C it is overheating.
 - **CPU** — how busy the processor is right now, % (`--cpu`).
 - **IOW** — how much the CPU idles waiting for the disk (`--iowait`,
-  Linux only; high — the disk is the bottleneck).
+  Linux only; high — the disk is the bottleneck; hidden on macOS/Windows).
 - **SWP** — swap in use (`--swap`; grows when memory runs out).
 - **DSK** — how full the system disk is (`--disk`; above 90% — time to clean).
 - **BAT** — battery charge (`--batt`; red below 20%).
 - **GPU** — how busy the video card is, % (`--gpu`).
-- **G°** — GPU temperature (`--gputemp`; not available without admin
-  rights on macOS/Windows — an honest dot).
+- **G°** — GPU temperature (`--gputemp`; hidden on macOS/Windows — no
+  unprivileged source).
 
-`999` — the host is not answering, `·` — no such sensor on this machine,
-`+++` — the value did not fit the column.
+`999` — the host is not answering, `·` — the sensor exists but is
+unavailable right now (e.g. TMP without `smctemp`), `+++` — the value did
+not fit the column. Columns that the OS cannot provide at all are hidden.
 
 Thresholds (green ≤ / yellow ≤ / red beyond):
 
