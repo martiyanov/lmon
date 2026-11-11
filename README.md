@@ -91,6 +91,43 @@ API: pass `--temp-cmd` (e.g. LibreHardwareMonitor via PowerShell) to show
 `C°`. At startup lmon says what was hidden or unavailable and how to fix it;
 hints never block the run and can be turned off with `--no-hints`.
 
+### Diagnostics on Windows
+
+If a column shows `·` or `999`, run these in PowerShell and attach the output to a bug report:
+
+```powershell
+lmon --version
+lmon --once --cols NGSPH --swap --gpu --gputemp
+
+# is the --temp-cmd wiring alive? (expect 55)
+lmon --once --cols T --temp-cmd "echo 55"
+
+# swap / page file
+Get-CimInstance Win32_PageFileUsage | Select-Object Name, AllocatedBaseSize, CurrentUsage
+
+# network and gateway
+ping -n 2 -w 1000 8.8.8.8
+(Get-NetRoute -DestinationPrefix 0.0.0.0/0 | Sort-Object RouteMetric | Select-Object -First 1).NextHop
+
+# GPU: NVIDIA driver tools, then WDDM counters (any vendor)
+nvidia-smi --query-gpu=temperature.gpu,utilization.gpu --format=csv,noheader
+Get-Counter '\GPU Engine(*)\Utilization Percentage' -ErrorAction SilentlyContinue
+
+# CPU temperature sources (optional; often needs admin / may be unsupported)
+Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature
+```
+
+What the values mean:
+
+- **`SWP`** — page file usage, %. `·` means the page file is disabled or unreadable: enable it in `sysdm.cpl` → Advanced → Performance → Virtual memory.
+- **`GPU`** — NVIDIA via NVML/nvidia-smi, AMD/Intel via PDH GPU Engine counters; `·` means no driver/source.
+- **`G°`** — NVIDIA only for now; AMD/Intel need an external monitor.
+- **`C°`** — no native Windows API; pass `--temp-cmd` (LibreHardwareMonitor, HWiNFO, ACPI WMI, any command printing °C).
+- **`NET`/`GTW = 999`** — ICMP echo is not getting through; the startup hint shows the firewall rule and `--target`/`--gw` options.
+- **`RUN` and `IOW`** are hidden on Windows on purpose: the OS has no load average and no iowait.
+
+Also include your Windows version, GPU vendor and whether `nvidia-smi` exists — that is enough to reproduce most reports.
+
 **If you have Go 1.22+**:
 
 ```sh

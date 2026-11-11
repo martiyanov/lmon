@@ -89,6 +89,43 @@ Move-Item lmon\lmon.exe "$env:LOCALAPPDATA\Microsoft\WindowsApps" -Force
 > программе: «Подробнее» → «Выполнить в любом случае». Код открыт:
 > [github.com/martiyanov/lmon](https://github.com/martiyanov/lmon).
 
+### Диагностика на Windows
+
+Если колонка показывает `·` или `999`, выполни в PowerShell и приложи вывод к отчёту:
+
+```powershell
+lmon --version
+lmon --once --cols NGSPH --swap --gpu --gputemp
+
+# проверить, что --temp-cmd работает (ожидается 55)
+lmon --once --cols T --temp-cmd "echo 55"
+
+# swap / файл подкачки
+Get-CimInstance Win32_PageFileUsage | Select-Object Name, AllocatedBaseSize, CurrentUsage
+
+# сеть и шлюз
+ping -n 2 -w 1000 8.8.8.8
+(Get-NetRoute -DestinationPrefix 0.0.0.0/0 | Sort-Object RouteMetric | Select-Object -First 1).NextHop
+
+# GPU: инструменты NVIDIA, затем счётчики WDDM (любой вендор)
+nvidia-smi --query-gpu=temperature.gpu,utilization.gpu --format=csv,noheader
+Get-Counter '\GPU Engine(*)\Utilization Percentage' -ErrorAction SilentlyContinue
+
+# источники температуры CPU (опционально; часто нужен админ и/или не поддерживается)
+Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature
+```
+
+Что означают значения:
+
+- **`SWP`** — занятость файла подкачки, %. `·` — файл подкачки отключён или не читается: включи в `sysdm.cpl` → Дополнительно → Быстродействие → Виртуальная память.
+- **`GPU`** — NVIDIA через NVML/nvidia-smi, AMD/Intel через счётчики PDH GPU Engine; `·` — нет драйвера/источника.
+- **`G°`** — пока только NVIDIA; для AMD/Intel нужен внешний монитор.
+- **`C°`** — штатного API в Windows нет; передай `--temp-cmd` (LibreHardwareMonitor, HWiNFO, ACPI WMI — любая команда, печатающая °C).
+- **`NET`/`GTW = 999`** — ICMP-эхо не проходит; подсказка при старте покажет правило файрвола и варианты `--target`/`--gw`.
+- **`RUN` и `IOW`** на Windows скрыты намеренно: в системе нет load average и iowait.
+
+Ещё укажи версию Windows, вендора GPU и есть ли `nvidia-smi` — этого достаточно, чтобы воспроизвести большинство отчётов.
+
 ### Linux
 
 Debian/Ubuntu: `curl -fsSLO .../lmon_amd64.deb && sudo dpkg -i lmon_amd64.deb`
