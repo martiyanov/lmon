@@ -48,6 +48,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
              на Linux читается из sysfs; на Windows нет датчика («·»).
   CPU (C)  — загрузка CPU, % (--cpu).
   IOW (I)  — iowait CPU, % (--iowait; только Linux, иначе «·»).
+  I/O (K)  — занятость диска, % (--disk-busy; Windows, PDH, без админа).
   SWP (S)  — занятые swap/файл подкачки, % (--swap; Windows читает
              pagefile через PDH, без прав администратора).
   DSK (U)  — занято на системном диске, % (--disk).
@@ -74,6 +75,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
     N — сеть      G — шлюз       L — очередь CPU  M — память
     T — t°C CPU   C — загрузка CPU (%)
     I — iowait    S — swap       U — диск (можно D)  B — батарея
+    K — занятость диска (--disk-busy, Windows)
     P — загрузка GPU (%)         H — t°GPU
 
   Примеры: только сеть и память — lmon --cols NM
@@ -86,7 +88,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
 Пороги (зелёный ≤ / жёлтый ≤ / дальше красный):
   NET: 50/150 мс   GTW: 10/50 мс   RUN: по ядрам* MEM: 60/85
   TMP: 60/75       CPU: 50/80      IOW: 5/20    SWP: 30/70
-  DSK: 80/90       BAT: наоборот — ≥50 зелёный, ≥20 жёлтый, ниже красный
+  DSK: 80/90       I/O: 60/85   BAT: наоборот — ≥50 зелёный, ≥20 жёлтый, ниже красный
 Значения крупнее 999 показываются как +++.
 * RUN: зелёный — пока очередь не длиннее числа ядер,
   жёлтый — до двух ядер очереди, дальше красный.
@@ -112,6 +114,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --hybrid      — цифры на цветной подложке
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
+  lmon --disk-busy   — занятость диска, % (Windows, PDH)
   lmon --cols TNGC   — свой набор и порядок колонок
   lmon --thresholds NET=100/200/500
                      — свои пороги цвета (например, для мобильного
@@ -136,6 +139,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --thresholds  LMON_THRESHOLDS   свои пороги цвета: КОЛОНКА=з/ж/к через
                               запятую, числа через / — NET=100/200/500,
                               RUN=8/16/32; LMON_THRESHOLDS
+  --disk-busy   LMON_DISK_BUSY  занятость диска, % (Windows, PDH; колонка I/O)
   --temp-cmd    LMON_TEMP_CMD  внешняя команда, печатающая температуру CPU
                               в °C (берётся первое число). Нужна на Windows,
                               где нет штатного API: например, LHM через
@@ -187,6 +191,7 @@ Columns (letter in parentheses is for --cols):
              on Linux read from sysfs; on Windows there is no sensor («·»).
   CPU (C)  — CPU usage, % (--cpu).
   IOW (I)  — CPU iowait, % (--iowait; Linux only, otherwise «·»).
+  I/O (K)  — disk busy time, % (--disk-busy; Windows, PDH, no admin).
   SWP (S)  — swap/pagefile in use, % (--swap; on Windows it reads
              pagefile via PDH, no admin rights).
   DSK (U)  — root disk usage, % (--disk).
@@ -213,6 +218,7 @@ Column set:
     N — network   G — gateway    L — CPU queue  M — memory
     T — CPU °C    C — CPU usage (%)
     I — iowait    S — swap       U — disk (D works too)  B — battery
+    K — disk busy (--disk-busy, Windows)
     P — GPU usage (%)            H — GPU °C
 
   Examples: network and memory only — lmon --cols NM
@@ -222,7 +228,7 @@ Colors: green — normal, yellow — attention, red — bad.
 Thresholds (green ≤ / yellow ≤ / then red):
   NET: 50/150 ms   GTW: 10/50 ms   RUN: per cores* MEM: 60/85
   TMP: 60/75       CPU: 50/80      IOW: 5/20    SWP: 30/70
-  DSK: 80/90       BAT: inverted — ≥50 green, ≥20 yellow, below red
+  DSK: 80/90       I/O: 60/85   BAT: inverted — ≥50 green, ≥20 yellow, below red
 Values above 999 are shown as +++.
 * RUN: green while the queue fits within the core count,
   yellow up to twice the cores, red above that.
@@ -248,6 +254,7 @@ Usage:
   lmon --hybrid      — digits on the state-colored background
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
+  lmon --disk-busy   — disk busy time %, Windows (PDH)
   lmon --cols TNGC   — your own set and order of columns
   lmon --thresholds NET=100/200/500
                      — your own color thresholds (e.g. for mobile
@@ -273,6 +280,7 @@ Settings (flags and environment variables):
                               COL=g/y/r, comma-separated groups, numbers
                               slashed — NET=100/200/500, RUN=8/16/32;
                               LMON_THRESHOLDS
+  --disk-busy   LMON_DISK_BUSY  disk busy time %, Windows (PDH; column I/O)
   --temp-cmd    LMON_TEMP_CMD  external command that prints CPU temperature
                               in °C (the first number is used). Needed on
                               Windows where no native API exists; e.g. LHM
@@ -332,6 +340,7 @@ type config struct {
 	iowait     bool
 	swap       bool
 	disk       bool
+	diskBusy   bool // --disk-busy: занятость диска (Windows, PDH)
 	batt       bool
 	gpu        bool
 	gputemp    bool
@@ -394,11 +403,12 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&blocks, "b", false, "shorthand for --blocks")
 	fs.BoolVar(&hybrid, "hybrid", false, "digits on the state-colored background")
 	lang := fs.String("lang", langAuto(), "message language: en or ru")
-	var cpu, iowait, swap, disk, batt, gpu, gputemp bool
+	var cpu, iowait, swap, disk, diskBusy, batt, gpu, gputemp bool
 	fs.BoolVar(&cpu, "cpu", false, "add CPU usage column")
 	fs.BoolVar(&iowait, "iowait", false, "add iowait column (Linux only)")
 	fs.BoolVar(&swap, "swap", false, "add swap usage column")
 	fs.BoolVar(&disk, "disk", false, "add root disk usage column")
+	fs.BoolVar(&diskBusy, "disk-busy", envFlag("LMON_DISK_BUSY"), "add disk busy column (Windows, PDH)")
 	fs.BoolVar(&batt, "batt", false, "add battery charge column")
 	fs.BoolVar(&gpu, "gpu", false, "add GPU utilization column")
 	fs.BoolVar(&gputemp, "gputemp", false, "add GPU temperature column")
@@ -476,7 +486,7 @@ func parseConfig(args []string) (config, error) {
 			}
 			id := string(r)
 			if _, ok := colRegistry[id]; !ok {
-				return config{}, fmt.Errorf(lmsg(lg, "--cols: unknown column %q (available: N G L M T C I S U B P H)", "--cols: неизвестная колонка %q (есть: N G L M T C I S U B P H)"), id)
+				return config{}, fmt.Errorf(lmsg(lg, "--cols: unknown column %q (available: N G L M T C I S U B P H K)", "--cols: неизвестная колонка %q (есть: N G L M T C I S U B P H K)"), id)
 			}
 			if seen[id] {
 				return config{}, fmt.Errorf(lmsg(lg, "--cols: column %q listed twice", "--cols: колонка %q указана дважды"), id)
@@ -508,7 +518,7 @@ func parseConfig(args []string) (config, error) {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
-		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt,
+		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd}, nil
 }
@@ -602,8 +612,8 @@ func parseThresholds(spec, lang string) (map[string][3]int, error) {
 		if !ok && !isPingName(id) {
 			// не буква, не имя колонки и не имя именованного пинга
 			return none, fmt.Errorf(lmsg(lang,
-				"--thresholds: unknown column %q (available: N G L M T C I S U B P H)",
-				"--thresholds: неизвестная колонка %q (есть: N G L M T C I S U B P H)"), eq[0])
+				"--thresholds: unknown column %q (available: N G L M T C I S U B P H K)",
+				"--thresholds: неизвестная колонка %q (есть: N G L M T C I S U B P H K)"), eq[0])
 		}
 		var t [3]int
 		ns := strings.Split(eq[1], "/")
@@ -945,6 +955,7 @@ var colRegistry = map[string]reading{
 	"B": {id: "B", head: "BAT", green: 50, yellow: 20, red: 0, invert: true},
 	"P": {id: "P", head: "GPU", green: 50, yellow: 85, red: 100},
 	"H": {id: "H", head: " G°", green: 60, yellow: 80, red: 90},
+	"K": {id: "K", head: "I/O", green: 60, yellow: 85, red: 100}, // диск занят (Windows, PDH)
 }
 
 // layout возвращает колонки в порядке вывода; значения заполнит sampleRow.
@@ -975,6 +986,7 @@ func requestedLayout(cfg config) []reading {
 	add("I", cfg.iowait)
 	add("S", cfg.swap)
 	add("U", cfg.disk)
+	add("K", cfg.diskBusy)
 	add("B", cfg.batt)
 	add("P", cfg.gpu)
 	add("H", cfg.gputemp)
@@ -1161,6 +1173,9 @@ func measure(ctx context.Context, cfg config) []reading {
 	}
 	if need("U") {
 		vals["U"] = meter.DiskPercent()
+	}
+	if need("K") {
+		vals["K"] = meter.DiskBusyPercent()
 	}
 	if need("B") {
 		vals["B"] = meter.BatteryPercent()

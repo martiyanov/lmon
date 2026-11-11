@@ -111,6 +111,10 @@ ping -n 2 -w 1000 8.8.8.8
 nvidia-smi --query-gpu=temperature.gpu,utilization.gpu --format=csv,noheader
 Get-Counter '\GPU Engine(*)\Utilization Percentage' -ErrorAction SilentlyContinue
 
+# давление на диск (имена счётчиков в неанглийской Windows локализованы)
+typeperf "\PhysicalDisk(_Total)\Avg. Disk Queue Length" -sc 3
+typeperf "\PhysicalDisk(_Total)\Avg. Disk sec/Read" -sc 3
+
 # источники температуры CPU (опционально; часто нужен админ и/или не поддерживается)
 Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature
 ```
@@ -162,6 +166,8 @@ lmon help   # вся справка: при русской локали — по
 - **IOW** — сколько процессор простаивает в ожидании диска (`--iowait`,
   только Linux; высокий — диск узкое место; на macOS/Windows скрыта).
 - **SWP** — занятый swap/файл подкачки (`--swap`; растёт при нехватке памяти). На Windows читается через PDH без прав администратора.
+- **I/O** — насколько занят диск, % (`--disk-busy`, Windows; ближайший аналог
+  Linux-iowait: читает `\PhysicalDisk(_Total)\% Disk Time` через PDH, без админа).
 - **DSK** — насколько заполнен системный диск (`--disk`; выше 90% — пора чистить).
 - **BAT** — заряд батареи (`--batt`; красный ниже 20%).
 - **GPU** — занятость видеокарты, % (`--gpu`). Windows: NVML/nvidia-smi (NVIDIA) или счётчики PDH GPU Engine (остальные).
@@ -175,7 +181,7 @@ lmon пишет, что скрыто и чем заменить; отключи�
 
 Три режима отображения на вкус: просто цифры (`lmon`), цветные
 квадраты без цифр (`lmon -b`), цифры на цветной подложке (`lmon --hybrid`).
-Набор и порядок колонок — любые: `lmon --cols NRMC` (буквы — в `lmon help`).
+Набор и порядок колонок — любые: `lmon --cols NRMC` (буквы — в `lmon help`). Занятость диска на Windows: `lmon --disk-busy` (колонка `I/O`, PDH без админа).
 Одна строка значений для tmux-статусбара: `lmon --once` (цвет — только на терминале, в пайп идёт чистый текст). Температура CPU на Windows — через `--temp-cmd` (LMON_TEMP_CMD): команда печатает °C, lmon берёт первое число.
 
 ## FAQ

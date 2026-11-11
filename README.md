@@ -113,6 +113,10 @@ ping -n 2 -w 1000 8.8.8.8
 nvidia-smi --query-gpu=temperature.gpu,utilization.gpu --format=csv,noheader
 Get-Counter '\GPU Engine(*)\Utilization Percentage' -ErrorAction SilentlyContinue
 
+# disk pressure (counter names are localized on non-English Windows)
+typeperf "\PhysicalDisk(_Total)\Avg. Disk Queue Length" -sc 3
+typeperf "\PhysicalDisk(_Total)\Avg. Disk sec/Read" -sc 3
+
 # CPU temperature sources (optional; often needs admin / may be unsupported)
 Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature
 ```
@@ -176,6 +180,8 @@ align exactly with the values. In plain words:
 - **IOW** — how much the CPU idles waiting for the disk (`--iowait`,
   Linux only; high — the disk is the bottleneck; hidden on macOS/Windows).
 - **SWP** — swap/pagefile in use (`--swap`; grows when memory runs out). On Windows it reads the page file through PDH, no admin needed.
+- **I/O** — how busy the disk is, % (`--disk-busy`, Windows; the closest thing
+  to Linux iowait: reads `\PhysicalDisk(_Total)\% Disk Time` via PDH, no admin).
 - **DSK** — how full the system disk is (`--disk`; above 90% — time to clean).
 - **BAT** — battery charge (`--batt`; red below 20%).
 - **GPU** — how busy the video card is, % (`--gpu`). Windows: NVML/nvidia-smi (NVIDIA) or PDH GPU Engine counters (other vendors).
@@ -199,6 +205,7 @@ Thresholds (green ≤ / yellow ≤ / red beyond):
 | `I` IOW | ≤ 5 | ≤ 20 | > 20 |
 | `S` SWP | ≤ 30 | ≤ 70 | > 70 |
 | `U` DSK | ≤ 80 | ≤ 90 | > 90 |
+| `K` I/O | ≤ 60 | ≤ 85 | > 85 |
 | `B` BAT | ≥ 50 | ≥ 20 | < 20 |
 | `P` GPU | ≤ 50 | ≤ 85 | > 85 |
 | `H` G° | ≤ 60 | ≤ 80 | > 80 |
@@ -250,6 +257,7 @@ machine; `999` means the host is unreachable.
 | `--cols` | `LMON_COLS` | base set | column set and order, one letter each (e.g. `NG,CSB`); flags add more |
 | `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |
 | `--temp-cmd` | `LMON_TEMP_CMD` | — | external command printing CPU temp in °C (e.g. LibreHardwareMonitor via PowerShell on Windows) |
+| `--disk-busy` | `LMON_DISK_BUSY` | off | disk busy time %, Windows (PDH `PhysicalDisk`) |
 | `--cpu` `--iowait` `--swap` `--disk` `--batt` `--gpu` `--gputemp` | — | off | add extra columns |
 
 ```sh

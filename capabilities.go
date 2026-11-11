@@ -26,11 +26,16 @@ func columnSupportedByOS(id, goos string) bool {
 	case "darwin":
 		switch id {
 		case "I", // iowait на macOS ядром не отдаётся
-			"H": // GPUTempC: powermetrics под sudo — не показываем
+			"H", // GPUTempC: powermetrics под sudo — не показываем
+			"K": // занятость диска — пока только Windows (PDH)
 			return false
 		}
 	case "linux":
-		// В Linux доступны все колонки; отдельные датчики (GPU, TMP)
+		switch id {
+		case "K": // занятость диска — пока только Windows (PDH)
+			return false
+		}
+		// Остальные колонки в Linux доступны; отдельные датчики (GPU, TMP)
 		// зависят от железа — для них остаются подсказки при -1.
 	default:
 		switch id {
@@ -56,6 +61,8 @@ func supportedReason(id string) string {
 		return "загрузка GPU"
 	case "H":
 		return "температура GPU"
+	case "K":
+		return "занятость диска"
 	}
 	return id
 }

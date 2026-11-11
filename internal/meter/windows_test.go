@@ -39,6 +39,9 @@ func TestSensors(t *testing.T) {
 	if g := GPUTempC(); g < -50 || g > 150 {
 		t.Errorf("GPUTempC = %d, want -50..150", g)
 	}
+	if b := DiskBusyPercent(); b < -1 || b > 100 {
+		t.Errorf("DiskBusyPercent = %d, want -1..100", b)
+	}
 	if _, err := LoadAvg(); err == nil {
 		t.Error("LoadAvg: на Windows ожидается ошибка")
 	}

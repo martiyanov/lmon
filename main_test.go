@@ -471,3 +471,44 @@ func TestParseTempCmdFlag(t *testing.T) {
 		t.Errorf("tempCmd = %q", cfg.tempCmd)
 	}
 }
+
+func TestDiskBusyColumn(t *testing.T) {
+	if !columnSupportedByOS("K", "windows") {
+		t.Error("K должна поддерживаться на Windows")
+	}
+	for _, goos := range []string{"darwin", "linux"} {
+		if columnSupportedByOS("K", goos) {
+			t.Errorf("K не должна поддерживаться на %s", goos)
+		}
+	}
+	cols, _ := layoutWithDropped(config{diskBusy: true}, "windows")
+	if got := ids(cols); !strings.Contains(got, "K") {
+		t.Errorf("windows layout = %q, нет K", got)
+	}
+	cols, dropped := layoutWithDropped(config{cols: []string{"K"}}, "darwin")
+	if got := ids(cols); got != "M" {
+		t.Errorf("darwin layout = %q, want fallback M", got)
+	}
+	if got := droppedHeads(dropped); got != "I/O" {
+		t.Errorf("dropped = %q, want I/O", got)
+	}
+}
+
+func TestParseDiskBusyFlag(t *testing.T) {
+	t.Setenv("LMON_DISK_BUSY", "")
+	cfg, err := parseConfig([]string{"--disk-busy"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.diskBusy {
+		t.Error("--disk-busy не установил флаг")
+	}
+	t.Setenv("LMON_DISK_BUSY", "1")
+	cfg, err = parseConfig(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.diskBusy {
+		t.Error("LMON_DISK_BUSY=1 не установил флаг")
+	}
+}
