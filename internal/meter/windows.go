@@ -87,11 +87,6 @@ func queryMemory() (physLoad, pageLoad int) {
 // MemPercent — занятая физическая память (как в диспетчере задач).
 func MemPercent() int { p, _ := queryMemory(); return p }
 
-// SwapPercent — реальная статистика файла подкачка через WinAPI недоступна
-// без счётчиков производительности; MEMORYSTATUSEX даёт committed memory,
-// а не swap. Показываем честное «нет данных».
-func SwapPercent() int { return -1 }
-
 // TempC — надёжного датчика температуры через WinAPI нет
 // (WMI-счётчик ненадёжен и требует прав администратора).
 func TempC() int { return -1 }

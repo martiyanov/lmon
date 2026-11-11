@@ -204,3 +204,25 @@ func TestNoHintsFlagAndEnv(t *testing.T) {
 		t.Error("LMON_NO_HINTS=1 не установил флаг")
 	}
 }
+
+func TestStartupHintsWindowsSensors(t *testing.T) {
+	cfg := config{lang: "en", swap: true, gpu: true, gputemp: true}
+	cols, dropped := layoutWithDropped(cfg, "windows")
+	setValues(cols, map[string]int{"N": 24, "G": 2, "L": -1, "M": 48, "T": -1, "S": -1, "P": -1, "H": -1})
+	txt := hintsText(startupHints(cfg, cols, "windows", dropped))
+	for _, want := range []string{"page file", "GPU", "G°"} {
+		if !strings.Contains(txt, want) {
+			t.Errorf("в подсказках нет %q:\n%s", want, txt)
+		}
+	}
+}
+
+func TestStartupHintsTempCmdFailure(t *testing.T) {
+	cfg := config{lang: "en", cols: []string{"T"}, tempCmd: "exit 1"}
+	cols, dropped := layoutWithDropped(cfg, "windows")
+	setValues(cols, map[string]int{"T": -1})
+	txt := hintsText(startupHints(cfg, cols, "windows", dropped))
+	if !strings.Contains(txt, "--temp-cmd") {
+		t.Errorf("нет подсказки про --temp-cmd:\n%s", txt)
+	}
+}

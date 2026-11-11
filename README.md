@@ -83,11 +83,13 @@ Expand-Archive lmon.zip; Move-Item lmon\lmon.exe "$env:LOCALAPPDATA\Microsoft\Wi
 ```
 
 (then run `lmon` in Windows Terminal; on ARM use `lmon_windows_arm64.zip`).
-On Windows the `L` (load average), `T` (temperature), `I` (iowait), `S` (swap)
-and GPU columns are hidden automatically — the OS does not expose those
-readings. At startup lmon says what was hidden and what to use instead
-(`--cpu` for CPU load); hints never block the run and can be turned off
-with `--no-hints` or `LMON_NO_HINTS=1`.
+On Windows the `L` (load average), `T` (CPU temperature) and `I` (iowait)
+columns are hidden automatically — the OS has no such readings. `SWP` reads
+the page file through PDH (no admin), `GPU`/`G°` use NVIDIA NVML/nvidia-smi
+or PDH GPU Engine counters (other vendors). CPU temperature has no native
+API: pass `--temp-cmd` (e.g. LibreHardwareMonitor via PowerShell) to show
+`C°`. At startup lmon says what was hidden or unavailable and how to fix it;
+hints never block the run and can be turned off with `--no-hints`.
 
 **If you have Go 1.22+**:
 
@@ -136,10 +138,10 @@ align exactly with the values. In plain words:
 - **CPU** — how busy the processor is right now, % (`--cpu`).
 - **IOW** — how much the CPU idles waiting for the disk (`--iowait`,
   Linux only; high — the disk is the bottleneck; hidden on macOS/Windows).
-- **SWP** — swap in use (`--swap`; grows when memory runs out).
+- **SWP** — swap/pagefile in use (`--swap`; grows when memory runs out). On Windows it reads the page file through PDH, no admin needed.
 - **DSK** — how full the system disk is (`--disk`; above 90% — time to clean).
 - **BAT** — battery charge (`--batt`; red below 20%).
-- **GPU** — how busy the video card is, % (`--gpu`).
+- **GPU** — how busy the video card is, % (`--gpu`). Windows: NVML/nvidia-smi (NVIDIA) or PDH GPU Engine counters (other vendors).
 - **G°** — GPU temperature (`--gputemp`; hidden on macOS/Windows — no
   unprivileged source).
 
@@ -210,6 +212,7 @@ machine; `999` means the host is unreachable.
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order, one letter each (e.g. `NG,CSB`); flags add more |
 | `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |
+| `--temp-cmd` | `LMON_TEMP_CMD` | — | external command printing CPU temp in °C (e.g. LibreHardwareMonitor via PowerShell on Windows) |
 | `--cpu` `--iowait` `--swap` `--disk` `--batt` `--gpu` `--gputemp` | — | off | add extra columns |
 
 ```sh

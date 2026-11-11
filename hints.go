@@ -143,33 +143,42 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 		}
 	}
 	if r, ok := byID["T"]; ok && r.v < 0 {
-		switch goos {
-		case "windows":
+		if cfg.tempCmd != "" {
 			add(lmsg(lang,
-				"C°: Windows has no CPU temperature API without extra software.",
-				"C°: в Windows нет API температуры CPU без внешнего ПО."),
+				"C°: --temp-cmd did not return a number.",
+				"C°: команда --temp-cmd не вернула число."),
 				lmsg(lang,
-					"The column stays «·»; use CPU/MEM/DSK. HWiNFO/OpenHardwareMonitor are not integrated yet.",
-					"Колонка останется «·»; используйте CPU/MEM/DSK. HWiNFO/OpenHardwareMonitor пока не интегрированы."))
-		case "darwin":
-			add(lmsg(lang,
-				"C°: the CPU temperature sensor needs smctemp.",
-				"C°: для температуры CPU нужен smctemp."),
-				lmsg(lang,
-					"Install it: brew install smctemp — or drop column T.",
-					"Установите: brew install smctemp — или уберите колонку T."))
-		case "linux":
-			add(lmsg(lang,
-				"C°: the CPU temperature sensor is not readable.",
-				"C°: датчик температуры CPU не читается."),
-				lmsg(lang,
-					"Check /sys/class/thermal or install lm-sensors; or drop the column.",
-					"Проверьте /sys/class/thermal или поставьте lm-sensors; либо уберите колонку."))
-		default:
-			add(lmsg(lang,
-				"C°: temperature is not available on this system.",
-				"C°: температура недоступна в этой системе."),
-				lmsg(lang, "Drop the column with --cols.", "Уберите колонку через --cols."))
+					"Check the command manually and that it prints °C (first number is used).",
+					"Проверьте команду вручную и что она печатает °C (берётся первое число)."))
+		} else {
+			switch goos {
+			case "windows":
+				add(lmsg(lang,
+					"C°: Windows has no CPU temperature API; use an external source.",
+					"C°: в Windows нет API температуры CPU; нужен внешний источник."),
+					lmsg(lang,
+						"Pass --temp-cmd (e.g. LibreHardwareMonitor via PowerShell) or drop column T.",
+						"Передайте --temp-cmd (например, LibreHardwareMonitor через PowerShell) или уберите колонку T."))
+			case "darwin":
+				add(lmsg(lang,
+					"C°: the CPU temperature sensor needs smctemp.",
+					"C°: для температуры CPU нужен smctemp."),
+					lmsg(lang,
+						"Install it: brew install smctemp — or drop column T.",
+						"Установите: brew install smctemp — или уберите колонку T."))
+			case "linux":
+				add(lmsg(lang,
+					"C°: the CPU temperature sensor is not readable.",
+					"C°: датчик температуры CPU не читается."),
+					lmsg(lang,
+						"Check /sys/class/thermal or install lm-sensors; or drop the column.",
+						"Проверьте /sys/class/thermal или поставьте lm-sensors; либо уберите колонку."))
+			default:
+				add(lmsg(lang,
+					"C°: temperature is not available on this system.",
+					"C°: температура недоступна в этой системе."),
+					lmsg(lang, "Drop the column with --cols.", "Уберите колонку через --cols."))
+			}
 		}
 	}
 	if r, ok := byID["I"]; ok && r.v < 0 && goos != "linux" {
@@ -181,11 +190,11 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 	if r, ok := byID["S"]; ok && r.v < 0 {
 		if goos == "windows" {
 			add(lmsg(lang,
-				"SWP: Windows swap is not exposed without performance counters.",
-				"SWP: swap в Windows не измеряется без счётчиков производительности."),
+				"SWP: the page file is disabled or cannot be read.",
+				"SWP: файл подкачки отключён или не читается."),
 				lmsg(lang,
-					"Use MEM/DSK, or drop the SWP column.",
-					"Используйте MEM/DSK или уберите колонку SWP."))
+					"Enable it in sysdm.cpl → Advanced → Performance → Virtual memory, or drop the SWP column.",
+					"Включите его: sysdm.cpl → Дополнительно → Быстродействие → Виртуальная память, или уберите колонку SWP."))
 		} else {
 			add(lmsg(lang,
 				"SWP: swap is unavailable on this system.",
@@ -195,19 +204,19 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 	}
 	if r, ok := byID["P"]; ok && r.v < 0 {
 		add(lmsg(lang,
-			"GPU: no GPU utilization data.",
-			"GPU: нет данных об утилизации GPU."),
+			"GPU: no GPU utilization source.",
+			"GPU: нет источника загрузки GPU."),
 			lmsg(lang,
-				"Windows: install nvidia-smi (NVIDIA driver); otherwise drop column P.",
-				"Windows: нужен nvidia-smi (драйвер NVIDIA); иначе уберите колонку P."))
+				"Windows: NVIDIA driver (NVML/nvidia-smi) or Windows 10 1709+ for PDH GPU Engine counters; otherwise drop column P.",
+				"Windows: драйвер NVIDIA (NVML/nvidia-smi) или Windows 10 1709+ для счётчиков PDH GPU Engine; иначе уберите колонку P."))
 	}
 	if r, ok := byID["H"]; ok && r.v < 0 {
 		add(lmsg(lang,
-			"G°: no GPU temperature data.",
-			"G°: нет данных о температуре GPU."),
+			"G°: no GPU temperature source.",
+			"G°: нет источника температуры GPU."),
 			lmsg(lang,
-				"Windows: nvidia-smi/driver required; otherwise drop column H.",
-				"Windows: нужен nvidia-smi/драйвер; иначе уберите колонку H."))
+				"Windows: NVIDIA via NVML/nvidia-smi; AMD/Intel need an external monitor (not supported yet); otherwise drop column H.",
+				"Windows: NVIDIA через NVML/nvidia-smi; AMD/Intel — только внешний монитор (пока не поддержано); иначе уберите колонку H."))
 	}
 	if r, ok := byID["U"]; ok && r.v < 0 {
 		add(lmsg(lang,

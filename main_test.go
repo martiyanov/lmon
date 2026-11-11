@@ -437,3 +437,37 @@ func TestHeaderAndHybridUseExplicitBlack(t *testing.T) {
 		}
 	}
 }
+
+func TestLayoutWindowsSensorColumns(t *testing.T) {
+	// SWP (pagefile), GPU и G° на Windows теперь поддержаны: источники —
+	// PDH/NVML/nvidia-smi, без прав администратора.
+	cols, _ := layoutWithDropped(config{swap: true, gpu: true, gputemp: true}, "windows")
+	got := ids(cols)
+	for _, want := range []string{"S", "P", "H"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("windows layout = %q, нет колонки %s", got, want)
+		}
+	}
+}
+
+func TestTempCmdKeepsTemperatureColumn(t *testing.T) {
+	cfg := config{cols: []string{"T"}, tempCmd: "echo 50"}
+	cols, dropped := layoutWithDropped(cfg, "windows")
+	if got := ids(cols); got != "T" {
+		t.Fatalf("layout = %q, want T (--temp-cmd включает C° на Windows)", got)
+	}
+	if len(dropped) != 0 {
+		t.Fatalf("dropped = %v, want пусто", dropped)
+	}
+}
+
+func TestParseTempCmdFlag(t *testing.T) {
+	t.Setenv("LMON_TEMP_CMD", "")
+	cfg, err := parseConfig([]string{"--temp-cmd", "echo 50"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.tempCmd != "echo 50" {
+		t.Errorf("tempCmd = %q", cfg.tempCmd)
+	}
+}

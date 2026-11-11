@@ -21,8 +21,8 @@ func TestSensors(t *testing.T) {
 	if m := MemPercent(); m < 0 || m > 100 {
 		t.Errorf("MemPercent = %d", m)
 	}
-	if s := SwapPercent(); s != -1 {
-		t.Errorf("SwapPercent = %d, want -1 (реальный swap-счётчик недоступен)", s)
+	if s := SwapPercent(); s < -1 || s > 100 {
+		t.Errorf("SwapPercent = %d, want -1..100 (pagefile через PDH)", s)
 	}
 	if b := BatteryPercent(); b != -1 && (b < 0 || b > 100) {
 		t.Errorf("BatteryPercent = %d", b)
@@ -31,7 +31,13 @@ func TestSensors(t *testing.T) {
 		t.Errorf("DiskPercent = %d", d)
 	}
 	if TempC() != -1 {
-		t.Error("TempC: на Windows ожидается -1")
+		t.Error("TempC: на Windows без внешнего источника ожидается -1")
+	}
+	if g := GPUPercent(); g < -1 || g > 100 {
+		t.Errorf("GPUPercent = %d, want -1..100", g)
+	}
+	if g := GPUTempC(); g < -50 || g > 150 {
+		t.Errorf("GPUTempC = %d, want -50..150", g)
 	}
 	if _, err := LoadAvg(); err == nil {
 		t.Error("LoadAvg: на Windows ожидается ошибка")

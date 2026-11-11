@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -47,7 +48,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
              на Linux читается из sysfs; на Windows нет датчика («·»).
   CPU (C)  — загрузка CPU, % (--cpu).
   IOW (I)  — iowait CPU, % (--iowait; только Linux, иначе «·»).
-  SWP (S)  — занятый swap, % (--swap; на Windows «·»).
+  SWP (S)  — занятые swap/файл подкачки, % (--swap; Windows читает
+             pagefile через PDH, без прав администратора).
   DSK (U)  — занято на системном диске, % (--disk).
   BAT (B)  — заряд батареи, % (--batt; шкала перевёрнута: меньше — хуже).
   GPU (P)  — загрузка GPU, % (--gpu; macOS — ioreg без sudo,
@@ -134,6 +136,10 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --thresholds  LMON_THRESHOLDS   свои пороги цвета: КОЛОНКА=з/ж/к через
                               запятую, числа через / — NET=100/200/500,
                               RUN=8/16/32; LMON_THRESHOLDS
+  --temp-cmd    LMON_TEMP_CMD  внешняя команда, печатающая температуру CPU
+                              в °C (берётся первое число). Нужна на Windows,
+                              где нет штатного API: например, LHM через
+                              PowerShell.
 
 Примеры:
   lmon --target 1.1.1.1
@@ -181,7 +187,8 @@ Columns (letter in parentheses is for --cols):
              on Linux read from sysfs; on Windows there is no sensor («·»).
   CPU (C)  — CPU usage, % (--cpu).
   IOW (I)  — CPU iowait, % (--iowait; Linux only, otherwise «·»).
-  SWP (S)  — swap in use, % (--swap; «·» on Windows).
+  SWP (S)  — swap/pagefile in use, % (--swap; on Windows it reads
+             pagefile via PDH, no admin rights).
   DSK (U)  — root disk usage, % (--disk).
   BAT (B)  — battery charge, % (--batt; inverted scale: less is worse).
   GPU (P)  — GPU utilization, % (--gpu; on macOS via ioreg without sudo,
@@ -266,6 +273,10 @@ Settings (flags and environment variables):
                               COL=g/y/r, comma-separated groups, numbers
                               slashed — NET=100/200/500, RUN=8/16/32;
                               LMON_THRESHOLDS
+  --temp-cmd    LMON_TEMP_CMD  external command that prints CPU temperature
+                              in °C (the first number is used). Needed on
+                              Windows where no native API exists; e.g. LHM
+                              via PowerShell.
 
 Examples:
   lmon --target 1.1.1.1
@@ -329,6 +340,7 @@ type config struct {
 	thresholds map[string][3]int // --thresholds: пороги цвета по колонкам
 	pings      []pingTarget      // --ping NAME=host: именованные пинги
 	noHints    bool              // --no-hints / LMON_NO_HINTS: без стартовых подсказок
+	tempCmd    string            // --temp-cmd: внешняя команда температуры (°C)
 }
 
 // pingTarget — именованная пинг-колонка (--ping VPN=10.8.0.1):
@@ -403,6 +415,7 @@ func parseConfig(args []string) (config, error) {
 	var once bool
 	fs.BoolVar(&once, "once", false, "print one line of values and exit (for tmux/status bars)")
 	noHints := fs.Bool("no-hints", envFlag("LMON_NO_HINTS"), "do not print startup hints about unavailable columns")
+	tempCmd := fs.String("temp-cmd", envStr("LMON_TEMP_CMD", ""), "external command that prints CPU temperature (°C)")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
@@ -497,7 +510,7 @@ func parseConfig(args []string) (config, error) {
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
 		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
-		noHints: *noHints}, nil
+		noHints: *noHints, tempCmd: *tempCmd}, nil
 }
 
 // rawList — повторяемый флаг: каждое вхождение добавляет строку.
@@ -974,6 +987,28 @@ func requestedLayout(cfg config) []reading {
 	return rs
 }
 
+// tempValue берёт температуру из внешней команды (--temp-cmd), если она
+// задана, иначе из штатного датчика ОС.
+var (
+	extTempMu   sync.Mutex
+	extTemp     *meter.CmdTemp
+	extTempSpec string
+)
+
+func tempValue(cfg config) int {
+	if cfg.tempCmd == "" {
+		return meter.TempC()
+	}
+	extTempMu.Lock()
+	if extTemp == nil || extTempSpec != cfg.tempCmd {
+		extTemp = meter.NewCmdTemp(cfg.tempCmd, 2*time.Second)
+		extTempSpec = cfg.tempCmd
+	}
+	inst := extTemp
+	extTempMu.Unlock()
+	return inst.TempC()
+}
+
 // layout — колонки с учётом возможностей ОС: то, что в системе не
 // измерить (RUN/C° в Windows и т. п.), не показывается вовсе.
 func layout(cfg config) []reading {
@@ -988,7 +1023,11 @@ func layoutWithDropped(cfg config, goos string) ([]reading, []droppedColumn) {
 	out := make([]reading, 0, len(rs))
 	var dropped []droppedColumn
 	for _, r := range rs {
-		if columnSupportedByOS(r.id, goos) {
+		supported := columnSupportedByOS(r.id, goos)
+		if r.id == "T" && cfg.tempCmd != "" {
+			supported = true // температура из внешней команды
+		}
+		if supported {
 			out = append(out, r)
 			continue
 		}
@@ -1112,7 +1151,7 @@ func measure(ctx context.Context, cfg config) []reading {
 		vals["M"] = meter.MemPercent()
 	}
 	if need("T") {
-		vals["T"] = meter.TempC()
+		vals["T"] = tempValue(cfg)
 	}
 	if cpuCh != nil {
 		vals["C"], vals["I"] = <-cpuCh, <-cpuCh

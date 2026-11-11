@@ -17,13 +17,12 @@ func columnSupportedByOS(id, goos string) bool {
 	case "windows":
 		switch id {
 		case "L", // load average в Windows отсутствует
-			"T", // нет API температуры CPU без внешнего ПО
-			"I", // iowait есть только в Linux
-			"S", // swap без счётчиков производительности не читается
-			"P", // утилизация GPU без nvidia-smi недоступна
-			"H": // температура GPU — та же история
+			"T", // нет официального API температуры CPU (только --temp-cmd)
+			"I": // iowait есть только в Linux
 			return false
 		}
+		// S (pagefile) читается через PDH; P/H — NVML/nvidia-smi/PDH;
+		// если источника нет, колонка покажет «·» и подсказку.
 	case "darwin":
 		switch id {
 		case "I", // iowait на macOS ядром не отдаётся
