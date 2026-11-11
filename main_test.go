@@ -396,3 +396,25 @@ func TestColsLetters(t *testing.T) {
 		}
 	}
 }
+
+func TestOnceUIColorsOnlyOnTTY(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+	cfg := config{hybrid: true}
+	rs := []reading{{id: "N", head: "NET", v: 20, green: 50, yellow: 150, red: 300}}
+
+	var piped bytes.Buffer
+	if row := newOnceUI(&piped, cfg, false).dataRow(rs); strings.ContainsRune(row, '\x1b') {
+		t.Errorf("--once в пайп содержит ANSI: %q", row)
+	}
+
+	var tty bytes.Buffer
+	if row := newOnceUI(&tty, cfg, true).dataRow(rs); !strings.ContainsRune(row, '\x1b') {
+		t.Errorf("--once на терминале без цвета: %q", row)
+	}
+
+	// NO_COLOR отключает цвет и на терминале
+	t.Setenv("NO_COLOR", "1")
+	if row := newOnceUI(&tty, cfg, true).dataRow(rs); strings.ContainsRune(row, '\x1b') {
+		t.Errorf("NO_COLOR не отключил цвет в --once: %q", row)
+	}
+}

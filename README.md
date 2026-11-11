@@ -209,7 +209,7 @@ machine; `999` means the host is unreachable.
 | `-b`, `--blocks` | — | off | color blocks instead of digits |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order, one letter each (e.g. `NG,CSB`); flags add more |
-| `--once` | — | off | print one plain line of values and exit (tmux status bar) |
+| `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |
 | `--cpu` `--iowait` `--swap` `--disk` `--batt` `--gpu` `--gputemp` | — | off | add extra columns |
 
 ```sh

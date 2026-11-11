@@ -76,8 +76,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
 
   Примеры: только сеть и память — lmon --cols NM
            swap перед памятью  — lmon --cols N,SG,M
-  --once         — одна строка значений без заголовка и без ANSI —
-                   для tmux-статусбара и скриптов:
+  --once         — одна строка значений без заголовка; цвет только на
+                   терминале, в пайпе — чистый текст (tmux/скрипты):
                    set -g status-right '#(lmon --once --cols=NGMC)'
 
 Цвета: зелёный — норма, жёлтый — внимание, красный — плохо.
@@ -118,7 +118,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                      — своя колонка пинга до любого хоста (имя 2–3
                        символа); VPN не подключён — будет 999.
                        Повторяемо: несколько --ping; LMON_PING
-  lmon --once        — одна строка значений (tmux/скрипты)
+  lmon --once        — одна строка значений; цвет только на терминале
   lmon --no-hints    — без подсказок о недоступных колонках
   lmon help          — эта справка
   lmon --version     — версия
@@ -249,7 +249,7 @@ Usage:
                      — your own ping column to any host (2-3 char
                        name); VPN down — the column shows 999.
                        Repeatable; LMON_PING
-  lmon --once        — one line of values (tmux/scripts)
+  lmon --once        — one line; colored only on a terminal
   lmon --no-hints    — start without hints about unavailable columns
   lmon help          — this help
   lmon --version     — version
@@ -754,7 +754,14 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		if !cfg.noHints {
 			printHints(os.Stderr, startupHints(cfg, rs, runtime.GOOS, dropped))
 		}
-		fmt.Fprintln(w, (&ui{w: w}).dataRow(rs))
+		// Цвет — как у обычного вывода: включаем только на терминале.
+		// В пайп/tmux строка остаётся чистым текстом (скрипты не ломаются).
+		tty := stdoutIsTTY() && w == io.Writer(os.Stdout)
+		if tty {
+			termSetup()
+			defer termRestore()
+		}
+		fmt.Fprintln(w, newOnceUI(w, cfg, tty).dataRow(rs))
 		return 0
 	}
 
@@ -815,6 +822,19 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		if err := nextTick(ctx, ticker, cfg.interval); err != nil {
 			return 130
 		}
+	}
+}
+
+// newOnceUI собирает ui для --once: tty передаётся явно, чтобы цвет
+// включался ровно на терминале и не зависел от os.Stdout в тестах.
+func newOnceUI(w io.Writer, cfg config, tty bool) *ui {
+	return &ui{
+		w:      w,
+		tty:    tty,
+		color:  tty && os.Getenv("NO_COLOR") == "",
+		blocks: cfg.blocks,
+		hybrid: cfg.hybrid,
+		lang:   cfg.lang,
 	}
 }
 
