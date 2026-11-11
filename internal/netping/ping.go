@@ -140,11 +140,45 @@ func isV6(host string) bool {
 	return err == nil && a.Is6() && !a.Is4In6()
 }
 
+// parseTimes достаёт времена отклика из вывода ping. Сначала — по метке
+// time/время (macOS/Linux/английская Windows, UTF-8). Если не нашлось,
+// разбираем строки с ASCII-меткой TTL: на русской Windows ping.exe пишет
+// в консольной кодировке (CP866/CP1251), и байты «время» не совпадают
+// с UTF-8 — раньше из-за этого NET/GTW показывали 999 при рабочем ping.
 func parseTimes(out string) []float64 {
 	ms := timeRe.FindAllStringSubmatch(out, -1)
 	times := make([]float64, 0, len(ms))
 	for _, m := range ms {
 		if v, err := strconv.ParseFloat(strings.ReplaceAll(m[1], ",", "."), 64); err == nil {
+			times = append(times, v)
+		}
+	}
+	if len(times) > 0 {
+		return times
+	}
+	return parseTTLTimes(out)
+}
+
+// ttlRe — ASCII-метка TTL в ответе Windows (в отличие от Linux/macOS,
+// там она заглавными: «TTL=117»). Не зависит от локали и кодировки.
+var ttlRe = regexp.MustCompile(`TTL[=\s]`)
+
+// eqNumRe — числа после «=»/«<»: «байт=32 время=33мс TTL=117».
+var eqNumRe = regexp.MustCompile(`[=<]\s*([0-9]+(?:[.,][0-9]+)?)`)
+
+// parseTTLTimes разбирает строки ответа Windows: числа идут в порядке
+// «байты, время, TTL», поэтому берём второе число строки.
+func parseTTLTimes(out string) []float64 {
+	var times []float64
+	for _, line := range strings.Split(out, "\n") {
+		if !ttlRe.MatchString(line) {
+			continue
+		}
+		nums := eqNumRe.FindAllStringSubmatch(line, -1)
+		if len(nums) < 2 {
+			continue
+		}
+		if v, err := strconv.ParseFloat(strings.ReplaceAll(nums[1][1], ",", "."), 64); err == nil {
 			times = append(times, v)
 		}
 	}

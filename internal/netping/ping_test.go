@@ -113,3 +113,31 @@ func TestRetryAllowed(t *testing.T) {
 		t.Error("retryAllowed(1.05с, 2с) = true, want false — ретрай не уложится")
 	}
 }
+
+func TestParseTimesWindowsOEM(t *testing.T) {
+	// Русская Windows: ping.exe при перенаправлении вывода пишет в OEM
+	// кодировке (CP866). Байты «время» не UTF-8, но «TTL» и цифры — ASCII.
+	// Строка: «Ответ от 8.8.8.8: число байт=32 время=33мс TTL=117»
+	line := []byte{
+		0x8e, 0xe2, 0xa2, 0xa5, 0xe2, ' ', 0xae, 0xe2, ' ', // Ответ от
+		'8', '.', '8', '.', '8', '.', '8', ':', ' ',
+		0xe7, 0xa8, 0xe1, 0xab, 0xae, ' ', // число
+		0xa1, 0xa0, 0xa9, 0xe2, '=', '3', '2', ' ', // байт=32
+		0xa2, 0xe0, 0xa5, 0xac, 0xef, '=', '3', '3', 0xac, 0xe1, ' ', // время=33мс
+		'T', 'T', 'L', '=', '1', '1', '7', '\n',
+	}
+	times := parseTimes(string(line))
+	if len(times) != 1 || times[0] != 33 {
+		t.Fatalf("parseTimes(OEM) = %v, want [33]", times)
+	}
+}
+
+func TestParseTimesWindowsEnglish(t *testing.T) {
+	// Английская Windows: Reply from 8.8.8.8: bytes=32 time=33ms TTL=117
+	out := "Reply from 8.8.8.8: bytes=32 time=33ms TTL=117\n" +
+		"Reply from 8.8.8.8: bytes=32 time<1ms TTL=117\n"
+	times := parseTimes(out)
+	if len(times) != 2 || times[0] != 33 || times[1] != 1 {
+		t.Fatalf("parseTimes(EN) = %v, want [33 1]", times)
+	}
+}
