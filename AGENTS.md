@@ -29,6 +29,8 @@
   функции не обёрнуты в используемой версии x/sys.
 - `legacy/lmon.zsh` — исходная zsh-версия, заморожена, не трогать.
 - `scripts/update-tap.sh` — обновление формулы homebrew-tap.
+- `scripts/release-local.sh` — локальный релиз: CI в Colima,
+  сборка в чистом клоне на теге, `gh release create`, тап.
 
 ## Команды
 
@@ -37,44 +39,35 @@ go vet ./... && go test ./...     # проверка
 go build -o lmon .                # сборка
 ./lmon --cpu --swap -b 5          # быстрая проверка руками
 ./scripts/test-all.sh             # полная локальная матрица (см. ниже)
+./scripts/release-local.sh v1.2.3 --notes-file /tmp/notes.md  # релиз
 ```
 
-## Тесты и релизы без GitHub Actions
+## Тесты и релизы
 
-GitHub Actions отключён за нехватой оплаченных минут (воркфлоу
-переименованы в `*.yml.disabled`; вернуть — переименовать обратно).
+GitHub Actions включён (ubuntu-only), но очередь у него периодически
+залипает: job может висеть в `queued` час и больше. Поэтому основной
+путь — локальная матрица, а релиз публикуется локально через `gh`.
 
-Вместо CI — `scripts/test-all.sh`: gofmt/vet/test/-race на маке,
-vet+test в `golang:1.22-alpine` через colima (реальный Linux),
-кросс-сборка всех шести платформ. Единственное, что потеряли из
-прежнего CI, — запуск тестов на настоящей Windows (кросс-сборка остаётся).
+CI: `scripts/test-all.sh` — gofmt/vet/test/-race на маке, vet+test в
+`golang:1.22-alpine` через colima (реальный Linux), проверка сайта docs
+и кросс-сборка всех шести платформ. Нужен `colima start`.
+Единственное, что не покрыто, — запуск тестов на настоящей Windows
+(кросс-сборка остаётся; идея с KVM/QEMU — в BACKLOG.md).
 
-Релиз без Actions:
+Релиз:
 1. `scripts/test-all.sh` — зелёное.
-2. Поднять `const version`, коммит, пуш, локальный тег `vX.Y.Z`.
-3. `goreleaser release --clean --skip=publish` (brew install goreleaser,
-   если нет) — артефакты в `dist/`.
-4. Владелец создаёт Release на GitHub и загружает файлы из `dist/`
-   через веб (имена вида lmon_<os>_<arch>.tar.gz / .zip и checksums.txt —
-   ссылки стабильны, README не устареет).
-5. `scripts/update-tap.sh vX.Y.Z` — как обычно (читает checksums из релиза).
+2. Поднять `const version` в `main.go`, коммит, пуш в `main`.
+3. Аннотированный тег `vX.Y.Z`, пуш тега. **Теги не перематывать**:
+   sum.golang.org запоминает хэш версии — правка только новым номером.
+4. `scripts/release-local.sh vX.Y.Z --notes-file notes.md` — прогоняет
+   CI, собирает goreleaser в чистом клоне на теге, публикует Release и
+   ассеты через `gh`, обновляет Homebrew-тап. Флаги: `--skip-ci`
+   (быстрый повтор), `--update` (перезалить ассеты существующего
+   релиза), `--no-tap`, `--dry-run`.
+5. `brew upgrade lmon` локально; проверить `lmon --version`.
 
-
-`go.mod` держит `go 1.22` — не поднимай без причины (совместимость).
-CGO всегда выключен (`CGO_ENABLED=0` в goreleaser).
-
-## Релиз
-
-1. Поднять `const version` в `main.go`, коммит, пуш в `main`.
-2. ДОЖДАТЬСЯ зелёного CI на этом коммите (все три ОС) — только потом
-   ставить тег `vX.Y.Z` и пушить его. Теги не перематывать.
-3. Release-воркфлоу сам прогоняет тесты матрицей ubuntu/macos/windows
-   и только после их успеха запускает goreleaser (публикация сборок
-   при красном CI исключена).
-4. Дождаться релиза, затем `scripts/update-tap.sh vX.Y.Z`
-   (обновит формулу в `~/Проекты/homebrew-tap` через SSH).
-4. **Теги никогда не перематывать**: sum.golang.org навсегда
-   запоминает хэш версии — правка = только новый номер версии.
+Требования к локальному релизу: `gh auth login` (scope repo),
+`goreleaser`, `docker`/`colima`, `git` с доступом к origin по SSH.
 
 ## Железные правила
 
