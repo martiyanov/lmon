@@ -418,3 +418,22 @@ func TestOnceUIColorsOnlyOnTTY(t *testing.T) {
 		t.Errorf("NO_COLOR не отключил цвет в --once: %q", row)
 	}
 }
+
+func TestHeaderAndHybridUseExplicitBlack(t *testing.T) {
+	// Windows Terminal «жирный чёрный» подсвечивает в серый — на цветной
+	// плашке подпись становится нечитаемой. Должен быть явный чёрный
+	// 256-цветной палитры (16) и без bold.
+	r := reading{id: "N", head: "NET", v: 20, green: 50, yellow: 150, red: 300}
+	u := &ui{color: true}
+	for name, s := range map[string]string{
+		"header": u.headerRow([]reading{r}),
+		"hybrid": u.hybridCell(r),
+	} {
+		if !strings.Contains(s, "38;5;16;48;5;") {
+			t.Errorf("%s: нет явного чёрного: %q", name, s)
+		}
+		if strings.Contains(s, "1;30") {
+			t.Errorf("%s: остался жирный чёрный: %q", name, s)
+		}
+	}
+}

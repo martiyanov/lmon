@@ -1292,7 +1292,7 @@ func (u *ui) headerRow(rs []reading) string {
 			cells[i] = dim + label + reset
 			continue
 		}
-		cells[i] = "\x1b[1;30;48;5;" + gradient256(r.severity()) + "m" + label + reset
+		cells[i] = "\x1b[38;5;16;48;5;" + gradient256(r.severity()) + "m" + label + reset
 	}
 	return strings.Join(cells, " ")
 }
@@ -1363,7 +1363,7 @@ func (u *ui) hybridCell(r reading) string {
 	if r.v < 0 {
 		return dim + valueText(r) + reset
 	}
-	return "\x1b[1;30;48;5;" + gradient256(r.severity()) + "m" + valueText(r) + reset
+	return "\x1b[38;5;16;48;5;" + gradient256(r.severity()) + "m" + valueText(r) + reset
 }
 
 func stdoutIsTTY() bool {
