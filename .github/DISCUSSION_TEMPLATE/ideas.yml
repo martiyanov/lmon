@@ -1,0 +1,36 @@
+title: "[Idea] "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Опиши идею так, чтобы её можно было реализовать: что неудобно, что хочется видеть, как это выглядит в терминале.
+        Describe the idea so it can be built: what hurts, what you want to see, how it should look in the terminal.
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Проблема / Problem"
+      description: "Что сейчас неудобно или чего не хватает / What is missing or painful today"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: "Предложение / Proposal"
+      description: "Как это должно работать: флаг, колонка, формат вывода / How it should work: flag, column, output format"
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Альтернативы / Alternatives"
+      description: "Что уже пробовал, другие инструменты, обходные пути / What you tried, other tools, workarounds"
+    validations:
+      required: false
+  - type: input
+    id: os
+    attributes:
+      label: "ОС / OS"
+      placeholder: "macOS 15, Ubuntu 24.04, Windows 11 24H2…"
+    validations:
+      required: false

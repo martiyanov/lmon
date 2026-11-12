@@ -281,6 +281,15 @@ Linux. Colors respect `NO_COLOR`.
 
 Установка и объяснения для тех, кому проще по-русски: [README.ru.md](README.ru.md).
 
+## Community
+
+- **GitHub Discussions** — ideas, questions, setups, release announcements: https://github.com/martiyanov/lmon/discussions
+- Rules and how an idea becomes a feature: [COMMUNITY.md](COMMUNITY.md)
+- Bugs and concrete tasks: [Issues](https://github.com/martiyanov/lmon/issues)
+- Security reports: privately via [Security → Report a vulnerability](https://github.com/martiyanov/lmon/security/advisories/new)
+
+Russian and English are both welcome. Canonical answers stay in Discussions so they remain searchable; Matrix/Telegram chat links will be added here once the rooms are created.
+
 ## License
 
 [MIT](LICENSE)

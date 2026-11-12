@@ -206,6 +206,15 @@ macOS/Linux: `sudo rm /usr/local/bin/lmon` (или
 `brew uninstall martiyanov/tap/lmon`).
 Windows: удали `lmon.exe` из `C:\Users\<имя>\AppData\Local\Microsoft\WindowsApps`.
 
+## Сообщество
+
+- **GitHub Discussions** — идеи, вопросы, настройки, анонсы релизов: https://github.com/martiyanov/lmon/discussions
+- Правила и путь идеи до фичи: [COMMUNITY.md](COMMUNITY.md)
+- Баги и конкретные задачи: [Issues](https://github.com/martiyanov/lmon/issues)
+- Об уязвимостях — приватно через [Security → Report a vulnerability](https://github.com/martiyanov/lmon/security/advisories/new)
+
+Русский и английский — оба языка OK. Канонические ответы остаются в Discussions, чтобы их можно было найти поиском; ссылки на Matrix/Telegram чат появятся здесь после создания комнаты и канала.
+
 ## Лицензия
 
 MIT — используй и меняй свободно. Код:

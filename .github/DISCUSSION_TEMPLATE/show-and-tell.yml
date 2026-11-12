@@ -1,0 +1,22 @@
+title: "[Show] "
+labels: ["showcase"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Покажи, как lmon живёт у тебя: tmux, скрипты, цвета, шрифты, виджеты.
+        Show how lmon lives on your machine: tmux, scripts, colors, fonts, widgets.
+  - type: textarea
+    id: setup
+    attributes:
+      label: "Что настроено / Setup"
+      description: "Команда запуска, конфиг, интеграции / Launch command, config, integrations"
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: "Скриншот / Screenshot"
+      description: "Перетащи картинку сюда / Drag an image here"
+    validations:
+      required: false

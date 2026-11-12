@@ -1,0 +1,37 @@
+title: "[Q] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Чем больше контекста — тем быстрее ответ. Приложи версию, ОС и вывод `lmon --once`.
+        More context — faster answer. Include version, OS and `lmon --once` output.
+  - type: textarea
+    id: question
+    attributes:
+      label: "Вопрос / Question"
+      description: "Что происходит и что ожидалось / What happens and what you expected"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: "Версия / Version"
+      placeholder: "lmon 1.12.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: "ОС / OS"
+      placeholder: "macOS 15, Ubuntu 24.04, Windows 11…"
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: "Вывод / Output"
+      description: "`lmon --once --cols NGSPH --swap --gpu --gputemp` (и скриншот, если удобно)"
+      render: text
+    validations:
+      required: false
