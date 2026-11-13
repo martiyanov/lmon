@@ -512,3 +512,49 @@ func TestParseDiskBusyFlag(t *testing.T) {
 		t.Error("LMON_DISK_BUSY=1 не установил флаг")
 	}
 }
+
+func TestColsWithPingNames(t *testing.T) {
+	for _, k := range []string{"LMON_COLS", "LMON_PING", "LMON_THRESHOLDS"} {
+		t.Setenv(k, "")
+	}
+	cfg, err := parseConfig([]string{"--ping", "VPN=192.0.2.1", "--cols", "NG,VPN,M"})
+	if err != nil {
+		t.Fatalf("--cols с пингом: %v", err)
+	}
+	if got := strings.Join(cfg.cols, ""); got != "NGVPNM" {
+		t.Fatalf("cols = %q, want NGVPNM", got)
+	}
+	// пинг уже стоит в --cols — справа повторно не добавляется
+	if got := ids(layout(cfg)); got != "NGVPNM" {
+		t.Errorf("layout = %q, want NGVPNM", got)
+	}
+
+	// без --cols пинг по-прежнему справа
+	cfg2, err := parseConfig([]string{"--ping", "VPN=192.0.2.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(layout(cfg2)); got != "NGLMTVPN" {
+		t.Errorf("layout без cols = %q, want NGLMTVPN", got)
+	}
+}
+
+func TestColsPingErrors(t *testing.T) {
+	for _, k := range []string{"LMON_COLS", "LMON_PING", "LMON_THRESHOLDS"} {
+		t.Setenv(k, "")
+	}
+	if _, err := parseConfig([]string{"--cols", "NG,VPN"}); err == nil || !strings.Contains(err.Error(), "ping") {
+		t.Errorf("незаданный пинг: err = %v, want подсказку про --ping", err)
+	}
+	if _, err := parseConfig([]string{"--ping", "VPN=192.0.2.1", "--cols", "VPN,VPN"}); err == nil || !strings.Contains(err.Error(), "twice") {
+		t.Errorf("дубль пинга: err = %v, want twice", err)
+	}
+	// компактная запись без разделителей остаётся рабочим набором букв
+	cfg, err := parseConfig([]string{"--cols", "NGM"})
+	if err != nil {
+		t.Fatalf("--cols NGM: %v", err)
+	}
+	if got := strings.Join(cfg.cols, ""); got != "NGM" {
+		t.Errorf("--cols NGM = %q", got)
+	}
+}

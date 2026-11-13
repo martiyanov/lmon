@@ -116,12 +116,15 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --gpu         — добавить колонку загрузки GPU
   lmon --disk-busy   — занятость диска, % (Windows, PDH)
   lmon --cols TNGC   — свой набор и порядок колонок
+  lmon --ping VPN=… --cols NG,VPN,M
+                     — пинг-колонку тоже можно поставить в нужное место
   lmon --thresholds NET=100/200/500
                      — свои пороги цвета (например, для мобильного
                        интернета); колонка=зелёный/жёлтый/красный
   lmon --ping VPN=10.8.0.1
                      — своя колонка пинга до любого хоста (имя 2–3
                        символа); VPN не подключён — будет 999.
+                       Место в выводе — в --cols (NG,VPN,M).
                        Повторяемо: несколько --ping; LMON_PING
   lmon --once        — одна строка значений; цвет только на терминале
   lmon --no-hints    — без подсказок о недоступных колонках
@@ -256,12 +259,15 @@ Usage:
   lmon --gpu         — add the GPU utilization column
   lmon --disk-busy   — disk busy time %, Windows (PDH)
   lmon --cols TNGC   — your own set and order of columns
+  lmon --ping VPN=… --cols NG,VPN,M
+                     — ping columns can be placed in the order too
   lmon --thresholds NET=100/200/500
                      — your own color thresholds (e.g. for mobile
                        internet); column=green/yellow/red
   lmon --ping VPN=10.8.0.1
                      — your own ping column to any host (2-3 char
                        name); VPN down — the column shows 999.
+                       Position it with --cols (NG,VPN,M).
                        Repeatable; LMON_PING
   lmon --once        — one line; colored only on a terminal
   lmon --no-hints    — start without hints about unavailable columns
@@ -412,7 +418,7 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&batt, "batt", false, "add battery charge column")
 	fs.BoolVar(&gpu, "gpu", false, "add GPU utilization column")
 	fs.BoolVar(&gputemp, "gputemp", false, "add GPU temperature column")
-	colsFlag := fs.String("cols", os.Getenv("LMON_COLS"), "base column set and order, e.g. NG,CSB (flags add more)")
+	colsFlag := fs.String("cols", os.Getenv("LMON_COLS"), "base column set and order, e.g. NG,CSB; --ping names can be placed too (NG,VPN,M)")
 	thrFlag := fs.String("thresholds", os.Getenv("LMON_THRESHOLDS"), "per-column color thresholds COL=green/yellow/red (e.g. NET=100/200/500)")
 	// --ping повторяемый: копим сырые строки, валидируем после разбора
 	var pingsRaw rawList
@@ -472,33 +478,6 @@ func parseConfig(args []string) (config, error) {
 		}
 	}
 
-	// --cols / LMON_COLS: свой набор и порядок колонок; перекрывает флаги.
-	// Каждая буква — колонка; запятая/пробел/плюс — разделители: «NG,CSB».
-	var cols []string
-	if spec := *colsFlag; spec != "" {
-		seen := map[string]bool{}
-		for _, r := range strings.ToUpper(spec) {
-			if r == ',' || r == ' ' || r == '+' {
-				continue
-			}
-			if r == 'D' { // D — понятная буква для диска, U — историческая
-				r = 'U'
-			}
-			id := string(r)
-			if _, ok := colRegistry[id]; !ok {
-				return config{}, fmt.Errorf(lmsg(lg, "--cols: unknown column %q (available: N G L M T C I S U B P H K)", "--cols: неизвестная колонка %q (есть: N G L M T C I S U B P H K)"), id)
-			}
-			if seen[id] {
-				return config{}, fmt.Errorf(lmsg(lg, "--cols: column %q listed twice", "--cols: колонка %q указана дважды"), id)
-			}
-			seen[id] = true
-			cols = append(cols, id)
-		}
-		if len(cols) == 0 {
-			return config{}, errors.New(lmsg(lg, "--cols: empty column set", "--cols: пустой набор колонок"))
-		}
-	}
-
 	// --thresholds / LMON_THRESHOLDS: свои пороги цвета, «NET=100,200,500».
 	// Для обычных колонок числа растут (зелёный < жёлтый < красный),
 	// для перевёрнутых (батарея) — убывают.
@@ -509,6 +488,13 @@ func parseConfig(args []string) (config, error) {
 
 	// --ping / LMON_PING: именованные пинг-колонки, «VPN=10.8.0.1».
 	pings, err := parsePings(pingsRaw, lg)
+	if err != nil {
+		return config{}, err
+	}
+
+	// --cols / LMON_COLS: набор и порядок колонок; сюда же можно ставить
+	// именованные пинг-колонки из --ping (VPN, DNS…).
+	cols, err := parseCols(*colsFlag, pings, lg)
 	if err != nil {
 		return config{}, err
 	}
@@ -577,6 +563,86 @@ func parsePings(raw rawList, lang string) ([]pingTarget, error) {
 		pings = append(pings, pingTarget{name: name, host: host})
 	}
 	return pings, nil
+}
+
+// parseCols разбирает --cols / LMON_COLS. Токены разделяются запятой,
+// пробелом или плюсом. Токен-имя пинга (--ping VPN=…) ставится в нужное
+// место; одиночные буквы — обычные колонки. Компактная запись без
+// разделителей (NGM) работает как раньше; чтобы вставить пинг, отделяй
+// его разделителем: NG,VPN,M.
+func parseCols(spec string, pings []pingTarget, lang string) ([]string, error) {
+	if spec == "" {
+		return nil, nil
+	}
+	pingByName := make(map[string]string, len(pings))
+	names := make([]string, 0, len(pings))
+	for _, p := range pings {
+		pingByName[p.name] = p.name
+		names = append(names, p.name)
+	}
+	seen := map[string]bool{}
+	var cols []string
+	add := func(id string) error {
+		if seen[id] {
+			return fmt.Errorf(lmsg(lang, "--cols: column %q listed twice", "--cols: колонка %q указана дважды"), id)
+		}
+		seen[id] = true
+		cols = append(cols, id)
+		return nil
+	}
+	for _, tok := range strings.FieldsFunc(spec, func(r rune) bool {
+		return r == ',' || r == ' ' || r == '+' || r == '\t'
+	}) {
+		up := strings.ToUpper(tok)
+		if name, ok := pingByName[up]; ok {
+			if err := add(name); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		// Токен из нескольких символов, который не имя пинга: это либо
+		// компактный набор букв (NGM), либо опечатка/незаданный пинг.
+		if len(up) > 1 {
+			onlyLetters := true
+			for _, r := range up {
+				if r == 'D' {
+					continue
+				}
+				if _, ok := colRegistry[string(r)]; !ok {
+					onlyLetters = false
+					break
+				}
+			}
+			if !onlyLetters {
+				hint := "N G L M T C I S U B P H K"
+				return nil, fmt.Errorf(lmsg(lang,
+					"--cols: unknown column or ping name %q (columns: %s; define a ping first: --ping %s=host)",
+					"--cols: неизвестная колонка или имя пинга %q (колонки: %s; пинг нужно сначала задать: --ping %s=host)"), up, hint, up)
+			}
+		}
+		for _, r := range up {
+			if r == 'D' { // D — понятная буква для диска, U — историческая
+				r = 'U'
+			}
+			id := string(r)
+			if _, ok := colRegistry[id]; !ok {
+				hint := "N G L M T C I S U B P H K"
+				if len(names) > 0 {
+					hint += ", " + strings.Join(names, " ")
+				}
+				return nil, fmt.Errorf(lmsg(lang,
+					"--cols: unknown column %q (available: %s; ping names only after --ping)",
+					"--cols: неизвестная колонка %q (есть: %s; имена пингов — только после --ping)"), id, hint)
+			}
+			if err := add(id); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if len(cols) == 0 {
+		return nil, errors.New(lmsg(lang, "--cols: empty column set", "--cols: пустой набор колонок"))
+	}
+	return cols, nil
 }
 
 // parseThresholds разбирает «NET=100,200,500,RUN=8,16,32»: колонка и три
@@ -968,7 +1034,11 @@ func requestedLayout(cfg config) []reading {
 	}
 	rs := make([]reading, 0, len(base)+5)
 	for _, id := range base {
-		rs = append(rs, colRegistry[id])
+		r, ok := columnByID(id, cfg.pings)
+		if !ok {
+			continue // не должно случаться: --cols проверен парсером
+		}
+		rs = append(rs, r)
 	}
 	// флаги добавляют колонки справа; уже указанные в --cols не дублируются
 	add := func(id string, on bool) {
@@ -990,13 +1060,40 @@ func requestedLayout(cfg config) []reading {
 	add("B", cfg.batt)
 	add("P", cfg.gpu)
 	add("H", cfg.gputemp)
-	// именованные пинги — справа, порогами как у NET
+	// именованные пинги, не указанные в --cols, — справа, порогами как у NET
 	for _, p := range cfg.pings {
-		r := reading{id: p.name, head: fmt.Sprintf("%3s", p.name), green: 50, yellow: 150, red: 300}
-		rs = append(rs, r)
+		r := pingReading(p)
+		exists := false
+		for _, x := range rs {
+			if x.id == r.id {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			rs = append(rs, r)
+		}
 	}
 	applyThresholds(rs, runtime.NumCPU(), cfg.thresholds)
 	return rs
+}
+
+// columnByID находит колонку по букве или имени пинга.
+func columnByID(id string, pings []pingTarget) (reading, bool) {
+	if r, ok := colRegistry[id]; ok {
+		return r, true
+	}
+	for _, p := range pings {
+		if p.name == id {
+			return pingReading(p), true
+		}
+	}
+	return reading{}, false
+}
+
+// pingReading — колонка именованного пинга; пороги как у NET.
+func pingReading(p pingTarget) reading {
+	return reading{id: p.name, head: fmt.Sprintf("%3s", p.name), green: 50, yellow: 150, red: 300}
 }
 
 // tempValue берёт температуру из внешней команды (--temp-cmd), если она

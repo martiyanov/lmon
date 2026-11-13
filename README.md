@@ -221,6 +221,11 @@ server inside your VPN tunnel: `--ping VPN=10.8.0.1`. While the tunnel is
 up you get its latency; VPN down — the column shows `999`. Repeatable,
 or via `LMON_PING="VPN=10.8.0.1,DNS=1.1.1.1"`.
 
+By default the column is appended on the right. To place it anywhere, add
+the name to `--cols`: `--cols NG,VPN,M` puts the VPN ping between the
+gateway and memory. Separators are required around ping names (commas,
+spaces or `+`); compact column sets like `NGM` still work.
+
 ### Blocks mode
 
 `lmon --hybrid` combines both: exact digits printed on the state-colored
@@ -254,7 +259,7 @@ machine; `999` means the host is unreachable.
 | `--interval` | `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
 | `-b`, `--blocks` | — | off | color blocks instead of digits |
 | `--hybrid` | — | off | digits on the state-colored background |
-| `--cols` | `LMON_COLS` | base set | column set and order, one letter each (e.g. `NG,CSB`); flags add more |
+| `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`) and `--ping` names (`NG,VPN,M`); flags add more |
 | `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |
 | `--temp-cmd` | `LMON_TEMP_CMD` | — | external command printing CPU temp in °C (e.g. LibreHardwareMonitor via PowerShell on Windows) |
 | `--disk-busy` | `LMON_DISK_BUSY` | off | disk busy time %, Windows (PDH `PhysicalDisk`) |
@@ -263,6 +268,7 @@ machine; `999` means the host is unreachable.
 ```sh
 lmon --target 1.1.1.1 --interval 2 10
 lmon -b --cols TNGC --cpu          # own set and order, flags add more
+lmon --ping VPN=10.8.0.1 --cols NG,VPN,M  # place a ping column anywhere
 tmux: set -g status-right '#(lmon --once --cols=NGMC)'
 ```
 
