@@ -288,7 +288,7 @@ Linux. Colors respect `NO_COLOR`.
 - Bugs and concrete tasks: [Issues](https://github.com/martiyanov/lmon/issues)
 - Security reports: privately via [Security → Report a vulnerability](https://github.com/martiyanov/lmon/security/advisories/new)
 
-Russian and English are both welcome. Canonical answers stay in Discussions so they remain searchable; Matrix/Telegram chat links will be added here once the rooms are created.
+Russian and English are both welcome. Answers worth keeping stay in Discussions so they remain searchable; Matrix/Telegram chat links will be added here once the rooms are created.
 
 ## License
 

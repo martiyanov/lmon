@@ -213,7 +213,7 @@ Windows: удали `lmon.exe` из `C:\Users\<имя>\AppData\Local\Microsoft\W
 - Баги и конкретные задачи: [Issues](https://github.com/martiyanov/lmon/issues)
 - Об уязвимостях — приватно через [Security → Report a vulnerability](https://github.com/martiyanov/lmon/security/advisories/new)
 
-Русский и английский — оба языка OK. Канонические ответы остаются в Discussions, чтобы их можно было найти поиском; ссылки на Matrix/Telegram чат появятся здесь после создания комнаты и канала.
+Русский и английский — оба языка OK. Ответы, которые важно сохранить, остаются в Discussions — их можно найти поиском; ссылки на чат Matrix/Telegram появятся здесь после создания комнаты и канала.
 
 ## Лицензия
 
