@@ -48,7 +48,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
              на Linux читается из sysfs; на Windows нет датчика («·»).
   CPU (C)  — загрузка CPU, % (--cpu).
   IOW (I)  — iowait CPU, % (--iowait; только Linux, иначе «·»).
-  I/O (K)  — занятость диска, % (--disk-busy; Windows, PDH, без админа).
+  I/O (K)  — занятость диска, % (--disk-busy; Windows — PDH, macOS — IOKit, без админа).
   SWP (S)  — занятые swap/файл подкачки, % (--swap; Windows читает
              pagefile через PDH, без прав администратора).
   DSK (U)  — занято на системном диске, % (--disk).
@@ -75,7 +75,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
     N — сеть      G — шлюз       L — очередь CPU  M — память
     T — t°C CPU   C — загрузка CPU (%)
     I — iowait    S — swap       U — диск (можно D)  B — батарея
-    K — занятость диска (--disk-busy, Windows)
+    K — занятость диска (--disk-busy, Windows/macOS)
     P — загрузка GPU (%)         H — t°GPU
 
   Примеры: только сеть и память — lmon --cols NM
@@ -114,7 +114,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --hybrid      — цифры на цветной подложке
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
-  lmon --disk-busy   — занятость диска, % (Windows, PDH)
+  lmon --disk-busy   — занятость диска, % (Windows/macOS)
   lmon --cols TNGC   — свой набор и порядок колонок
   lmon --ping VPN=… --cols NG,VPN,M
                      — пинг-колонку тоже можно поставить в нужное место
@@ -142,7 +142,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --thresholds  LMON_THRESHOLDS   свои пороги цвета: КОЛОНКА=з/ж/к через
                               запятую, числа через / — NET=100/200/500,
                               RUN=8/16/32; LMON_THRESHOLDS
-  --disk-busy   LMON_DISK_BUSY  занятость диска, % (Windows, PDH; колонка I/O)
+  --disk-busy   LMON_DISK_BUSY  занятость диска, % (Windows PDH / macOS IOKit; колонка I/O)
   --temp-cmd    LMON_TEMP_CMD  внешняя команда, печатающая температуру CPU
                               в °C (берётся первое число). Нужна на Windows,
                               где нет штатного API: например, LHM через
@@ -194,7 +194,7 @@ Columns (letter in parentheses is for --cols):
              on Linux read from sysfs; on Windows there is no sensor («·»).
   CPU (C)  — CPU usage, % (--cpu).
   IOW (I)  — CPU iowait, % (--iowait; Linux only, otherwise «·»).
-  I/O (K)  — disk busy time, % (--disk-busy; Windows, PDH, no admin).
+  I/O (K)  — disk busy time, % (--disk-busy; Windows uses PDH, macOS IOKit; no admin).
   SWP (S)  — swap/pagefile in use, % (--swap; on Windows it reads
              pagefile via PDH, no admin rights).
   DSK (U)  — root disk usage, % (--disk).
@@ -221,7 +221,7 @@ Column set:
     N — network   G — gateway    L — CPU queue  M — memory
     T — CPU °C    C — CPU usage (%)
     I — iowait    S — swap       U — disk (D works too)  B — battery
-    K — disk busy (--disk-busy, Windows)
+    K — disk busy (--disk-busy, Windows/macOS)
     P — GPU usage (%)            H — GPU °C
 
   Examples: network and memory only — lmon --cols NM
@@ -257,7 +257,7 @@ Usage:
   lmon --hybrid      — digits on the state-colored background
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
-  lmon --disk-busy   — disk busy time %, Windows (PDH)
+  lmon --disk-busy   — disk busy time %, Windows/macOS
   lmon --cols TNGC   — your own set and order of columns
   lmon --ping VPN=… --cols NG,VPN,M
                      — ping columns can be placed in the order too
@@ -286,7 +286,7 @@ Settings (flags and environment variables):
                               COL=g/y/r, comma-separated groups, numbers
                               slashed — NET=100/200/500, RUN=8/16/32;
                               LMON_THRESHOLDS
-  --disk-busy   LMON_DISK_BUSY  disk busy time %, Windows (PDH; column I/O)
+  --disk-busy   LMON_DISK_BUSY  disk busy time %, Windows PDH / macOS IOKit (column I/O)
   --temp-cmd    LMON_TEMP_CMD  external command that prints CPU temperature
                               in °C (the first number is used). Needed on
                               Windows where no native API exists; e.g. LHM
@@ -346,7 +346,7 @@ type config struct {
 	iowait     bool
 	swap       bool
 	disk       bool
-	diskBusy   bool // --disk-busy: занятость диска (Windows, PDH)
+	diskBusy   bool // --disk-busy: занятость диска (Windows PDH / macOS IOKit)
 	batt       bool
 	gpu        bool
 	gputemp    bool
@@ -414,7 +414,7 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&iowait, "iowait", false, "add iowait column (Linux only)")
 	fs.BoolVar(&swap, "swap", false, "add swap usage column")
 	fs.BoolVar(&disk, "disk", false, "add root disk usage column")
-	fs.BoolVar(&diskBusy, "disk-busy", envFlag("LMON_DISK_BUSY"), "add disk busy column (Windows, PDH)")
+	fs.BoolVar(&diskBusy, "disk-busy", envFlag("LMON_DISK_BUSY"), "add disk busy column (Windows PDH / macOS IOKit)")
 	fs.BoolVar(&batt, "batt", false, "add battery charge column")
 	fs.BoolVar(&gpu, "gpu", false, "add GPU utilization column")
 	fs.BoolVar(&gputemp, "gputemp", false, "add GPU temperature column")

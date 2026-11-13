@@ -180,8 +180,9 @@ align exactly with the values. In plain words:
 - **IOW** — how much the CPU idles waiting for the disk (`--iowait`,
   Linux only; high — the disk is the bottleneck; hidden on macOS/Windows).
 - **SWP** — swap/pagefile in use (`--swap`; grows when memory runs out). On Windows it reads the page file through PDH, no admin needed.
-- **I/O** — how busy the disk is, % (`--disk-busy`, Windows; the closest thing
-  to Linux iowait: reads `\PhysicalDisk(_Total)\% Disk Time` via PDH, no admin).
+- **I/O** — how busy the disk is, % (`--disk-busy`; Windows reads
+  `\PhysicalDisk(_Total)\% Disk Time` via PDH, macOS derives it from IOKit
+  `Total Time (Read/Write)`; no admin). The closest thing to Linux iowait.
 - **DSK** — how full the system disk is (`--disk`; above 90% — time to clean).
 - **BAT** — battery charge (`--batt`; red below 20%).
 - **GPU** — how busy the video card is, % (`--gpu`). Windows: NVML/nvidia-smi (NVIDIA) or PDH GPU Engine counters (other vendors).
@@ -262,7 +263,7 @@ machine; `999` means the host is unreachable.
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`) and `--ping` names (`NG,VPN,M`); flags add more |
 | `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |
 | `--temp-cmd` | `LMON_TEMP_CMD` | — | external command printing CPU temp in °C (e.g. LibreHardwareMonitor via PowerShell on Windows) |
-| `--disk-busy` | `LMON_DISK_BUSY` | off | disk busy time %, Windows (PDH `PhysicalDisk`) |
+| `--disk-busy` | `LMON_DISK_BUSY` | off | disk busy time %: Windows PDH `PhysicalDisk`, macOS IOKit |
 | `--cpu` `--iowait` `--swap` `--disk` `--batt` `--gpu` `--gputemp` | — | off | add extra columns |
 
 ```sh

@@ -26,13 +26,13 @@ func columnSupportedByOS(id, goos string) bool {
 	case "darwin":
 		switch id {
 		case "I", // iowait на macOS ядром не отдаётся
-			"H", // GPUTempC: powermetrics под sudo — не показываем
-			"K": // занятость диска — пока только Windows (PDH)
+			"H": // GPUTempC: powermetrics под sudo — не показываем
 			return false
 		}
+		// K (занятость диска) читается через IOKit, без sudo.
 	case "linux":
 		switch id {
-		case "K": // занятость диска — пока только Windows (PDH)
+		case "K": // занятость диска: на Linux пока нет (для I/O есть IOW)
 			return false
 		}
 		// Остальные колонки в Linux доступны; отдельные датчики (GPU, TMP)

@@ -1,7 +1,7 @@
-//go:build !windows
+//go:build !windows && !darwin
 
 package meter
 
-// DiskBusyPercent — занятость диска: пока только Windows (PDH). На
-// macOS/Linux честно -1; аналог iowait для них — колонка IOW.
+// DiskBusyPercent — занятость диска: на Linux пока нет реализации
+// (для I/O там есть колонка IOW), на прочих ОС — «нет данных».
 func DiskBusyPercent() int { return -1 }

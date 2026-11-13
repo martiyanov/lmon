@@ -473,21 +473,23 @@ func TestParseTempCmdFlag(t *testing.T) {
 }
 
 func TestDiskBusyColumn(t *testing.T) {
-	if !columnSupportedByOS("K", "windows") {
-		t.Error("K должна поддерживаться на Windows")
-	}
-	for _, goos := range []string{"darwin", "linux"} {
-		if columnSupportedByOS("K", goos) {
-			t.Errorf("K не должна поддерживаться на %s", goos)
+	for _, goos := range []string{"windows", "darwin"} {
+		if !columnSupportedByOS("K", goos) {
+			t.Errorf("K должна поддерживаться на %s", goos)
 		}
 	}
-	cols, _ := layoutWithDropped(config{diskBusy: true}, "windows")
-	if got := ids(cols); !strings.Contains(got, "K") {
-		t.Errorf("windows layout = %q, нет K", got)
+	if columnSupportedByOS("K", "linux") {
+		t.Error("K пока не поддерживается на Linux")
 	}
-	cols, dropped := layoutWithDropped(config{cols: []string{"K"}}, "darwin")
+	for _, goos := range []string{"windows", "darwin"} {
+		cols, _ := layoutWithDropped(config{diskBusy: true}, goos)
+		if got := ids(cols); !strings.Contains(got, "K") {
+			t.Errorf("%s layout = %q, нет K", goos, got)
+		}
+	}
+	cols, dropped := layoutWithDropped(config{cols: []string{"K"}}, "linux")
 	if got := ids(cols); got != "M" {
-		t.Errorf("darwin layout = %q, want fallback M", got)
+		t.Errorf("linux layout = %q, want fallback M", got)
 	}
 	if got := droppedHeads(dropped); got != "I/O" {
 		t.Errorf("dropped = %q, want I/O", got)

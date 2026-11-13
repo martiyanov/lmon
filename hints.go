@@ -219,12 +219,17 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 				"Windows: NVIDIA через NVML/nvidia-smi; AMD/Intel — только внешний монитор (пока не поддержано); иначе уберите колонку H."))
 	}
 	if r, ok := byID["K"]; ok && r.v < 0 {
+		detail := lmsg(lang,
+			"Check `ioreg -r -c IOBlockStorageDriver -k Statistics -l`, or drop column K.",
+			"Проверьте `ioreg -r -c IOBlockStorageDriver -k Statistics -l` или уберите колонку K.")
+		if goos == "windows" {
+			detail = lmsg(lang,
+				"PhysicalDisk performance counters are disabled or broken; try `lodctr /r` as admin, or drop column K.",
+				"Счётчики PhysicalDisk отключены или сломаны; попробуйте `lodctr /r` от админа или уберите колонку K.")
+		}
 		add(lmsg(lang,
 			"I/O: the disk busy counter is unavailable.",
-			"I/O: счётчик занятости диска недоступен."),
-			lmsg(lang,
-				"Windows: PhysicalDisk performance counters are disabled or broken; try `lodctr /r` as admin, or drop column K.",
-				"Windows: счётчики PhysicalDisk отключены или сломаны; попробуйте `lodctr /r` от админа или уберите колонку K."))
+			"I/O: счётчик занятости диска недоступен."), detail)
 	}
 	if r, ok := byID["U"]; ok && r.v < 0 {
 		add(lmsg(lang,
