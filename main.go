@@ -123,7 +123,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                        интернета); колонка=зелёный/жёлтый/красный
   lmon --ping VPN=10.8.0.1
                      — своя колонка пинга до любого хоста (имя 2–3
-                       символа); VPN не подключён — будет 999.
+                       символа); VPN не подключён — в TUI «...»,
+                       в --once — 999.
                        Место в выводе — в --cols (NG,VPN,M).
                        Повторяемо: несколько --ping; LMON_PING
   lmon --once        — одна строка значений; цвет только на терминале
@@ -143,6 +144,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                               запятую, числа через / — NET=100/200/500,
                               RUN=8/16/32; LMON_THRESHOLDS
   --disk-busy   LMON_DISK_BUSY  занятость диска, % (Windows PDH / macOS IOKit; колонка I/O)
+  --symbols     LMON_SYMBOLS    в --once: «...» вместо 999 для «нет ответа»
   --temp-cmd    LMON_TEMP_CMD  внешняя команда, печатающая температуру CPU
                               в °C (берётся первое число). Нужна на Windows,
                               где нет штатного API: например, LHM через
@@ -157,7 +159,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
 RUN и C° в Windows, iowait в macOS): вместо датчика не показывается «·».
 При старте lmon печатает, что скрыто и чем заменить (--cpu и т. п.).
 «·» остаётся только для датчиков, которые бывают, но сейчас недоступны
-(TMP без smctemp, GPU без nvidia-smi). 999 — ICMP-ответ не пришёл:
+(TMP без smctemp, GPU без nvidia-smi). «...» в TUI (или 999 в --once;
+с --symbols — тоже «...») — ICMP-ответ не пришёл:
 хост, файрвол или сеть. Подсказки не блокируют запуск; отключить:
 --no-hints или LMON_NO_HINTS=1.
 
@@ -266,7 +269,7 @@ Usage:
                        internet); column=green/yellow/red
   lmon --ping VPN=10.8.0.1
                      — your own ping column to any host (2-3 char
-                       name); VPN down — the column shows 999.
+                       name); VPN down — «...» in TUI, 999 in --once.
                        Position it with --cols (NG,VPN,M).
                        Repeatable; LMON_PING
   lmon --once        — one line; colored only on a terminal
@@ -287,6 +290,7 @@ Settings (flags and environment variables):
                               slashed — NET=100/200/500, RUN=8/16/32;
                               LMON_THRESHOLDS
   --disk-busy   LMON_DISK_BUSY  disk busy time %, Windows PDH / macOS IOKit (column I/O)
+  --symbols     LMON_SYMBOLS    in --once: «...» instead of 999 for “no reply”
   --temp-cmd    LMON_TEMP_CMD  external command that prints CPU temperature
                               in °C (the first number is used). Needed on
                               Windows where no native API exists; e.g. LHM
@@ -301,7 +305,8 @@ Columns unsupported by the OS are hidden automatically (e.g. RUN and C°
 on Windows, iowait on macOS) instead of showing «·». At startup lmon
 prints what was hidden and what to use instead (--cpu etc.). «·» stays
 only for sensors that usually exist but are unavailable right now
-(TMP without smctemp, GPU without nvidia-smi). 999 — no ICMP reply:
+(TMP without smctemp, GPU without nvidia-smi). «...» in TUI (999 in --once;
+with --symbols also «...») — no ICMP reply:
 host, firewall or network. Hints never block the run; disable them
 with --no-hints or LMON_NO_HINTS=1.
 
@@ -356,6 +361,7 @@ type config struct {
 	pings      []pingTarget      // --ping NAME=host: именованные пинги
 	noHints    bool              // --no-hints / LMON_NO_HINTS: без стартовых подсказок
 	tempCmd    string            // --temp-cmd: внешняя команда температуры (°C)
+	symbols    bool              // --symbols: «...» вместо 999 в --once
 }
 
 // pingTarget — именованная пинг-колонка (--ping VPN=10.8.0.1):
@@ -432,6 +438,7 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&once, "once", false, "print one line of values and exit (for tmux/status bars)")
 	noHints := fs.Bool("no-hints", envFlag("LMON_NO_HINTS"), "do not print startup hints about unavailable columns")
 	tempCmd := fs.String("temp-cmd", envStr("LMON_TEMP_CMD", ""), "external command that prints CPU temperature (°C)")
+	symbols := fs.Bool("symbols", envFlag("LMON_SYMBOLS"), "in --once, show «...» instead of 999 when a host does not answer")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
@@ -506,7 +513,7 @@ func parseConfig(args []string) (config, error) {
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
 		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
-		noHints: *noHints, tempCmd: *tempCmd}, nil
+		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols}, nil
 }
 
 // rawList — повторяемый флаг: каждое вхождение добавляет строку.
@@ -858,7 +865,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	defer termRestore()
 
 	tty := stdoutIsTTY()
-	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid, lang: cfg.lang}
+	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid, symbols: true, lang: cfg.lang}
 	u.head, u.sep = headerOf(cols)
 
 	defer u.restore()
@@ -918,12 +925,13 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 // включался ровно на терминале и не зависел от os.Stdout в тестах.
 func newOnceUI(w io.Writer, cfg config, tty bool) *ui {
 	return &ui{
-		w:      w,
-		tty:    tty,
-		color:  tty && os.Getenv("NO_COLOR") == "",
-		blocks: cfg.blocks,
-		hybrid: cfg.hybrid,
-		lang:   cfg.lang,
+		w:       w,
+		tty:     tty,
+		color:   tty && os.Getenv("NO_COLOR") == "",
+		blocks:  cfg.blocks,
+		hybrid:  cfg.hybrid,
+		symbols: cfg.symbols,
+		lang:    cfg.lang,
 	}
 }
 
@@ -1331,16 +1339,17 @@ func rampRGB(s float64) (r, g, b int) {
 }
 
 type ui struct {
-	w      io.Writer
-	tty    bool
-	color  bool
-	blocks bool
-	hybrid bool
-	lang   string
-	rows   int
-	head   string
-	sep    string
-	lastRS []reading
+	w       io.Writer
+	tty     bool
+	color   bool
+	blocks  bool
+	hybrid  bool
+	symbols bool // показывать «...» вместо 999 (нет ответа)
+	lang    string
+	rows    int
+	head    string
+	sep     string
+	lastRS  []reading
 }
 
 func (u *ui) setup() {
@@ -1467,15 +1476,27 @@ func valueText(r reading) string {
 	return fmt.Sprintf("%3d", r.v) // ° живёт в заголовке колонки, не в значениях
 }
 
+// displayText — как valueText, но в режиме символов «нет ответа» показывает
+// «...» вместо 999 (три точки не путаются с разделителем «---»).
+func (u *ui) displayText(r reading) string {
+	if u.symbols && r.v == 999 {
+		return "..."
+	}
+	return valueText(r)
+}
+
 // digitCell — классическое цифровое представление с трёхступенчатым цветом.
 func (u *ui) digitCell(r reading) string {
 	if !u.color {
-		return valueText(r)
+		return u.displayText(r)
 	}
 	if r.v < 0 {
-		return dim + valueText(r) + reset
+		return dim + u.displayText(r) + reset
 	}
-	s := valueText(r)
+	if u.symbols && r.v == 999 {
+		return red + "..." + reset
+	}
+	s := u.displayText(r)
 	var c string
 	if r.invert {
 		switch {
@@ -1505,6 +1526,9 @@ func (u *ui) blockCell(r reading) string {
 	if r.v < 0 { // датчика нет
 		return dim + "███" + reset
 	}
+	if u.symbols && r.v == 999 {
+		return red + "..." + reset
+	}
 	return "\x1b[38;5;" + gradient256(r.severity()) + "m███" + reset
 }
 
@@ -1512,9 +1536,9 @@ func (u *ui) blockCell(r reading) string {
 // (как нижняя лента заголовка, но в потоке данных).
 func (u *ui) hybridCell(r reading) string {
 	if r.v < 0 {
-		return dim + valueText(r) + reset
+		return dim + u.displayText(r) + reset
 	}
-	return "\x1b[38;5;16;48;5;" + gradient256(r.severity()) + "m" + valueText(r) + reset
+	return "\x1b[38;5;16;48;5;" + gradient256(r.severity()) + "m" + u.displayText(r) + reset
 }
 
 func stdoutIsTTY() bool {

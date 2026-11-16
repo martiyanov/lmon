@@ -64,8 +64,8 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 	if netOn && gwOn && net.v == 999 && gw.v == 999 {
 		if goos == "windows" {
 			add(lmsg(lang,
-				"NET and GTW = 999: no ICMP reply at all — the local firewall or network drops echo.",
-				"NET и GTW = 999: ICMP-эхо не проходит никуда — его режет файрвол или сеть."),
+				"NET and GTW: no ICMP reply at all — the local firewall or network drops echo.",
+				"NET и GTW: ICMP-эхо не проходит никуда — его режет файрвол или сеть."),
 				lmsg(lang,
 					"Allow echo in PowerShell (admin): New-NetFirewallRule -DisplayName \"Allow ICMPv4\" -Protocol ICMPv4 -IcmpType 8 -Action Allow; or check Wi-Fi/cable and --target.",
 					"Разрешите эхо в PowerShell (админ): New-NetFirewallRule -DisplayName \"Allow ICMPv4\" -Protocol ICMPv4 -IcmpType 8 -Action Allow; или проверьте Wi-Fi/кабель и --target."))
@@ -92,8 +92,8 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 					"На Windows часто виноват файрвол. Разрешите эхо (PowerShell от админа): New-NetFirewallRule -DisplayName \"Allow ICMPv4\" -Protocol ICMPv4 -IcmpType 8 -Action Allow; или другой хост: --target 1.1.1.1")
 			}
 			add(lmsg(lang,
-				"NET = 999: no ICMP reply from the external host.",
-				"NET = 999: ICMP-эхо до внешнего хоста не проходит."), detail)
+				"NET: no ICMP reply from the external host.",
+				"NET: ICMP-эхо до внешнего хоста не проходит."), detail)
 		case net.v < 0:
 			add(lmsg(lang,
 				"NET: the ping utility is unavailable, so there is no measurement.",
@@ -122,8 +122,8 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 					"Проверьте адрес/Wi-Fi/кабель; ICMP может быть отфильтрован (см. подсказку NET).")
 			}
 			add(lmsg(lang,
-				"GTW = 999: the gateway does not answer ping.",
-				"GTW = 999: шлюз не отвечает на ping."), detail)
+				"GTW: the gateway does not answer ping.",
+				"GTW: шлюз не отвечает на ping."), detail)
 		}
 	}
 
@@ -253,8 +253,8 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 			continue
 		}
 		add(fmt.Sprintf(lmsg(lang,
-			"%s = 999: no ICMP reply from %s.",
-			"%s = 999: нет ICMP-ответа от %s."), p.name, p.host),
+			"%s: no ICMP reply from %s.",
+			"%s: нет ICMP-ответа от %s."), p.name, p.host),
 			lmsg(lang,
 				"Check the host/route; if ICMP is filtered, see the NET hint.",
 				"Проверьте хост/маршрут; если ICMP фильтруется — см. подсказку NET."))

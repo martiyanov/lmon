@@ -560,3 +560,51 @@ func TestColsPingErrors(t *testing.T) {
 		t.Errorf("--cols NGM = %q", got)
 	}
 }
+
+func TestUnreachableSymbols(t *testing.T) {
+	r := reading{id: "N", head: "NET", v: 999, green: 50, yellow: 150, red: 300}
+	plain := &ui{}
+	if got := plain.dataRow([]reading{r}); got != "999" {
+		t.Errorf("без --symbols: %q, want 999", got)
+	}
+	sym := &ui{symbols: true}
+	if got := sym.dataRow([]reading{r}); got != "..." {
+		t.Errorf("с символами: %q, want ...", got)
+	}
+	hyb := &ui{symbols: true, color: true, hybrid: true}
+	got := hyb.dataRow([]reading{r})
+	if !strings.Contains(got, "...") || strings.Contains(got, "999") {
+		t.Errorf("hybrid: %q, want ... на цветной подложке", got)
+	}
+	// блоки в режиме символов тоже дают понять «ответа нет»
+	blk := &ui{symbols: true, color: true, blocks: true}
+	if got := blk.dataRow([]reading{r}); !strings.Contains(got, "...") {
+		t.Errorf("blocks: %q, want ...", got)
+	}
+}
+
+func TestSymbolsFlagAndEnv(t *testing.T) {
+	t.Setenv("LMON_SYMBOLS", "")
+	cfg, err := parseConfig([]string{"--symbols"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.symbols {
+		t.Error("--symbols не установил флаг")
+	}
+	cfg, err = parseConfig([]string{"--once", "--symbols"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.symbols || !cfg.once {
+		t.Errorf("--once --symbols: symbols=%v once=%v", cfg.symbols, cfg.once)
+	}
+	t.Setenv("LMON_SYMBOLS", "1")
+	cfg, err = parseConfig(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.symbols {
+		t.Error("LMON_SYMBOLS=1 не установил флаг")
+	}
+}

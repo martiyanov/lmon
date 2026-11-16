@@ -189,7 +189,7 @@ align exactly with the values. In plain words:
 - **G°** — GPU temperature (`--gputemp`; hidden on macOS/Windows — no
   unprivileged source).
 
-`999` — the host is not answering, `·` — the sensor exists but is
+`...` in the TUI (or `999` in `--once`; add `--symbols` to get `...` there too) — the host is not answering, `·` — the sensor exists but is
 unavailable right now (e.g. TMP without `smctemp`), `+++` — the value did
 not fit the column. Columns that the OS cannot provide at all are hidden.
 
@@ -219,7 +219,7 @@ length: "all cores busy" is still green). Override any column with
 
 `--ping NAME=host` adds your own ping column (2–3 char name) — e.g. the
 server inside your VPN tunnel: `--ping VPN=10.8.0.1`. While the tunnel is
-up you get its latency; VPN down — the column shows `999`. Repeatable,
+up you get its latency; VPN down — the column shows `...` (TUI) or `999` (`--once`). Repeatable,
 or via `LMON_PING="VPN=10.8.0.1,DNS=1.1.1.1"`.
 
 By default the column is appended on the right. To place it anywhere, add
@@ -236,7 +236,7 @@ background (the bottom ribbon look, but in the data stream).
 one per column, with a continuous green → yellow → red gradient along
 each column's scale. You read the status with peripheral vision instead
 of parsing numbers. A dim square (or `·`) means no sensor on this
-machine; `999` means the host is unreachable.
+machine; `...` (TUI) or `999` (`--once`) means the host is unreachable.
 
 ### Reading bad numbers
 
@@ -264,6 +264,7 @@ machine; `999` means the host is unreachable.
 | `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |
 | `--temp-cmd` | `LMON_TEMP_CMD` | — | external command printing CPU temp in °C (e.g. LibreHardwareMonitor via PowerShell on Windows) |
 | `--disk-busy` | `LMON_DISK_BUSY` | off | disk busy time %: Windows PDH `PhysicalDisk`, macOS IOKit |
+| `--symbols` | `LMON_SYMBOLS` | off | in `--once`, show `...` instead of `999` for “no reply” |
 | `--cpu` `--iowait` `--swap` `--disk` `--batt` `--gpu` `--gputemp` | — | off | add extra columns |
 
 ```sh

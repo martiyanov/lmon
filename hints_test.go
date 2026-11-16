@@ -87,7 +87,7 @@ func TestStartupHintsWindowsHiddenAndNetwork(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Скрыты в этой ОС: RUN, C°",
-		"NET и GTW = 999", "New-NetFirewallRule", "--cpu",
+		"NET и GTW: ICMP-эхо", "New-NetFirewallRule", "--cpu",
 	} {
 		if !strings.Contains(txt, want) {
 			t.Errorf("в подсказках нет %q:\n%s", want, txt)
@@ -161,7 +161,7 @@ func TestStartupHintsNamedPing(t *testing.T) {
 	setValues(cols, map[string]int{"N": 24, "G": 2, "L": 1, "M": 48, "T": 55, "VPN": 999})
 	hs := startupHints(cfg, cols, "linux", dropped)
 	txt := hintsText(hs)
-	if len(hs) != 1 || !strings.Contains(txt, "VPN = 999") || !strings.Contains(txt, "10.0.0.1") {
+	if len(hs) != 1 || !strings.Contains(txt, "VPN: no ICMP reply") || !strings.Contains(txt, "10.0.0.1") {
 		t.Fatalf("named ping hint = %d:\n%s", len(hs), txt)
 	}
 }
