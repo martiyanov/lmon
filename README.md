@@ -255,6 +255,24 @@ GPU, I/O, pings from `--ping`) and silently drops what the OS does not expose.
 It cannot be combined with `--cols`; with `--gpu-index 0,1` you get one GPU
 block per card (`G0`, `G1`, `T0`, `T1`).
 
+### Horizontal timeline
+
+`lmon --horizontal` turns the view 90°: one row per parameter, time flows
+to the right, and each cell is a colored block. No digits.
+
+```sh
+lmon --horizontal
+lmon --horizontal --labels full
+```
+
+- newest sample is on the left, older samples move right;
+- short labels are the `--cols` letters, `--labels full` gives names like
+  `Network`, `Memory`, `CPU temp`;
+- only rows that fit the terminal height are shown; the rest are skipped;
+- purple = no sensor, bright red = no reply;
+- TUI only; `--once` keeps its normal one-line output and cannot be combined
+  with `--horizontal`.
+
 ### TUI: header leads by one sample
 
 In the TUI the pinned header always shows the **current** sample, while the
@@ -305,6 +323,8 @@ Without color (`NO_COLOR`, pipe) the text fallbacks stay.
 | `--interval` | `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
 | `--bars` | — | off | colored bars instead of digits (`--blocks` is a legacy alias) |
 | `--compact` | `LMON_COMPACT` | off | one letter and one colored block per parameter, no gaps |
+| `--horizontal` | `LMON_HORIZONTAL` | off | horizontal color timeline (TUI) |
+| `--labels` | `LMON_LABELS` | `short` | horizontal labels: `full` or `short` |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`), `--ping` names (`NG,VPN,M`), and an empty column for two commas (`NG,,M`); flags add more |
 | `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |

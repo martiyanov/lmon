@@ -912,3 +912,53 @@ func TestEmitDelaysDataByOneSample(t *testing.T) {
 		t.Errorf("нет второго замера: %q", b.String())
 	}
 }
+
+func TestHorizontalView(t *testing.T) {
+	var b bytes.Buffer
+	v := &hview{w: &b, rows: 3, cols: 20, history: map[string][]hcell{}, lang: "en"}
+	rs := []reading{
+		{id: "N", head: "NET", v: 10},
+		{id: "M", head: "MEM", v: 95, green: 60, yellow: 85, red: 97},
+		{id: "T", head: " C°", v: -1},
+		{id: "C", head: "CPU", v: 20},
+	}
+	v.add(rs)
+	v.draw(rs)
+	out := b.String()
+	for _, want := range []string{"N ", "M ", "T "} {
+		if !strings.Contains(out, want) {
+			t.Errorf("horizontal output = %q, no %q", out, want)
+		}
+	}
+	if strings.Contains(out, "CPU") {
+		t.Errorf("показана строка, не поместившаяся по высоте: %q", out)
+	}
+	if !strings.Contains(out, "█") {
+		t.Errorf("нет цветных блоков: %q", out)
+	}
+	if hLabel(reading{id: "N"}, true) != "Network" {
+		t.Errorf("full label N = %q", hLabel(reading{id: "N"}, true))
+	}
+	if hLabel(reading{id: "M"}, false) != "M" {
+		t.Errorf("short label M = %q", hLabel(reading{id: "M"}, false))
+	}
+}
+
+func TestHorizontalFlags(t *testing.T) {
+	for _, k := range []string{"LMON_HORIZONTAL", "LMON_LABELS"} {
+		t.Setenv(k, "")
+	}
+	cfg, err := parseConfig([]string{"--horizontal", "--labels", "full"})
+	if err != nil || !cfg.horizontal || !cfg.labelsFull {
+		t.Fatalf("horizontal flags: %+v %v", cfg, err)
+	}
+	if _, err := parseConfig([]string{"--horizontal", "--bars"}); err == nil {
+		t.Error("--horizontal + --bars: ожидалась ошибка")
+	}
+	if _, err := parseConfig([]string{"--horizontal", "--once"}); err == nil {
+		t.Error("--horizontal + --once: ожидалась ошибка")
+	}
+	if _, err := parseConfig([]string{"--labels", "wide"}); err == nil {
+		t.Error("--labels wide: ожидалась ошибка")
+	}
+}

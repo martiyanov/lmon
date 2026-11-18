@@ -82,6 +82,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --hybrid      — смешанный режим: точные цифры на подложке цвета
   --compact     — по одной букве и одному цветному блоку на параметр,
                   без пробелов (фиолетовый — нет датчика, красный — нет ответа).
+  --horizontal  — горизонтальная цветная лента: параметр = строка,
+                  время идёт вправо; --labels full|short — подписи.
 
 Набор колонок:
   --cols NG,CSB  — свой набор и порядок (каждая буква — колонка,
@@ -135,6 +137,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --bars        — режим цветных квадратов
   lmon --hybrid      — цифры на цветной подложке
   lmon --compact     — минимализм: одна буква и один цветной блок на параметр
+  lmon --horizontal  — строки-параметры, цветная история вправо
+  lmon --horizontal --labels full   # полные подписи
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
   lmon --gpu-list    — список видеокарт (индекс: имя)
@@ -179,6 +183,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --disk-busy   LMON_DISK_BUSY  занятость диска, % (Windows PDH / macOS IOKit; колонка I/O)
   --symbols     LMON_SYMBOLS    в --once: «...» вместо 999 для «нет ответа»
   --compact     LMON_COMPACT    одна буква и один цветной блок на параметр, без пробелов
+  --horizontal  LMON_HORIZONTAL горизонтальная цветная лента (TUI)
+  --labels      LMON_LABELS     подписи в горизонтальном режиме: full или short
   --gpu-index   LMON_GPU_INDEX  индекс или список GPU для --gpu/--gputemp: 0 или 0,1
   --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
   --all         LMON_ALL        все доступные колонки (с --ping — ещё и они)
@@ -277,6 +283,8 @@ Display modes:
   --hybrid      — mixed mode: exact digits on the state-colored background
   --compact     — one letter and one colored block per parameter, no gaps
                   (purple = no sensor, red = no reply).
+  --horizontal  — horizontal color timeline: one row per parameter,
+                  time flows right; --labels full|short selects labels.
 
 Column set:
   --cols NG,CSB  — your own set and order (each letter is a column;
@@ -329,6 +337,8 @@ Usage:
   lmon --bars        — colored blocks mode
   lmon --hybrid      — digits on the state-colored background
   lmon --compact     — minimal: one letter and one colored block per parameter
+  lmon --horizontal  — parameter rows, color history to the right
+  lmon --horizontal --labels full   # full labels
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
   lmon --gpu-list    — list GPUs (index: name)
@@ -373,6 +383,8 @@ Settings (flags and environment variables):
   --disk-busy   LMON_DISK_BUSY  disk busy time %, Windows PDH / macOS IOKit (column I/O)
   --symbols     LMON_SYMBOLS    in --once: «...» instead of 999 for “no reply”
   --compact     LMON_COMPACT    one letter and one colored block per parameter, no gaps
+  --horizontal  LMON_HORIZONTAL horizontal color timeline (TUI)
+  --labels      LMON_LABELS     horizontal mode labels: full or short
   --gpu-index   LMON_GPU_INDEX  GPU index or list for --gpu/--gputemp: 0 or 0,1
   --gpu-list    LMON_GPU_LIST   list GPUs and exit
   --all         LMON_ALL        every available column (pings too, if --ping)
@@ -448,6 +460,8 @@ type config struct {
 	blocks     bool
 	hybrid     bool
 	compact    bool
+	horizontal bool
+	labelsFull bool
 	cpu        bool
 	iowait     bool
 	swap       bool
@@ -561,6 +575,8 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&blocks, "blocks", false, "alias for --bars (legacy name)")
 	fs.BoolVar(&hybrid, "hybrid", false, "digits on the state-colored background")
 	fs.BoolVar(&compact, "compact", envFlag("LMON_COMPACT"), "one character per column, no gaps")
+	horizontal := fs.Bool("horizontal", envFlag("LMON_HORIZONTAL"), "horizontal color timeline (TUI)")
+	labels := fs.String("labels", envStr("LMON_LABELS", "short"), "horizontal labels: full or short")
 	lang := fs.String("lang", langAuto(), "message language: en or ru")
 	var cpu, iowait, swap, disk, diskBusy, batt, gpu, gputemp bool
 	fs.BoolVar(&cpu, "cpu", false, "add CPU usage column")
@@ -614,6 +630,16 @@ func parseConfig(args []string) (config, error) {
 	}
 	if compact && (blocks || hybrid) {
 		return config{}, errors.New(lmsg(lg, "--compact cannot be combined with --bars/--blocks or --hybrid", "--compact не сочетается с --bars/--blocks или --hybrid"))
+	}
+	labelsMode := strings.ToLower(strings.TrimSpace(*labels))
+	if labelsMode != "full" && labelsMode != "short" {
+		return config{}, fmt.Errorf(lmsg(lg, "--labels=%q: expected full or short", "--labels=%q: ожидается full или short"), *labels)
+	}
+	if *horizontal && (blocks || hybrid || compact) {
+		return config{}, errors.New(lmsg(lg, "--horizontal cannot be combined with --bars/--blocks, --hybrid or --compact", "--horizontal не сочетается с --bars/--blocks, --hybrid или --compact"))
+	}
+	if *horizontal && once {
+		return config{}, errors.New(lmsg(lg, "--horizontal cannot be combined with --once; use the normal --once output", "--horizontal не сочетается с --once; используйте обычный вывод --once"))
 	}
 
 	var iters int
@@ -707,7 +733,7 @@ func parseConfig(args []string) (config, error) {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
-		blocks: blocks, hybrid: hybrid, compact: compact, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
+		blocks: blocks, hybrid: hybrid, compact: compact, horizontal: *horizontal, labelsFull: labelsMode == "full", cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
 		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans,
@@ -1090,6 +1116,14 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		return 0
 	}
 
+	if cfg.horizontal {
+		if !stdoutIsTTY() {
+			fmt.Fprintln(os.Stderr, lmsg(cfg.lang, "lmon: --horizontal requires a terminal", "lmon: --horizontal требует терминал"))
+			return 2
+		}
+		return monitorHorizontal(ctx, cfg, w, dropped)
+	}
+
 	termSetup()
 	defer termRestore()
 
@@ -1145,6 +1179,53 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		}
 		u.maybeResize()
 		u.emit(measure(ctx, cfg))
+		if cfg.iters > 0 && it >= cfg.iters {
+			return 0
+		}
+		if err := nextTick(ctx, ticker, cfg.interval); err != nil {
+			return 130
+		}
+	}
+}
+
+// monitorHorizontal — TUI-режим «параметр = строка, время = вправо».
+func monitorHorizontal(ctx context.Context, cfg config, w io.Writer, dropped []droppedColumn) int {
+	termSetup()
+	defer termRestore()
+	v := newHView(w, cfg, true)
+	v.setup()
+	defer v.restore()
+
+	first := measure(ctx, cfg)
+	if !cfg.noHints {
+		if hs := startupHints(cfg, first, runtime.GOOS, dropped); len(hs) > 0 {
+			printHints(os.Stderr, hs)
+		}
+	}
+	v.add(first)
+	v.draw(first)
+	if cfg.iters > 0 && cfg.iters <= 1 {
+		return 0
+	}
+	ticker := time.NewTicker(cfg.interval)
+	defer ticker.Stop()
+	refreshGW := time.NewTicker(30 * time.Second)
+	defer refreshGW.Stop()
+	for it := 2; ; it++ {
+		select {
+		case <-ctx.Done():
+			return 130
+		default:
+		}
+		select {
+		case <-refreshGW.C:
+			refreshGateway(&cfg, meter.DefaultGateway)
+		default:
+		}
+		v.resize()
+		rs := measure(ctx, cfg)
+		v.add(rs)
+		v.draw(rs)
 		if cfg.iters > 0 && it >= cfg.iters {
 			return 0
 		}
@@ -1662,6 +1743,261 @@ func measure(ctx context.Context, cfg config) []reading {
 	}
 
 	return rs
+}
+
+// hcell — одно деление горизонтальной ленты: уровень 0..1 и особое состояние.
+type hcell struct {
+	sev   float64
+	state int // 0 — обычное, -1 — нет датчика, 999 — нет ответа
+}
+
+// hview — горизонтальный цветной режим: параметр = строка, время = вправо.
+type hview struct {
+	w       io.Writer
+	tty     bool
+	color   bool
+	full    bool // полные подписи (--labels full)
+	lang    string
+	rows    int
+	cols    int
+	order   []string
+	history map[string][]hcell
+}
+
+func newHView(w io.Writer, cfg config, tty bool) *hview {
+	v := &hview{
+		w:       w,
+		tty:     tty,
+		color:   tty && os.Getenv("NO_COLOR") == "",
+		full:    cfg.labelsFull,
+		lang:    cfg.lang,
+		rows:    termRows(),
+		cols:    termCols(),
+		history: map[string][]hcell{},
+	}
+	if v.rows <= 0 {
+		v.rows = 24
+	}
+	if v.cols <= 0 {
+		v.cols = 80
+	}
+	return v
+}
+
+func (v *hview) setup() {
+	if v.tty {
+		fmt.Fprint(v.w, "\x1b[?25l\x1b[2J\x1b[H")
+	}
+}
+
+func (v *hview) restore() {
+	if v.tty {
+		fmt.Fprint(v.w, "\x1b[0m\x1b[?25h\n")
+	}
+}
+
+func (v *hview) resize() {
+	r, c := termRows(), termCols()
+	if r > 0 {
+		v.rows = r
+	}
+	if c > 0 {
+		v.cols = c
+	}
+}
+
+// add добавляет новый замер в ленты; показываются только поместившиеся строки.
+func (v *hview) add(rs []reading) {
+	visible := make([]reading, 0, len(rs))
+	for _, r := range rs {
+		if r.blank {
+			continue
+		}
+		if len(visible) >= v.rows {
+			break
+		}
+		visible = append(visible, r)
+	}
+	v.order = v.order[:0]
+	for _, r := range visible {
+		v.order = append(v.order, r.id)
+		cell := hcell{state: 0}
+		switch {
+		case r.v < 0:
+			cell.state = -1
+		case r.v == 999:
+			cell.state = 999
+		default:
+			cell.sev = r.severity()
+		}
+		h := append([]hcell{cell}, v.history[r.id]...)
+		if len(h) > v.cols {
+			h = h[:v.cols]
+		}
+		v.history[r.id] = h
+	}
+}
+
+func (v *hview) lines(rs []reading) []string {
+	// rs — замеры для подписей/порядка; history уже накоплена в add.
+	visible := make([]reading, 0, len(rs))
+	for _, r := range rs {
+		if r.blank {
+			continue
+		}
+		if len(visible) >= v.rows {
+			break
+		}
+		visible = append(visible, r)
+	}
+	if len(visible) == 0 {
+		return nil
+	}
+	labels := make([]string, len(visible))
+	labelW := 1
+	for i, r := range visible {
+		labels[i] = hLabel(r, v.full)
+		if n := len([]rune(labels[i])); n > labelW {
+			labelW = n
+		}
+	}
+	if max := v.cols / 2; max > 0 && labelW > max {
+		labelW = max
+	}
+	barW := v.cols - labelW - 1
+	if barW < 1 {
+		barW = 1
+	}
+	out := make([]string, 0, len(visible))
+	for i, r := range visible {
+		lab := labels[i]
+		lr := []rune(lab)
+		if len(lr) > labelW {
+			lr = lr[:labelW]
+		}
+		lab = string(lr) + strings.Repeat(" ", labelW-len(lr))
+		var b strings.Builder
+		if v.color {
+			b.WriteString(dim)
+		}
+		b.WriteString(lab)
+		if v.color {
+			b.WriteString(reset)
+		}
+		b.WriteByte(' ')
+		hist := v.history[r.id]
+		for j := 0; j < barW; j++ {
+			if j >= len(hist) {
+				b.WriteByte(' ')
+				continue
+			}
+			c := hist[j]
+			if !v.color {
+				b.WriteString("█")
+				continue
+			}
+			switch c.state {
+			case -1:
+				b.WriteString(purple + "█" + reset)
+			case 999:
+				b.WriteString(redBright + "█" + reset)
+			default:
+				b.WriteString("\x1b[38;5;" + gradient256(c.sev) + "m█" + reset)
+			}
+		}
+		out = append(out, b.String())
+	}
+	return out
+}
+
+func (v *hview) draw(rs []reading) {
+	lines := v.lines(rs)
+	if !v.tty {
+		for _, l := range lines {
+			fmt.Fprintln(v.w, l)
+		}
+		return
+	}
+	fmt.Fprint(v.w, "\x1b[H")
+	for i, l := range lines {
+		fmt.Fprintf(v.w, "\x1b[%d;1H\x1b[2K%s", i+1, l)
+	}
+	// стереть остаток экрана, если строк стало меньше
+	fmt.Fprintf(v.w, "\x1b[%d;1H\x1b[0J", len(lines)+1)
+}
+
+// hLabel — подпись строки в горизонтальном режиме.
+func hLabel(r reading, full bool) string {
+	if !full {
+		return compactLabel(r)
+	}
+	switch r.id {
+	case "N":
+		return "Network"
+	case "G":
+		return "Gateway"
+	case "L":
+		return "CPU load"
+	case "M":
+		return "Memory"
+	case "T":
+		return "CPU temp"
+	case "C":
+		return "CPU"
+	case "I":
+		return "iowait"
+	case "S":
+		return "Swap"
+	case "U":
+		return "Disk"
+	case "B":
+		return "Battery"
+	case "P":
+		return "GPU"
+	case "H":
+		return "GPU temp"
+	case "K":
+		return "Disk I/O"
+	case "F":
+		return "Fans"
+	case "W":
+		return "GPU power"
+	case "Y":
+		return "NVMe temp"
+	case "A":
+		return "Disk latency"
+	case "Q":
+		return "Disk queue"
+	case "R":
+		return "Net RX"
+	case "J":
+		return "Net TX"
+	case "E":
+		return "Net errors"
+	case "Z":
+		return "Mem pressure"
+	case "O":
+		return "Failed units"
+	case "X":
+		return "Reboot needed"
+	case "PW":
+		return "CPU power"
+	case "WR":
+		return "NVMe wear"
+	}
+	if strings.HasPrefix(r.id, "G") && len(r.id) > 1 {
+		return "GPU " + r.id[1:]
+	}
+	if strings.HasPrefix(r.id, "T") && len(r.id) > 1 {
+		return "GPU " + r.id[1:] + " temp"
+	}
+	if strings.HasPrefix(r.id, "F") && len(r.id) > 1 {
+		return "Fan " + r.id[1:]
+	}
+	if r.id == "GF" {
+		return "GPU fan"
+	}
+	return r.id
 }
 
 // dataRow — строка значений (цифры или квадраты) без служебных символов.
