@@ -84,8 +84,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   без пробелов (фиолетовый — нет датчика, красный — нет ответа).
   --horizontal  — горизонтальная цветная лента: параметр = строка,
                   время идёт вправо; --labels full|short — подписи.
-  --rain        — падающие значения: подписи сверху, значения вниз,
-                  заполнение Braille-символами.
+  --rain        — направление: новые значения сверху, падают вниз;
+                  символы/цвета как в выбранном режиме.
   --matrix      — зелёная матричная палитра (можно с любым режимом).
 
 Набор колонок:
@@ -141,7 +141,9 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --hybrid      — цифры на цветной подложке
   lmon --compact     — минимализм: одна буква и один цветной блок на параметр
   lmon --horizontal  — строки-параметры, цветная история вправо
-  lmon --rain --matrix — зелёный дождь значений сверху вниз
+  lmon --rain          — цифры падают вниз
+  lmon --rain --bars   — блоки падают вниз
+  lmon --rain --matrix — падающие значения в зелёной палитре
   lmon --bars --matrix — блочный режим в зелёной палитре
   lmon --horizontal --labels full   # полные подписи
   lmon --cpu --swap  — добавить колонки CPU и swap
@@ -190,7 +192,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --compact     LMON_COMPACT    одна буква и один цветной блок на параметр, без пробелов
   --horizontal  LMON_HORIZONTAL горизонтальная цветная лента (TUI)
   --labels      LMON_LABELS     подписи в горизонтальном режиме: full или short
-  --rain        LMON_RAIN       падающие значения, заголовки сверху
+  --rain        LMON_RAIN       направление вниз: новые значения сверху
   --matrix      LMON_MATRIX     зелёная палитра (любой режим)
   --gpu-index   LMON_GPU_INDEX  индекс или список GPU для --gpu/--gputemp: 0 или 0,1
   --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
@@ -292,8 +294,8 @@ Display modes:
                   (purple = no sensor, red = no reply).
   --horizontal  — horizontal color timeline: one row per parameter,
                   time flows right; --labels full|short selects labels.
-  --rain        — falling values: labels on top, values fall down,
-                  cells filled with Braille patterns.
+  --rain        — direction: new values on top, falling down;
+                  symbols/colors come from the selected mode.
   --matrix      — green matrix palette (works with any mode).
 
 Column set:
@@ -348,7 +350,9 @@ Usage:
   lmon --hybrid      — digits on the state-colored background
   lmon --compact     — minimal: one letter and one colored block per parameter
   lmon --horizontal  — parameter rows, color history to the right
-  lmon --rain --matrix — green value rain from top to bottom
+  lmon --rain          — digits falling down
+  lmon --rain --bars   — blocks falling down
+  lmon --rain --matrix — falling values in the green palette
   lmon --bars --matrix — block mode in the green palette
   lmon --horizontal --labels full   # full labels
   lmon --cpu --swap  — add CPU and swap columns
@@ -397,7 +401,7 @@ Settings (flags and environment variables):
   --compact     LMON_COMPACT    one letter and one colored block per parameter, no gaps
   --horizontal  LMON_HORIZONTAL horizontal color timeline (TUI)
   --labels      LMON_LABELS     horizontal mode labels: full or short
-  --rain        LMON_RAIN       falling values, labels on top
+  --rain        LMON_RAIN       down direction: new values on top
   --matrix      LMON_MATRIX     green palette (any mode)
   --gpu-index   LMON_GPU_INDEX  GPU index or list for --gpu/--gputemp: 0 or 0,1
   --gpu-list    LMON_GPU_LIST   list GPUs and exit
@@ -659,8 +663,8 @@ func parseConfig(args []string) (config, error) {
 	if *horizontal && once {
 		return config{}, errors.New(lmsg(lg, "--horizontal cannot be combined with --once; use the normal --once output", "--horizontal не сочетается с --once; используйте обычный вывод --once"))
 	}
-	if rain && (blocks || hybrid || compact || *horizontal) {
-		return config{}, errors.New(lmsg(lg, "--rain cannot be combined with other display modes", "--rain не сочетается с другими режимами отображения"))
+	if rain && *horizontal {
+		return config{}, errors.New(lmsg(lg, "--rain cannot be combined with --horizontal", "--rain не сочетается с --horizontal"))
 	}
 	if rain && once {
 		return config{}, errors.New(lmsg(lg, "--rain cannot be combined with --once; use the normal --once output", "--rain не сочетается с --once; используйте обычный вывод --once"))
@@ -1147,19 +1151,12 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		}
 		return monitorHorizontal(ctx, cfg, w, dropped)
 	}
-	if cfg.rain {
-		if !stdoutIsTTY() {
-			fmt.Fprintln(os.Stderr, lmsg(cfg.lang, "lmon: --rain requires a terminal", "lmon: --rain требует терминал"))
-			return 2
-		}
-		return monitorRain(ctx, cfg, w, dropped)
-	}
 
 	termSetup()
 	defer termRestore()
 
 	tty := stdoutIsTTY()
-	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, matrix: cfg.matrixPalette, symbols: true, lang: cfg.lang}
+	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, matrix: cfg.matrixPalette, rain: cfg.rain, symbols: true, lang: cfg.lang}
 	if cfg.compact {
 		u.head, u.sep = headerOfCompact(cols)
 	} else {
@@ -2120,6 +2117,8 @@ type ui struct {
 	hybrid     bool
 	compact    bool
 	matrix     bool
+	rain       bool
+	rainRows   [][]reading
 	symbols    bool // показывать «...» вместо 999 (нет ответа)
 	lang       string
 	rows       int
@@ -2141,6 +2140,10 @@ func (u *ui) setup() {
 		return
 	}
 	fmt.Fprint(u.w, "\x1b[?25l") // спрятать курсор — не мелькает
+	if u.rain {
+		u.redrawRain(termRows())
+		return
+	}
 	u.redraw(termRows())
 }
 
@@ -2171,11 +2174,32 @@ func (u *ui) resize(rows int) {
 	if rows < 2 {
 		rows = 2
 	}
+	if u.rain {
+		u.redrawRain(rows)
+		return
+	}
 	fmt.Fprint(u.w, "\x1b[r") // сброс прежней области прокрутки
 	fmt.Fprintf(u.w, "\x1b[1;%dr", rows-1)
 	u.paintHeader(rows)
 	fmt.Fprintf(u.w, "\x1b[%d;1H", rows-1)
 	u.rows = rows
+}
+
+// redrawRain рисует заголовок сверху, данные — под ним, новые сверху.
+func (u *ui) redrawRain(rows int) {
+	if rows < 2 {
+		rows = 2
+	}
+	u.rows = rows
+	fmt.Fprint(u.w, "\x1b[2J\x1b[H")
+	fmt.Fprintf(u.w, "\x1b[1;1H\x1b[2K%s", u.headerRow(u.lastRS))
+	for i, rs := range u.rainRows {
+		if i >= rows-1 {
+			break
+		}
+		fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[2K%s", i+2, u.dataRow(rs))
+	}
+	fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[0J", min(rows, len(u.rainRows)+2))
 }
 
 func (u *ui) redraw(rows int) {
@@ -2244,6 +2268,21 @@ func (u *ui) emit(rs []reading) {
 	u.lastRS = rs
 	if !u.tty {
 		fmt.Fprintln(u.w, u.dataRow(rs))
+		return
+	}
+	if u.rain {
+		if !u.hasPending {
+			u.pending = rs
+			u.hasPending = true
+			u.redrawRain(u.rows)
+			return
+		}
+		u.rainRows = append([][]reading{u.pending}, u.rainRows...)
+		if len(u.rainRows) > u.rows-1 {
+			u.rainRows = u.rainRows[:u.rows-1]
+		}
+		u.pending = rs
+		u.redrawRain(u.rows)
 		return
 	}
 	// Заголовок — текущий замер, данные над ним — на один замер позже:

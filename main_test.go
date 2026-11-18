@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"math/bits"
 	"runtime"
 	"strings"
 	"testing"
@@ -964,63 +963,42 @@ func TestHorizontalFlags(t *testing.T) {
 	}
 }
 
-func TestMatrixView(t *testing.T) {
-	if len(matrixGlyphs) != 256 {
-		t.Fatalf("matrixGlyphs = %d, want 256", len(matrixGlyphs))
-	}
-	if matrixGlyphs[0] != 0x2800 || matrixGlyphs[255] != 0x28FF {
-		t.Errorf("matrix ramp endpoints = %U/%U", matrixGlyphs[0], matrixGlyphs[255])
-	}
-	prev := -1
-	for i, r := range matrixGlyphs {
-		n := bits.OnesCount8(uint8(r - 0x2800))
-		if n < prev {
-			t.Errorf("ramp[%d] density %d < %d", i, n, prev)
-		}
-		prev = n
-	}
+func TestRainDirection(t *testing.T) {
 	var b bytes.Buffer
-	v := &mview{w: &b, rows: 5, cols: 3, history: map[string][]hcell{}}
-	rs := []reading{
-		{id: "N", head: "NET", v: 0},
-		{id: "M", head: "MEM", v: 95, green: 60, yellow: 85, red: 97},
-		{id: "T", head: " C°", v: -1},
+	u := &ui{w: &b, tty: true, rain: true, rows: 5, color: false}
+	r1 := []reading{{id: "N", head: "NET", v: 1}}
+	r2 := []reading{{id: "N", head: "NET", v: 2}}
+	u.emit(r1)
+	if strings.Contains(b.String(), "  1") {
+		t.Errorf("первый замер сразу стал данными: %q", b.String())
 	}
-	v.add(rs)
-	v.draw(rs)
-	out := b.String()
-	if !strings.Contains(out, "NMT") {
-		t.Errorf("matrix headers = %q", out)
+	b.Reset()
+	u.emit(r2)
+	if !strings.Contains(b.String(), "  1") {
+		t.Errorf("нет предыдущего замера: %q", b.String())
 	}
-	braille := false
-	for _, r := range out {
-		if r >= 0x2801 && r <= 0x28FF {
-			braille = true
-			break
-		}
+	if strings.Contains(b.String(), "  2") {
+		t.Errorf("текущий замер слишком рано в данных: %q", b.String())
 	}
-	if !braille {
-		t.Errorf("matrix values = %q, нет Braille-заполнения", out)
+	b.Reset()
+	r3 := []reading{{id: "N", head: "NET", v: 3}}
+	u.emit(r3)
+	if strings.Index(b.String(), "  2") < 0 || strings.Index(b.String(), "  1") < 0 {
+		t.Errorf("rain rows = %q", b.String())
 	}
-	if strings.ContainsAny(out, "0123456789") {
-		t.Errorf("matrix output содержит цифры: %q", out)
+	if strings.Index(b.String(), "  2") > strings.Index(b.String(), "  1") {
+		t.Errorf("новые данные должны быть выше старых: %q", b.String())
 	}
 
-	cases := []string{"--matrix", "--matrix", "--matrix"}
-	_ = cases
-	if _, err := parseConfig([]string{"--rain", "--once"}); err == nil {
-		t.Error("--rain + --once: ожидалась ошибка")
+	cfg, err := parseConfig([]string{"--rain", "--bars"})
+	if err != nil || !cfg.rain || !cfg.blocks {
+		t.Errorf("--rain --bars: %+v %v", cfg, err)
 	}
 	if _, err := parseConfig([]string{"--rain", "--horizontal"}); err == nil {
 		t.Error("--rain + --horizontal: ожидалась ошибка")
 	}
-	cfg, err := parseConfig([]string{"--bars", "--matrix"})
-	if err != nil || !cfg.blocks || !cfg.matrixPalette {
-		t.Errorf("--bars --matrix: %+v %v", cfg, err)
-	}
-	cfg, err = parseConfig([]string{"--rain", "--matrix"})
-	if err != nil || !cfg.rain || !cfg.matrixPalette {
-		t.Errorf("--rain --matrix: %+v %v", cfg, err)
+	if _, err := parseConfig([]string{"--rain", "--once"}); err == nil {
+		t.Error("--rain + --once: ожидалась ошибка")
 	}
 }
 

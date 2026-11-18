@@ -255,22 +255,23 @@ GPU, I/O, pings from `--ping`) and silently drops what the OS does not expose.
 It cannot be combined with `--cols`; with `--gpu-index 0,1` you get one GPU
 block per card (`G0`, `G1`, `T0`, `T1`).
 
-### Rain mode
+### Rain direction
+
+`--rain` is not a separate display mode: it only changes the direction.
+Symbols and colors stay exactly as in the selected mode.
 
 ```sh
-lmon --rain --matrix
+lmon --rain          # digits, new values on top, falling down
+lmon --rain --bars
+lmon --rain --hybrid
+lmon --rain --compact
+lmon --rain --matrix # green palette
 ```
 
-Labels are on top, values fall downward. A cell is filled with one of 256
-Braille patterns: 0 is empty, 255 is maximally filled and light green.
-The denser/brighter the cell, the worse the value.
-
-- `--rain` is the falling-values mode; `--matrix` is the green palette;
-- `--rain --matrix` gives the green Matrix look;
-- `--rain` alone uses the normal palette (purple/red special states);
-- TUI only; `--once` keeps its normal output and cannot be combined;
-- cannot be combined with other display modes;
-- labels are the short `--cols` letters.
+- header is on top; new values appear under it and move down;
+- `--rain` works with digits, `--bars`, `--hybrid`, `--compact`;
+- it cannot be combined with `--horizontal` or `--once`;
+- `--matrix` is the green palette, independent of direction.
 
 `--matrix` is a palette and works with any mode:
 
