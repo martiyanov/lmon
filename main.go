@@ -300,6 +300,7 @@ Column set:
 
 Colors: green — normal, yellow — attention, red — bad;
 purple — no sensor (block/compact), bright red block — no reply.
+TUI: header shows the current sample, the row above is one sample older.
 Thresholds (green ≤ / yellow ≤ / then red):
   NET: 50/150 ms   GTW: 10/50 ms   RUN: per cores* MEM: 60/85
   TMP: 60/75       CPU: 50/80      IOW: 5/20    SWP: 30/70
@@ -1719,18 +1720,20 @@ func rampRGB(s float64) (r, g, b int) {
 }
 
 type ui struct {
-	w       io.Writer
-	tty     bool
-	color   bool
-	blocks  bool
-	hybrid  bool
-	compact bool
-	symbols bool // показывать «...» вместо 999 (нет ответа)
-	lang    string
-	rows    int
-	head    string
-	sep     string
-	lastRS  []reading
+	w          io.Writer
+	tty        bool
+	color      bool
+	blocks     bool
+	hybrid     bool
+	compact    bool
+	symbols    bool // показывать «...» вместо 999 (нет ответа)
+	lang       string
+	rows       int
+	head       string
+	sep        string
+	lastRS     []reading
+	pending    []reading // предыдущий замер: печатается на следующем тике
+	hasPending bool
 }
 
 func (u *ui) setup() {
@@ -1849,8 +1852,19 @@ func (u *ui) emit(rs []reading) {
 		fmt.Fprintln(u.w, u.dataRow(rs))
 		return
 	}
+	// Заголовок — текущий замер, данные над ним — на один замер позже:
+	// цвет сначала появляется в заголовке, затем на следующем тике уходит
+	// вверх по истории, без одновременного дубля внизу.
+	if !u.hasPending {
+		u.pending = rs
+		u.hasPending = true
+		u.paintHeader(u.rows)
+		fmt.Fprintf(u.w, "\x1b[%d;1H", u.rows-1)
+		return
+	}
 	fmt.Fprint(u.w, "\r\n") // прокрутка области данных
-	fmt.Fprint(u.w, u.dataRow(rs))
+	fmt.Fprint(u.w, u.dataRow(u.pending))
+	u.pending = rs
 	u.paintHeader(u.rows)
 	fmt.Fprintf(u.w, "\x1b[%d;1H", u.rows-1)
 }

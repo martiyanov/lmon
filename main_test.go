@@ -890,3 +890,25 @@ func TestColsBlankColumn(t *testing.T) {
 		t.Errorf("compact blank row = %q (%d runes)", row, got)
 	}
 }
+
+func TestEmitDelaysDataByOneSample(t *testing.T) {
+	var b bytes.Buffer
+	u := &ui{w: &b, tty: true, rows: 4, lang: "en"}
+	u.emit([]reading{{id: "N", head: "NET", v: 1}})
+	if strings.Contains(b.String(), "  1") {
+		t.Errorf("первый замер напечатан сразу: %q", b.String())
+	}
+	b.Reset()
+	u.emit([]reading{{id: "N", head: "NET", v: 2}})
+	if !strings.Contains(b.String(), "  1") {
+		t.Errorf("нет предыдущего замера: %q", b.String())
+	}
+	if strings.Contains(b.String(), "  2") {
+		t.Errorf("текущий замер напечатан слишком рано: %q", b.String())
+	}
+	b.Reset()
+	u.emit([]reading{{id: "N", head: "NET", v: 3}})
+	if !strings.Contains(b.String(), "  2") {
+		t.Errorf("нет второго замера: %q", b.String())
+	}
+}

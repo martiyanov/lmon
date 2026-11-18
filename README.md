@@ -255,6 +255,13 @@ GPU, I/O, pings from `--ping`) and silently drops what the OS does not expose.
 It cannot be combined with `--cols`; with `--gpu-index 0,1` you get one GPU
 block per card (`G0`, `G1`, `T0`, `T1`).
 
+### TUI: header leads by one sample
+
+In the TUI the pinned header always shows the **current** sample, while the
+data row directly above it is one sample older. So a color change appears
+first in the header and moves upward on the next tick instead of lighting
+the header and the cell above it at the same time. `--once` is unchanged.
+
 ### Compact mode
 
 `lmon --compact` is the most minimal view: one letter per parameter in the
