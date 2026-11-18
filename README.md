@@ -281,7 +281,7 @@ lmon --rain --matrix
 ```
 
 Cells use a mixed set of keyboard symbols and Greek letters, ordered by
-visual weight: `. , : ; - = + * # % & @ λ π Σ Ψ Ω Ѣ Ѧ Ѫ`. Higher values use
+visual weight: `. , : ; - = + * # % & @ λ π Σ Ψ Ω`. Higher values use
 heavier glyphs; all glyphs are the same bright green (no brightness
 gradient). Repeated values cycle through equivalent glyphs so the rain
 keeps changing. All glyphs are single-width.
