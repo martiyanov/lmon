@@ -274,28 +274,28 @@ lmon --rain --matrix # green palette
 - it cannot be combined with `--horizontal` or `--once`;
 - `--matrix` is the green fill-glyph style, independent of direction.
 
-`--rain --matrix` uses single-cell fill glyphs instead of digits/colors:
+`--rain --matrix` uses single-cell cipher glyphs instead of digits/colors:
 
 ```sh
 lmon --rain --matrix
 ```
 
-The cell is filled by a block character — `▏`, `▎`, `▍`, `▌`, `▋`, `▊`,
-`▉`, `█` and their vertical/quadrant variants. Higher values fill more of
-the cell; all glyphs are the same bright green (no brightness gradient).
-Repeated values cycle through equivalent glyphs so the rain keeps changing.
-The glyphs are single-width, unlike runic letters.
+Cells use a mixed set of keyboard symbols and Greek letters, ordered by
+visual weight: `. , : ; - = + * # % & @ λ π Σ Ψ Ω`. Higher values use
+heavier glyphs; all glyphs are the same bright green (no brightness
+gradient). Repeated values cycle through equivalent glyphs so the rain
+keeps changing. All glyphs are single-width.
 
 `--matrix` is a full style and works with any mode: colors become green and
-digits/blocks become single-cell fill glyphs.
+digits/blocks become single-cell cipher glyphs.
 
 ```sh
-lmon --matrix              # normal grid: fill glyphs instead of digits
+lmon --matrix              # normal grid: cipher glyphs instead of digits
 lmon --bars --matrix
 lmon --hybrid --matrix
-lmon --compact --matrix    # one fill glyph per parameter
+lmon --compact --matrix    # one glyph per parameter
 lmon --horizontal --matrix
-lmon --rain --matrix       # falling fill glyphs
+lmon --rain --matrix       # falling cipher glyphs
 
 ### Horizontal timeline
 
@@ -367,7 +367,7 @@ Without color (`NO_COLOR`, pipe) the text fallbacks stay.
 | `--compact` | `LMON_COMPACT` | off | one letter and one colored block per parameter, no gaps |
 | `--horizontal` | `LMON_HORIZONTAL` | off | horizontal color timeline (TUI) |
 | `--rain` | `LMON_RAIN` | off | falling values, Braille fill, TUI only |
-| `--matrix` | `LMON_MATRIX` | off | matrix style: green + fill glyphs (any mode) |
+| `--matrix` | `LMON_MATRIX` | off | matrix style: green + cipher glyphs (any mode) |
 | `--labels` | `LMON_LABELS` | `short` | horizontal labels: `full` or `short` |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`), `--ping` names (`NG,VPN,M`), and an empty column for two commas (`NG,,M`); flags add more |

@@ -86,9 +86,9 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   время идёт вправо; --labels full|short — подписи.
   --rain        — направление: заголовок сверху, новые значения
                   появляются под ним и падают вниз; символы/цвета как обычно.
-  --rain --matrix — падающие заполняющие символы (█, ▌, ▚, ▂…),
+  --rain --matrix — падающие символы (. , : - = + * # % & @ λ π Σ Ψ Ω),
                   все одним зелёным цветом.
-  --matrix      — матричный стиль: зелёный + заполняющие символы
+  --matrix      — матричный стиль: зелёный + символы по визуальному весу
                   вместо цифр (работает с любым режимом).
 
 Набор колонок:
@@ -146,7 +146,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --horizontal  — строки-параметры, цветная история вправо
   lmon --rain          — цифры падают вниз
   lmon --rain --bars   — блоки падают вниз
-  lmon --rain --matrix — падающие заполняющие символы
+  lmon --rain --matrix — падающие символы по визуальному весу
   lmon --matrix        — обычный режим без цифр, только заполнение
   lmon --compact --matrix — по одному символу заполнения
   lmon --horizontal --labels full   # полные подписи
@@ -300,9 +300,9 @@ Display modes:
                   time flows right; --labels full|short selects labels.
   --rain        — direction: header stays on top, new values appear
                   under it and fall down; symbols/colors unchanged.
-  --rain --matrix — falling fill glyphs (█, ▌, ▚, ▂…),
+  --rain --matrix — falling glyphs (. , : - = + * # % & @ λ π Σ Ψ Ω),
                   all in the same green color.
-  --matrix      — matrix style: green + fill glyphs instead of digits
+  --matrix      — matrix style: green + weight-ordered glyphs instead of digits
                   (works with any mode).
 
 Column set:
@@ -359,9 +359,9 @@ Usage:
   lmon --horizontal  — parameter rows, color history to the right
   lmon --rain          — digits falling down
   lmon --rain --bars   — blocks falling down
-  lmon --rain --matrix — falling fill glyphs
+  lmon --rain --matrix — falling weight-ordered glyphs
   lmon --matrix        — normal mode without digits, fill only
-  lmon --compact --matrix — one fill glyph per parameter
+  lmon --compact --matrix — one glyph per parameter
   lmon --horizontal --labels full   # full labels
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
