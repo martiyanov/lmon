@@ -268,8 +268,8 @@ lmon --rain --compact
 lmon --rain --matrix # green palette
 ```
 
-- header stays pinned at the bottom, as in the normal mode;
-- new values appear at the top of the data area and move down toward it;
+- header stays pinned on top;
+- new values appear under it and move down;
 - `--rain` works with digits, `--bars`, `--hybrid`, `--compact`;
 - it cannot be combined with `--horizontal` or `--once`;
 - `--matrix` is the green palette, independent of direction.

@@ -84,8 +84,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   без пробелов (фиолетовый — нет датчика, красный — нет ответа).
   --horizontal  — горизонтальная цветная лента: параметр = строка,
                   время идёт вправо; --labels full|short — подписи.
-  --rain        — направление: заголовок внизу, новые значения
-                  появляются сверху и падают вниз; символы/цвета как обычно.
+  --rain        — направление: заголовок сверху, новые значения
+                  появляются под ним и падают вниз; символы/цвета как обычно.
   --matrix      — зелёная матричная палитра (можно с любым режимом).
 
 Набор колонок:
@@ -294,8 +294,8 @@ Display modes:
                   (purple = no sensor, red = no reply).
   --horizontal  — horizontal color timeline: one row per parameter,
                   time flows right; --labels full|short selects labels.
-  --rain        — direction: header stays at the bottom, new values
-                  appear at the top and fall down; symbols/colors unchanged.
+  --rain        — direction: header stays on top, new values appear
+                  under it and fall down; symbols/colors unchanged.
   --matrix      — green matrix palette (works with any mode).
 
 Column set:
@@ -2185,22 +2185,22 @@ func (u *ui) resize(rows int) {
 	u.rows = rows
 }
 
-// redrawRain: заголовок остаётся внизу, как в обычном режиме, но новые
-// значения появляются сверху и опускаются вниз (старые уходят к заголовку).
+// redrawRain: заголовок сверху, новые значения появляются под ним
+// и опускаются вниз (старые уходят ниже).
 func (u *ui) redrawRain(rows int) {
 	if rows < 2 {
 		rows = 2
 	}
 	u.rows = rows
 	fmt.Fprint(u.w, "\x1b[2J\x1b[H")
+	fmt.Fprintf(u.w, "\x1b[1;1H\x1b[2K%s", u.headerRow(u.lastRS))
 	for i, rs := range u.rainRows {
 		if i >= rows-1 {
 			break
 		}
-		fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[2K%s", i+1, u.dataRow(rs))
+		fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[2K%s", i+2, u.dataRow(rs))
 	}
-	fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[2K%s", rows, u.headerRow(u.lastRS))
-	fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[0J", rows)
+	fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[0J", min(rows, len(u.rainRows)+2))
 }
 
 func (u *ui) redraw(rows int) {
