@@ -12,18 +12,18 @@ import (
 	"github.com/martiyanov/lmon/internal/meter"
 )
 
-// runeLevels — «инопланетные» руны, сгруппированные по визуальной сложности:
-// от одной точки до плотного знака. Внутри группы несколько вариантов,
+// runeLevels — одноклеточные символы заполнения, сгруппированные по
+// заполненной площади: 1/8 … 8/8. Внутри группы несколько вариантов,
 // поэтому одно и то же значение каждый раз выглядит немного иначе.
 var runeLevels = [][]rune{
-	{'᛫', '᛬', '᛭'},
-	{'ᚠ', 'ᚢ', 'ᚦ', 'ᚨ', 'ᚱ', 'ᚲ'},
-	{'ᚷ', 'ᚹ', 'ᚺ', 'ᚾ', 'ᛁ', 'ᛃ'},
-	{'ᛈ', 'ᛇ', 'ᛉ', 'ᛊ', 'ᛏ', 'ᛒ'},
-	{'ᛖ', 'ᛗ', 'ᛚ', 'ᛜ', 'ᛞ', 'ᛟ'},
-	{'ᚣ', 'ᚤ', 'ᚥ', 'ᚧ', 'ᚫ', 'ᚬ'},
-	{'ᛠ', 'ᛡ', 'ᛢ', 'ᛣ', 'ᛤ'},
-	{'ᛥ', 'ᛦ', 'ᛧ', 'ᛨ', 'ᛩ', 'ᛪ', 'ᛮ', 'ᛯ', 'ᛰ'},
+	{'▏', '▁'},           // 1/8
+	{'▎', '▂', '▖'},      // 2/8
+	{'▍', '▃'},           // 3/8
+	{'▌', '▄', '▚', '▞'}, // 4/8
+	{'▋', '▅'},           // 5/8
+	{'▊', '▆', '▜'},      // 6/8
+	{'▉', '▇', '▟'},      // 7/8
+	{'█'},                // full
 }
 
 // runeGlyph выбирает руну по уровню 0..1; cycle перебирает варианты
@@ -49,7 +49,7 @@ type gcell struct {
 	blank bool
 }
 
-// gview — падающие руны: заголовки сверху, значения вниз.
+// gview — падающие заполняющие символы: заголовки сверху, значения вниз.
 type gview struct {
 	w        io.Writer
 	tty      bool
@@ -151,10 +151,7 @@ func (v *gview) cell(c gcell) string {
 	if !v.color {
 		return string(c.glyph)
 	}
-	if v.matrix {
-		return matrixColor(c.sev) + string(c.glyph) + reset
-	}
-	return fgSev(c.sev, false) + string(c.glyph) + reset
+	return "\x1b[38;5;46m" + string(c.glyph) + reset
 }
 
 func (v *gview) draw(rs []reading) {
@@ -184,11 +181,7 @@ func (v *gview) draw(rs []reading) {
 	}
 	fmt.Fprint(v.w, "\x1b[H\x1b[1;1H\x1b[2K")
 	if v.color {
-		if v.matrix {
-			fmt.Fprint(v.w, "\x1b[38;5;46m")
-		} else {
-			fmt.Fprint(v.w, grn)
-		}
+		fmt.Fprint(v.w, "\x1b[38;5;46m")
 	}
 	for _, r := range vis {
 		fmt.Fprint(v.w, compactLabel(r))

@@ -1029,38 +1029,35 @@ func TestRainUsesModeSymbols(t *testing.T) {
 	}
 }
 
-func TestRuneGlyphs(t *testing.T) {
+func TestMatrixFillGlyphs(t *testing.T) {
 	if runeGlyph(0, 0) != ' ' {
 		t.Error("нулевое значение должно быть пустым")
 	}
 	a := runeGlyph(0.5, 0)
 	b := runeGlyph(0.5, 1)
 	if a == b {
-		t.Errorf("одинаковое значение не меняет руну: %q", a)
+		t.Errorf("одинаковое значение не меняет символ: %q", a)
 	}
 	if runeGlyph(1, 0) == ' ' {
 		t.Error("максимум не должен быть пустым")
 	}
-	v := &gview{rows: 4, cols: 3, history: map[string][]gcell{}, counters: map[string]int{}}
+	v := &gview{rows: 4, cols: 3, color: true, history: map[string][]gcell{}, counters: map[string]int{}}
 	r := []reading{{id: "N", head: "NET", v: 200, green: 50, yellow: 150, red: 300}}
 	v.add(r)
 	v.add(r)
 	h := v.history["N"]
 	if len(h) < 2 || h[0].glyph == h[1].glyph {
-		t.Errorf("повтор значения не перебирает руны: %+v", h)
+		t.Errorf("повтор значения не перебирает символы: %+v", h)
+	}
+	if !strings.Contains(v.cell(h[0]), "38;5;46") {
+		t.Errorf("символ не одним зелёным цветом: %q", v.cell(h[0]))
 	}
 
-	cfg, err := parseConfig([]string{"--rain", "--matrix", "--glyphs", "runes"})
-	if err != nil || cfg.glyphs != "runes" || !cfg.rain || !cfg.matrixPalette {
-		t.Errorf("--rain --matrix --glyphs runes: %+v %v", cfg, err)
+	cfg, err := parseConfig([]string{"--rain", "--matrix"})
+	if err != nil || !cfg.rain || !cfg.matrixPalette {
+		t.Errorf("--rain --matrix: %+v %v", cfg, err)
 	}
-	if cfg, err := parseConfig([]string{"--rain", "--glyphs", "alien"}); err != nil || cfg.glyphs != "runes" {
-		t.Errorf("--glyphs alien: %+v %v", cfg, err)
-	}
-	if _, err := parseConfig([]string{"--glyphs", "runes"}); err == nil {
-		t.Error("--glyphs runes без --rain: ожидалась ошибка")
-	}
-	if _, err := parseConfig([]string{"--rain", "--bars", "--glyphs", "runes"}); err == nil {
-		t.Error("--glyphs runes + --bars: ожидалась ошибка")
+	if _, err := parseConfig([]string{"--rain", "--bars"}); err != nil {
+		t.Errorf("--rain --bars: %v", err)
 	}
 }

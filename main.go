@@ -86,8 +86,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   время идёт вправо; --labels full|short — подписи.
   --rain        — направление: заголовок сверху, новые значения
                   появляются под ним и падают вниз; символы/цвета как обычно.
-  --glyphs runes — с --rain: падающие руны вместо цифр/блоков;
-                  --glyphs alien — то же самое.
+  --rain --matrix — падающие заполняющие символы (█, ▌, ▚, ▂…),
+                  все одним зелёным цветом.
   --matrix      — зелёная матричная палитра (можно с любым режимом).
 
 Набор колонок:
@@ -145,7 +145,6 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --horizontal  — строки-параметры, цветная история вправо
   lmon --rain          — цифры падают вниз
   lmon --rain --bars   — блоки падают вниз
-  lmon --rain --matrix --glyphs runes — зелёные инопланетные руны
   lmon --rain --matrix — падающие значения в зелёной палитре
   lmon --bars --matrix — блочный режим в зелёной палитре
   lmon --horizontal --labels full   # полные подписи
@@ -196,7 +195,6 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --horizontal  LMON_HORIZONTAL горизонтальная цветная лента (TUI)
   --labels      LMON_LABELS     подписи в горизонтальном режиме: full или short
   --rain        LMON_RAIN       направление вниз: новые значения сверху
-  --glyphs      LMON_GLYPHS     символы для --rain: auto или runes
   --matrix      LMON_MATRIX     зелёная палитра (любой режим)
   --gpu-index   LMON_GPU_INDEX  индекс или список GPU для --gpu/--gputemp: 0 или 0,1
   --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
@@ -300,8 +298,8 @@ Display modes:
                   time flows right; --labels full|short selects labels.
   --rain        — direction: header stays on top, new values appear
                   under it and fall down; symbols/colors unchanged.
-  --glyphs runes — with --rain: falling runes instead of digits/blocks;
-                  --glyphs alien — same thing.
+  --rain --matrix — falling fill glyphs (█, ▌, ▚, ▂…),
+                  all in the same green color.
   --matrix      — green matrix palette (works with any mode).
 
 Column set:
@@ -358,7 +356,6 @@ Usage:
   lmon --horizontal  — parameter rows, color history to the right
   lmon --rain          — digits falling down
   lmon --rain --bars   — blocks falling down
-  lmon --rain --matrix --glyphs runes — green alien runes
   lmon --rain --matrix — falling values in the green palette
   lmon --bars --matrix — block mode in the green palette
   lmon --horizontal --labels full   # full labels
@@ -409,7 +406,6 @@ Settings (flags and environment variables):
   --horizontal  LMON_HORIZONTAL horizontal color timeline (TUI)
   --labels      LMON_LABELS     horizontal mode labels: full or short
   --rain        LMON_RAIN       down direction: new values on top
-  --glyphs      LMON_GLYPHS     rain glyphs: auto or runes
   --matrix      LMON_MATRIX     green palette (any mode)
   --gpu-index   LMON_GPU_INDEX  GPU index or list for --gpu/--gputemp: 0 or 0,1
   --gpu-list    LMON_GPU_LIST   list GPUs and exit
@@ -489,7 +485,6 @@ type config struct {
 	horizontal    bool
 	labelsFull    bool
 	rain          bool
-	glyphs        string
 	matrixPalette bool
 	cpu           bool
 	iowait        bool
@@ -606,7 +601,6 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&compact, "compact", envFlag("LMON_COMPACT"), "one character per column, no gaps")
 	fs.BoolVar(&rain, "rain", envFlag("LMON_RAIN"), "falling values: headers on top, values fall down")
 	matrixPalette := fs.Bool("matrix", envFlag("LMON_MATRIX"), "green matrix palette (works with any mode)")
-	glyphs := fs.String("glyphs", envStr("LMON_GLYPHS", "auto"), "rain glyphs: auto or runes")
 	horizontal := fs.Bool("horizontal", envFlag("LMON_HORIZONTAL"), "horizontal color timeline (TUI)")
 	labels := fs.String("labels", envStr("LMON_LABELS", "short"), "horizontal labels: full or short")
 	lang := fs.String("lang", langAuto(), "message language: en or ru")
@@ -678,19 +672,6 @@ func parseConfig(args []string) (config, error) {
 	}
 	if rain && once {
 		return config{}, errors.New(lmsg(lg, "--rain cannot be combined with --once; use the normal --once output", "--rain не сочетается с --once; используйте обычный вывод --once"))
-	}
-	glyphMode := strings.ToLower(strings.TrimSpace(*glyphs))
-	if glyphMode == "alien" {
-		glyphMode = "runes"
-	}
-	if glyphMode != "auto" && glyphMode != "runes" {
-		return config{}, fmt.Errorf(lmsg(lg, "--glyphs=%q: expected auto or runes", "--glyphs=%q: ожидается auto или runes"), *glyphs)
-	}
-	if glyphMode != "auto" && !rain {
-		return config{}, errors.New(lmsg(lg, "--glyphs runes requires --rain", "--glyphs runes требует --rain"))
-	}
-	if glyphMode != "auto" && (blocks || hybrid || compact) {
-		return config{}, errors.New(lmsg(lg, "--glyphs runes cannot be combined with --bars/--hybrid/--compact", "--glyphs runes не сочетается с --bars/--hybrid/--compact"))
 	}
 
 	var iters int
@@ -784,7 +765,7 @@ func parseConfig(args []string) (config, error) {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
-		blocks: blocks, hybrid: hybrid, compact: compact, horizontal: *horizontal, labelsFull: labelsMode == "full", rain: rain, glyphs: glyphMode, matrixPalette: *matrixPalette, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
+		blocks: blocks, hybrid: hybrid, compact: compact, horizontal: *horizontal, labelsFull: labelsMode == "full", rain: rain, matrixPalette: *matrixPalette, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
 		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans,
@@ -1174,9 +1155,9 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		}
 		return monitorHorizontal(ctx, cfg, w, dropped)
 	}
-	if cfg.rain && cfg.glyphs == "runes" {
+	if cfg.rain && cfg.matrixPalette {
 		if !stdoutIsTTY() {
-			fmt.Fprintln(os.Stderr, lmsg(cfg.lang, "lmon: --glyphs runes requires a terminal", "lmon: --glyphs runes требует терминал"))
+			fmt.Fprintln(os.Stderr, lmsg(cfg.lang, "lmon: --rain --matrix requires a terminal", "lmon: --rain --matrix требует терминал"))
 			return 2
 		}
 		return monitorRunes(ctx, cfg, w, dropped)

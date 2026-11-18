@@ -274,18 +274,17 @@ lmon --rain --matrix # green palette
 - it cannot be combined with `--horizontal` or `--once`;
 - `--matrix` is the green palette, independent of direction.
 
-Alien runes instead of digits/blocks:
+`--rain --matrix` uses single-cell fill glyphs instead of digits/colors:
 
 ```sh
-lmon --rain --matrix --glyphs runes
+lmon --rain --matrix
 ```
 
-`--glyphs runes` (alias `--glyphs alien`) uses Runic glyphs instead of
-digits. They are grouped by visual complexity, and repeated values cycle
-through variants of the same level, so the rain keeps changing. Higher
-values pick denser/brighter glyphs. The green palette comes from `--matrix`.
-Runic needs a font with runic coverage (Noto Sans Runic, Apple Symbols,
-some DejaVu builds); otherwise you will see boxes.
+The cell is filled by a block character — `▏`, `▎`, `▍`, `▌`, `▋`, `▊`,
+`▉`, `█` and their vertical/quadrant variants. Higher values fill more of
+the cell; all glyphs are the same bright green (no brightness gradient).
+Repeated values cycle through equivalent glyphs so the rain keeps changing.
+The glyphs are single-width, unlike runic letters.
 
 `--matrix` is a palette and works with any mode:
 
@@ -367,7 +366,6 @@ Without color (`NO_COLOR`, pipe) the text fallbacks stay.
 | `--horizontal` | `LMON_HORIZONTAL` | off | horizontal color timeline (TUI) |
 | `--rain` | `LMON_RAIN` | off | falling values, Braille fill, TUI only |
 | `--matrix` | `LMON_MATRIX` | off | green matrix palette (any mode) |
-| `--glyphs` | `LMON_GLYPHS` | `auto` | rain glyphs: `auto` or `runes`/`alien` |
 | `--labels` | `LMON_LABELS` | `short` | horizontal labels: `full` or `short` |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`), `--ping` names (`NG,VPN,M`), and an empty column for two commas (`NG,,M`); flags add more |
