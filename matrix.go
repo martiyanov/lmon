@@ -39,7 +39,7 @@ func matrixRamp() []rune {
 var matrixGlyphs = matrixRamp()
 
 // matrixColor — зелёная гамма: тёмно-зелёный → светло-зелёный.
-func matrixColor(sev float64) string {
+func matrixCode(sev float64) int {
 	palette := []int{22, 28, 34, 40, 46, 82, 118, 154}
 	i := int(sev*float64(len(palette)-1) + 0.5)
 	if i < 0 {
@@ -48,7 +48,15 @@ func matrixColor(sev float64) string {
 	if i >= len(palette) {
 		i = len(palette) - 1
 	}
-	return "\x1b[38;5;" + strconv.Itoa(palette[i]) + "m"
+	return palette[i]
+}
+
+func matrixColor(sev float64) string {
+	return "\x1b[38;5;" + strconv.Itoa(matrixCode(sev)) + "m"
+}
+
+func matrixBg(sev float64) string {
+	return "\x1b[38;5;16;48;5;" + strconv.Itoa(matrixCode(sev)) + "m"
 }
 
 // mview — матричный режим: подписи сверху, значения падают вниз.
@@ -56,6 +64,7 @@ type mview struct {
 	w       io.Writer
 	tty     bool
 	color   bool
+	matrix  bool
 	rows    int
 	cols    int
 	history map[string][]hcell
@@ -66,6 +75,7 @@ func newMView(w io.Writer, cfg config, tty bool) *mview {
 		w:       w,
 		tty:     tty,
 		color:   tty && os.Getenv("NO_COLOR") == "",
+		matrix:  cfg.matrixPalette,
 		rows:    termRows(),
 		cols:    termCols(),
 		history: map[string][]hcell{},
@@ -158,7 +168,13 @@ func (v *mview) cell(c hcell) string {
 	if !v.color {
 		return string(g)
 	}
-	return matrixColor(sev) + string(g) + reset
+	if v.matrix {
+		return matrixColor(sev) + string(g) + reset
+	}
+	if c.state == 999 {
+		return redBright + string(g) + reset
+	}
+	return fgSev(sev, false) + string(g) + reset
 }
 
 func (v *mview) draw(rs []reading) {
@@ -192,7 +208,11 @@ func (v *mview) draw(rs []reading) {
 	// заголовки
 	fmt.Fprint(v.w, "\x1b[1;1H\x1b[2K")
 	if v.color {
-		fmt.Fprint(v.w, "\x1b[38;5;46m")
+		if v.matrix {
+			fmt.Fprint(v.w, "\x1b[38;5;46m")
+		} else {
+			fmt.Fprint(v.w, grn)
+		}
 	}
 	for _, r := range vis {
 		fmt.Fprint(v.w, compactLabel(r))
@@ -215,7 +235,7 @@ func (v *mview) draw(rs []reading) {
 	fmt.Fprintf(v.w, "\x1b[%d;1H\x1b[0J", h+2)
 }
 
-func monitorMatrix(ctx context.Context, cfg config, w io.Writer, dropped []droppedColumn) int {
+func monitorRain(ctx context.Context, cfg config, w io.Writer, dropped []droppedColumn) int {
 	termSetup()
 	defer termRestore()
 	v := newMView(w, cfg, true)

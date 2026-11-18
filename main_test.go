@@ -1008,10 +1008,34 @@ func TestMatrixView(t *testing.T) {
 
 	cases := []string{"--matrix", "--matrix", "--matrix"}
 	_ = cases
-	if _, err := parseConfig([]string{"--matrix", "--once"}); err == nil {
-		t.Error("--matrix + --once: ожидалась ошибка")
+	if _, err := parseConfig([]string{"--rain", "--once"}); err == nil {
+		t.Error("--rain + --once: ожидалась ошибка")
 	}
-	if _, err := parseConfig([]string{"--matrix", "--horizontal"}); err == nil {
-		t.Error("--matrix + --horizontal: ожидалась ошибка")
+	if _, err := parseConfig([]string{"--rain", "--horizontal"}); err == nil {
+		t.Error("--rain + --horizontal: ожидалась ошибка")
+	}
+	cfg, err := parseConfig([]string{"--bars", "--matrix"})
+	if err != nil || !cfg.blocks || !cfg.matrixPalette {
+		t.Errorf("--bars --matrix: %+v %v", cfg, err)
+	}
+	cfg, err = parseConfig([]string{"--rain", "--matrix"})
+	if err != nil || !cfg.rain || !cfg.matrixPalette {
+		t.Errorf("--rain --matrix: %+v %v", cfg, err)
+	}
+}
+
+func TestMatrixPaletteWithModes(t *testing.T) {
+	u := &ui{color: true, blocks: true, matrix: true}
+	s := u.blockCell(reading{id: "M", v: 95, green: 60, yellow: 85, red: 97})
+	if !strings.Contains(s, "38;5;118") || strings.Contains(s, "196") {
+		t.Errorf("bars+matrix block = %q, want green palette", s)
+	}
+	h := u.headerRow([]reading{{id: "M", head: "MEM", v: 95, green: 60, yellow: 85, red: 97}})
+	if !strings.Contains(h, "48;5;118") {
+		t.Errorf("bars+matrix header = %q", h)
+	}
+	cfg, err := parseConfig([]string{"--matrix", "--once"})
+	if err != nil || !cfg.matrixPalette || !cfg.once {
+		t.Errorf("--matrix --once: %+v %v", cfg, err)
 	}
 }

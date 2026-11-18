@@ -255,20 +255,31 @@ GPU, I/O, pings from `--ping`) and silently drops what the OS does not expose.
 It cannot be combined with `--cols`; with `--gpu-index 0,1` you get one GPU
 block per card (`G0`, `G1`, `T0`, `T1`).
 
-### Matrix mode
+### Rain mode
 
 ```sh
-lmon --matrix
+lmon --rain --matrix
 ```
 
-Labels are on top, values fall downward. Only green shades are used; a cell
-is filled with one of 256 Braille patterns: 0 is empty, 255 is maximally
-filled and light green. The denser/brighter the cell, the worse the value.
-Purple/red are not used in this mode.
+Labels are on top, values fall downward. A cell is filled with one of 256
+Braille patterns: 0 is empty, 255 is maximally filled and light green.
+The denser/brighter the cell, the worse the value.
 
+- `--rain` is the falling-values mode; `--matrix` is the green palette;
+- `--rain --matrix` gives the green Matrix look;
+- `--rain` alone uses the normal palette (purple/red special states);
 - TUI only; `--once` keeps its normal output and cannot be combined;
 - cannot be combined with other display modes;
 - labels are the short `--cols` letters.
+
+`--matrix` is a palette and works with any mode:
+
+```sh
+lmon --matrix              # digits in green shades
+lmon --bars --matrix
+lmon --hybrid --matrix
+lmon --compact --matrix
+lmon --horizontal --matrix
 
 ### Horizontal timeline
 
@@ -339,7 +350,8 @@ Without color (`NO_COLOR`, pipe) the text fallbacks stay.
 | `--bars` | — | off | colored bars instead of digits (`--blocks` is a legacy alias) |
 | `--compact` | `LMON_COMPACT` | off | one letter and one colored block per parameter, no gaps |
 | `--horizontal` | `LMON_HORIZONTAL` | off | horizontal color timeline (TUI) |
-| `--matrix` | `LMON_MATRIX` | off | green matrix rain, Braille fill, TUI only |
+| `--rain` | `LMON_RAIN` | off | falling values, Braille fill, TUI only |
+| `--matrix` | `LMON_MATRIX` | off | green matrix palette (any mode) |
 | `--labels` | `LMON_LABELS` | `short` | horizontal labels: `full` or `short` |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`), `--ping` names (`NG,VPN,M`), and an empty column for two commas (`NG,,M`); flags add more |

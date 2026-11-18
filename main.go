@@ -84,8 +84,9 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   без пробелов (фиолетовый — нет датчика, красный — нет ответа).
   --horizontal  — горизонтальная цветная лента: параметр = строка,
                   время идёт вправо; --labels full|short — подписи.
-  --matrix      — матрица: подписи сверху, значения падают вниз,
-                  только зелёный, заполнение Braille-символами.
+  --rain        — падающие значения: подписи сверху, значения вниз,
+                  заполнение Braille-символами.
+  --matrix      — зелёная матричная палитра (можно с любым режимом).
 
 Набор колонок:
   --cols NG,CSB  — свой набор и порядок (каждая буква — колонка,
@@ -140,7 +141,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --hybrid      — цифры на цветной подложке
   lmon --compact     — минимализм: одна буква и один цветной блок на параметр
   lmon --horizontal  — строки-параметры, цветная история вправо
-  lmon --matrix      — зелёный дождь значений сверху вниз
+  lmon --rain --matrix — зелёный дождь значений сверху вниз
+  lmon --bars --matrix — блочный режим в зелёной палитре
   lmon --horizontal --labels full   # полные подписи
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
@@ -188,7 +190,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --compact     LMON_COMPACT    одна буква и один цветной блок на параметр, без пробелов
   --horizontal  LMON_HORIZONTAL горизонтальная цветная лента (TUI)
   --labels      LMON_LABELS     подписи в горизонтальном режиме: full или short
-  --matrix      LMON_MATRIX     матричный режим (TUI)
+  --rain        LMON_RAIN       падающие значения, заголовки сверху
+  --matrix      LMON_MATRIX     зелёная палитра (любой режим)
   --gpu-index   LMON_GPU_INDEX  индекс или список GPU для --gpu/--gputemp: 0 или 0,1
   --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
   --all         LMON_ALL        все доступные колонки (с --ping — ещё и они)
@@ -289,8 +292,9 @@ Display modes:
                   (purple = no sensor, red = no reply).
   --horizontal  — horizontal color timeline: one row per parameter,
                   time flows right; --labels full|short selects labels.
-  --matrix      — matrix: labels on top, values fall down, green only,
+  --rain        — falling values: labels on top, values fall down,
                   cells filled with Braille patterns.
+  --matrix      — green matrix palette (works with any mode).
 
 Column set:
   --cols NG,CSB  — your own set and order (each letter is a column;
@@ -344,7 +348,8 @@ Usage:
   lmon --hybrid      — digits on the state-colored background
   lmon --compact     — minimal: one letter and one colored block per parameter
   lmon --horizontal  — parameter rows, color history to the right
-  lmon --matrix      — green value rain from top to bottom
+  lmon --rain --matrix — green value rain from top to bottom
+  lmon --bars --matrix — block mode in the green palette
   lmon --horizontal --labels full   # full labels
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
@@ -392,7 +397,8 @@ Settings (flags and environment variables):
   --compact     LMON_COMPACT    one letter and one colored block per parameter, no gaps
   --horizontal  LMON_HORIZONTAL horizontal color timeline (TUI)
   --labels      LMON_LABELS     horizontal mode labels: full or short
-  --matrix      LMON_MATRIX     matrix mode (TUI)
+  --rain        LMON_RAIN       falling values, labels on top
+  --matrix      LMON_MATRIX     green palette (any mode)
   --gpu-index   LMON_GPU_INDEX  GPU index or list for --gpu/--gputemp: 0 or 0,1
   --gpu-list    LMON_GPU_LIST   list GPUs and exit
   --all         LMON_ALL        every available column (pings too, if --ping)
@@ -459,47 +465,48 @@ const (
 )
 
 type config struct {
-	target     string
-	gw         string
-	gwAuto     bool // шлюз определён автоматически — можно переопределить позже
-	interval   time.Duration
-	iters      int
-	once       bool
-	blocks     bool
-	hybrid     bool
-	compact    bool
-	horizontal bool
-	labelsFull bool
-	matrix     bool
-	cpu        bool
-	iowait     bool
-	swap       bool
-	disk       bool
-	diskBusy   bool // --disk-busy: занятость диска (Windows PDH / macOS IOKit)
-	batt       bool
-	gpu        bool
-	gputemp    bool
-	cols       []string
-	lang       string            // язык help и сообщений: "en" (умолчание) или "ru"
-	thresholds map[string][3]int // --thresholds: пороги цвета по колонкам
-	pings      []pingTarget      // --ping NAME=host: именованные пинги
-	noHints    bool              // --no-hints / LMON_NO_HINTS: без стартовых подсказок
-	tempCmd    string            // --temp-cmd: внешняя команда температуры (°C)
-	symbols    bool              // --symbols: «...» вместо 999 в --once
-	gpuIdx     []int             // --gpu-index: какие GPU показывать (0 — первая)
-	gpuList    bool              // --gpu-list: показать список GPU и выйти
-	all        bool              // --all: все доступные колонки
-	fans       bool              // --fans: скорость вентиляторов, % (Linux)
-	fansAll    bool              // --fans-all: колонка на каждый вентилятор
-	fansList   bool              // --fans-list: показать список вентиляторов
-	gpuPower   bool              // --gpu-power: GPU power, W
-	nvme       bool              // --nvme: NVMe temperature
-	diskIO     bool              // --disk-io: await + queue
-	netRate    bool              // --net-rate: RX/TX KB/s + errors
-	psi        bool              // --psi: memory pressure
-	system     bool              // --system: failed units + reboot required
-	cpuPower   bool              // --cpu-power: CPU package W (root/RAPL)
-	nvmeSmart  bool              // --nvme-smart: NVMe wear % (root/SMART)
+	target        string
+	gw            string
+	gwAuto        bool // шлюз определён автоматически — можно переопределить позже
+	interval      time.Duration
+	iters         int
+	once          bool
+	blocks        bool
+	hybrid        bool
+	compact       bool
+	horizontal    bool
+	labelsFull    bool
+	rain          bool
+	matrixPalette bool
+	cpu           bool
+	iowait        bool
+	swap          bool
+	disk          bool
+	diskBusy      bool // --disk-busy: занятость диска (Windows PDH / macOS IOKit)
+	batt          bool
+	gpu           bool
+	gputemp       bool
+	cols          []string
+	lang          string            // язык help и сообщений: "en" (умолчание) или "ru"
+	thresholds    map[string][3]int // --thresholds: пороги цвета по колонкам
+	pings         []pingTarget      // --ping NAME=host: именованные пинги
+	noHints       bool              // --no-hints / LMON_NO_HINTS: без стартовых подсказок
+	tempCmd       string            // --temp-cmd: внешняя команда температуры (°C)
+	symbols       bool              // --symbols: «...» вместо 999 в --once
+	gpuIdx        []int             // --gpu-index: какие GPU показывать (0 — первая)
+	gpuList       bool              // --gpu-list: показать список GPU и выйти
+	all           bool              // --all: все доступные колонки
+	fans          bool              // --fans: скорость вентиляторов, % (Linux)
+	fansAll       bool              // --fans-all: колонка на каждый вентилятор
+	fansList      bool              // --fans-list: показать список вентиляторов
+	gpuPower      bool              // --gpu-power: GPU power, W
+	nvme          bool              // --nvme: NVMe temperature
+	diskIO        bool              // --disk-io: await + queue
+	netRate       bool              // --net-rate: RX/TX KB/s + errors
+	psi           bool              // --psi: memory pressure
+	system        bool              // --system: failed units + reboot required
+	cpuPower      bool              // --cpu-power: CPU package W (root/RAPL)
+	nvmeSmart     bool              // --nvme-smart: NVMe wear % (root/SMART)
 }
 
 // pingTarget — именованная пинг-колонка (--ping VPN=10.8.0.1):
@@ -579,12 +586,13 @@ func parseConfig(args []string) (config, error) {
 	target := fs.String("target", envStr("LMON_TARGET", "8.8.8.8"), "external host")
 	gw := fs.String("gw", envStr("LMON_GW", ""), "gateway (auto-detected by default)")
 	interval := fs.Float64("interval", envFloat("LMON_INTERVAL", 1), "seconds between lines")
-	var blocks, hybrid, compact, matrix bool
+	var blocks, hybrid, compact, rain bool
 	fs.BoolVar(&blocks, "bars", false, "colored bars instead of digits")
 	fs.BoolVar(&blocks, "blocks", false, "alias for --bars (legacy name)")
 	fs.BoolVar(&hybrid, "hybrid", false, "digits on the state-colored background")
 	fs.BoolVar(&compact, "compact", envFlag("LMON_COMPACT"), "one character per column, no gaps")
-	fs.BoolVar(&matrix, "matrix", envFlag("LMON_MATRIX"), "matrix rain: headers on top, values fall down, green only")
+	fs.BoolVar(&rain, "rain", envFlag("LMON_RAIN"), "falling values: headers on top, values fall down")
+	matrixPalette := fs.Bool("matrix", envFlag("LMON_MATRIX"), "green matrix palette (works with any mode)")
 	horizontal := fs.Bool("horizontal", envFlag("LMON_HORIZONTAL"), "horizontal color timeline (TUI)")
 	labels := fs.String("labels", envStr("LMON_LABELS", "short"), "horizontal labels: full or short")
 	lang := fs.String("lang", langAuto(), "message language: en or ru")
@@ -651,11 +659,11 @@ func parseConfig(args []string) (config, error) {
 	if *horizontal && once {
 		return config{}, errors.New(lmsg(lg, "--horizontal cannot be combined with --once; use the normal --once output", "--horizontal не сочетается с --once; используйте обычный вывод --once"))
 	}
-	if matrix && (blocks || hybrid || compact || *horizontal) {
-		return config{}, errors.New(lmsg(lg, "--matrix cannot be combined with other display modes", "--matrix не сочетается с другими режимами отображения"))
+	if rain && (blocks || hybrid || compact || *horizontal) {
+		return config{}, errors.New(lmsg(lg, "--rain cannot be combined with other display modes", "--rain не сочетается с другими режимами отображения"))
 	}
-	if matrix && once {
-		return config{}, errors.New(lmsg(lg, "--matrix cannot be combined with --once; use the normal --once output", "--matrix не сочетается с --once; используйте обычный вывод --once"))
+	if rain && once {
+		return config{}, errors.New(lmsg(lg, "--rain cannot be combined with --once; use the normal --once output", "--rain не сочетается с --once; используйте обычный вывод --once"))
 	}
 
 	var iters int
@@ -749,7 +757,7 @@ func parseConfig(args []string) (config, error) {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
-		blocks: blocks, hybrid: hybrid, compact: compact, horizontal: *horizontal, labelsFull: labelsMode == "full", matrix: matrix, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
+		blocks: blocks, hybrid: hybrid, compact: compact, horizontal: *horizontal, labelsFull: labelsMode == "full", rain: rain, matrixPalette: *matrixPalette, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
 		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans,
@@ -1139,19 +1147,19 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		}
 		return monitorHorizontal(ctx, cfg, w, dropped)
 	}
-	if cfg.matrix {
+	if cfg.rain {
 		if !stdoutIsTTY() {
-			fmt.Fprintln(os.Stderr, lmsg(cfg.lang, "lmon: --matrix requires a terminal", "lmon: --matrix требует терминал"))
+			fmt.Fprintln(os.Stderr, lmsg(cfg.lang, "lmon: --rain requires a terminal", "lmon: --rain требует терминал"))
 			return 2
 		}
-		return monitorMatrix(ctx, cfg, w, dropped)
+		return monitorRain(ctx, cfg, w, dropped)
 	}
 
 	termSetup()
 	defer termRestore()
 
 	tty := stdoutIsTTY()
-	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, symbols: true, lang: cfg.lang}
+	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, matrix: cfg.matrixPalette, symbols: true, lang: cfg.lang}
 	if cfg.compact {
 		u.head, u.sep = headerOfCompact(cols)
 	} else {
@@ -1268,6 +1276,7 @@ func newOnceUI(w io.Writer, cfg config, tty bool) *ui {
 		blocks:  cfg.blocks,
 		hybrid:  cfg.hybrid,
 		compact: cfg.compact,
+		matrix:  cfg.matrixPalette,
 		symbols: cfg.symbols,
 		lang:    cfg.lang,
 	}
@@ -1780,6 +1789,7 @@ type hview struct {
 	tty     bool
 	color   bool
 	full    bool // полные подписи (--labels full)
+	matrix  bool
 	lang    string
 	rows    int
 	cols    int
@@ -1793,6 +1803,7 @@ func newHView(w io.Writer, cfg config, tty bool) *hview {
 		tty:     tty,
 		color:   tty && os.Getenv("NO_COLOR") == "",
 		full:    cfg.labelsFull,
+		matrix:  cfg.matrixPalette,
 		lang:    cfg.lang,
 		rows:    termRows(),
 		cols:    termCols(),
@@ -1921,11 +1932,19 @@ func (v *hview) lines(rs []reading) []string {
 			}
 			switch c.state {
 			case -1:
-				b.WriteString(purple + "█" + reset)
+				if v.matrix {
+					b.WriteString(fgSev(0, true) + "█" + reset)
+				} else {
+					b.WriteString(purple + "█" + reset)
+				}
 			case 999:
-				b.WriteString(redBright + "█" + reset)
+				if v.matrix {
+					b.WriteString(fgSev(1, true) + "█" + reset)
+				} else {
+					b.WriteString(redBright + "█" + reset)
+				}
 			default:
-				b.WriteString("\x1b[38;5;" + gradient256(c.sev) + "m█" + reset)
+				b.WriteString(fgSev(c.sev, v.matrix) + "█" + reset)
 			}
 		}
 		out = append(out, b.String())
@@ -2062,6 +2081,21 @@ func gradient256(s float64) string {
 	return strconv.Itoa(16 + 36*q(r) + 6*q(g) + q(b))
 }
 
+// fgSev/bgSev — цвет значения в обычной или матричной палитре.
+func fgSev(sev float64, matrix bool) string {
+	if matrix {
+		return matrixColor(sev)
+	}
+	return "\x1b[38;5;" + gradient256(sev) + "m"
+}
+
+func bgSev(sev float64, matrix bool) string {
+	if matrix {
+		return matrixBg(sev)
+	}
+	return "\x1b[38;5;16;48;5;" + gradient256(sev) + "m"
+}
+
 func rampRGB(s float64) (r, g, b int) {
 	// зелёный (0,220,0) → жёлтый (255,220,0) → красный (255,40,0)
 	switch {
@@ -2085,6 +2119,7 @@ type ui struct {
 	blocks     bool
 	hybrid     bool
 	compact    bool
+	matrix     bool
 	symbols    bool // показывать «...» вместо 999 (нет ответа)
 	lang       string
 	rows       int
@@ -2247,14 +2282,22 @@ func (u *ui) headerRow(rs []reading) string {
 				continue
 			}
 			if r.v < 0 {
-				cells[i] = purpleBg + label + reset
+				if u.matrix {
+					cells[i] = bgSev(0, true) + label + reset
+				} else {
+					cells[i] = purpleBg + label + reset
+				}
 				continue
 			}
 			if r.v == 999 {
-				cells[i] = redBg + label + reset
+				if u.matrix {
+					cells[i] = bgSev(1, true) + label + reset
+				} else {
+					cells[i] = redBg + label + reset
+				}
 				continue
 			}
-			cells[i] = "\x1b[38;5;16;48;5;" + gradient256(r.severity()) + "m" + label + reset
+			cells[i] = bgSev(r.severity(), u.matrix) + label + reset
 		}
 		return strings.Join(cells, "")
 	}
@@ -2265,15 +2308,23 @@ func (u *ui) headerRow(rs []reading) string {
 			continue
 		}
 		label := r.head
-		if r.v < 0 { // датчика нет — фиолетовая подпись
-			cells[i] = purpleBg + label + reset
+		if r.v < 0 {
+			if u.matrix {
+				cells[i] = bgSev(0, true) + label + reset
+			} else {
+				cells[i] = purpleBg + label + reset
+			}
 			continue
 		}
-		if r.v == 999 { // нет ответа — красная подпись
-			cells[i] = redBg + label + reset
+		if r.v == 999 {
+			if u.matrix {
+				cells[i] = bgSev(1, true) + label + reset
+			} else {
+				cells[i] = redBg + label + reset
+			}
 			continue
 		}
-		cells[i] = "\x1b[38;5;16;48;5;" + gradient256(r.severity()) + "m" + label + reset
+		cells[i] = bgSev(r.severity(), u.matrix) + label + reset
 	}
 	return strings.Join(cells, " ")
 }
@@ -2315,9 +2366,15 @@ func (u *ui) digitCell(r reading) string {
 		return dim + u.displayText(r) + reset
 	}
 	if u.symbols && r.v == 999 {
+		if u.matrix {
+			return fgSev(1, true) + "..." + reset
+		}
 		return red + "..." + reset
 	}
 	s := u.displayText(r)
+	if u.matrix {
+		return fgSev(r.severity(), true) + s + reset
+	}
 	var c string
 	if r.invert {
 		switch {
@@ -2348,15 +2405,21 @@ func (u *ui) blockCell(r reading) string {
 		if !u.color {
 			return dim + "·" + reset
 		}
+		if u.matrix {
+			return fgSev(0, true) + "███" + reset
+		}
 		return purple + "███" + reset
 	}
 	if r.v == 999 { // нет ответа
 		if !u.color {
 			return red + "..." + reset
 		}
+		if u.matrix {
+			return fgSev(1, true) + "███" + reset
+		}
 		return redBright + "███" + reset
 	}
-	return "\x1b[38;5;" + gradient256(r.severity()) + "m███" + reset
+	return fgSev(r.severity(), u.matrix) + "███" + reset
 }
 
 // compactCell — один блок на параметр, без пробелов.
@@ -2364,12 +2427,18 @@ func (u *ui) blockCell(r reading) string {
 func (u *ui) compactCell(r reading) string {
 	if r.v < 0 {
 		if u.color {
+			if u.matrix {
+				return fgSev(0, true) + "█" + reset
+			}
 			return purple + "█" + reset
 		}
 		return "·"
 	}
 	if r.v == 999 {
 		if u.color {
+			if u.matrix {
+				return fgSev(1, true) + "█" + reset
+			}
 			return redBright + "█" + reset
 		}
 		return "!"
@@ -2377,7 +2446,7 @@ func (u *ui) compactCell(r reading) string {
 	if !u.color {
 		return "█"
 	}
-	return "\x1b[38;5;" + gradient256(r.severity()) + "m█" + reset
+	return fgSev(r.severity(), u.matrix) + "█" + reset
 }
 
 // hybridCell — смешанный режим: точные цифры на подложке цвета состояния
@@ -2386,7 +2455,7 @@ func (u *ui) hybridCell(r reading) string {
 	if r.v < 0 {
 		return dim + u.displayText(r) + reset
 	}
-	return "\x1b[38;5;16;48;5;" + gradient256(r.severity()) + "m" + u.displayText(r) + reset
+	return bgSev(r.severity(), u.matrix) + u.displayText(r) + reset
 }
 
 func stdoutIsTTY() bool {
