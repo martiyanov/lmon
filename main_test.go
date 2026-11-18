@@ -704,3 +704,23 @@ func TestAllFlag(t *testing.T) {
 		t.Errorf("--all multi layout = %q, не должно быть P/H", mgot)
 	}
 }
+
+func TestFansFlag(t *testing.T) {
+	for _, k := range []string{"LMON_FANS", "LMON_ALL"} {
+		t.Setenv(k, "")
+	}
+	cfg, err := parseConfig([]string{"--fans"})
+	if err != nil || !cfg.fans {
+		t.Fatalf("--fans: cfg=%+v err=%v", cfg.fans, err)
+	}
+	// FAN есть только на Linux; на Windows/macOS колонка скрыта
+	if cols, _ := layoutWithDropped(config{fans: true}, "linux"); !strings.Contains(ids(cols), "F") {
+		t.Errorf("linux layout без F: %q", ids(cols))
+	}
+	if cols, _ := layoutWithDropped(config{fans: true}, "windows"); strings.Contains(ids(cols), "F") {
+		t.Errorf("windows layout не должен содержать F: %q", ids(cols))
+	}
+	if cols, _ := layoutWithDropped(config{fans: true}, "darwin"); strings.Contains(ids(cols), "F") {
+		t.Errorf("darwin layout не должен содержать F: %q", ids(cols))
+	}
+}

@@ -49,6 +49,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   CPU (C)  — загрузка CPU, % (--cpu).
   IOW (I)  — iowait CPU, % (--iowait; только Linux, иначе «·»).
   I/O (K)  — занятость диска, % (--disk-busy; Windows — PDH, macOS — IOKit, без админа).
+  FAN (F)  — скорость вентиляторов, % (--fans; Linux: PWM hwmon + вентилятор GPU).
   SWP (S)  — занятые swap/файл подкачки, % (--swap; Windows читает
              pagefile через PDH, без прав администратора).
   DSK (U)  — занято на системном диске, % (--disk).
@@ -76,6 +77,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
     T — t°C CPU   C — загрузка CPU (%)
     I — iowait    S — swap       U — диск (можно D)  B — батарея
     K — занятость диска (--disk-busy, Windows/macOS)
+    F — скорость вентиляторов, % (--fans, Linux)
     P — загрузка GPU (%)         H — t°GPU
 
   Примеры: только сеть и память — lmon --cols NM
@@ -119,6 +121,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --gpu-index 0,1 --gpu --gputemp
                      — по колонке на каждую GPU: G0/G1 и T0/T1
   lmon --disk-busy   — занятость диска, % (Windows/macOS)
+  lmon --fans        — скорость вентиляторов, % (Linux: hwmon + GPU)
   lmon --all         — все доступные колонки сразу
   lmon --cols TNGC   — свой набор и порядок колонок
   lmon --ping VPN=… --cols NG,VPN,M
@@ -153,6 +156,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --gpu-index   LMON_GPU_INDEX  индекс или список GPU для --gpu/--gputemp: 0 или 0,1
   --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
   --all         LMON_ALL        все доступные колонки (с --ping — ещё и они)
+  --fans        LMON_FANS       скорость вентиляторов, % (Linux: hwmon PWM + GPU)
   --temp-cmd    LMON_TEMP_CMD  внешняя команда, печатающая температуру CPU
                               в °C (берётся первое число). Нужна на Windows,
                               где нет штатного API: например, LHM через
@@ -206,6 +210,7 @@ Columns (letter in parentheses is for --cols):
   CPU (C)  — CPU usage, % (--cpu).
   IOW (I)  — CPU iowait, % (--iowait; Linux only, otherwise «·»).
   I/O (K)  — disk busy time, % (--disk-busy; Windows uses PDH, macOS IOKit; no admin).
+  FAN (F)  — fan speed, % (--fans; Linux: hwmon PWM + GPU fan).
   SWP (S)  — swap/pagefile in use, % (--swap; on Windows it reads
              pagefile via PDH, no admin rights).
   DSK (U)  — root disk usage, % (--disk).
@@ -233,6 +238,7 @@ Column set:
     T — CPU °C    C — CPU usage (%)
     I — iowait    S — swap       U — disk (D works too)  B — battery
     K — disk busy (--disk-busy, Windows/macOS)
+    F — fan speed, % (--fans, Linux)
     P — GPU usage (%)            H — GPU °C
 
   Examples: network and memory only — lmon --cols NM
@@ -273,6 +279,7 @@ Usage:
   lmon --gpu-index 0,1 --gpu --gputemp
                      — one column per GPU: G0/G1 and T0/T1
   lmon --disk-busy   — disk busy time %, Windows/macOS
+  lmon --fans        — fan speed, % (Linux: hwmon + GPU)
   lmon --all         — every available column at once
   lmon --cols TNGC   — your own set and order of columns
   lmon --ping VPN=… --cols NG,VPN,M
@@ -307,6 +314,7 @@ Settings (flags and environment variables):
   --gpu-index   LMON_GPU_INDEX  GPU index or list for --gpu/--gputemp: 0 or 0,1
   --gpu-list    LMON_GPU_LIST   list GPUs and exit
   --all         LMON_ALL        every available column (pings too, if --ping)
+  --fans        LMON_FANS       fan speed, % (Linux: hwmon PWM + GPU)
   --temp-cmd    LMON_TEMP_CMD  external command that prints CPU temperature
                               in °C (the first number is used). Needed on
                               Windows where no native API exists; e.g. LHM
@@ -381,6 +389,7 @@ type config struct {
 	gpuIdx     []int             // --gpu-index: какие GPU показывать (0 — первая)
 	gpuList    bool              // --gpu-list: показать список GPU и выйти
 	all        bool              // --all: все доступные колонки
+	fans       bool              // --fans: скорость вентиляторов, % (Linux)
 }
 
 // pingTarget — именованная пинг-колонка (--ping VPN=10.8.0.1):
@@ -458,6 +467,7 @@ func parseConfig(args []string) (config, error) {
 	gpuIdxFlag := fs.String("gpu-index", envStr("LMON_GPU_INDEX", "0"), "GPU index or comma list for --gpu/--gputemp (see --gpu-list)")
 	gpuList := fs.Bool("gpu-list", envFlag("LMON_GPU_LIST"), "list available GPUs and exit")
 	all := fs.Bool("all", envFlag("LMON_ALL"), "show every available column (pings included if --ping given)")
+	fans := fs.Bool("fans", envFlag("LMON_FANS"), "add fan speed column, % (Linux: hwmon PWM + GPU fan)")
 	colsFlag := fs.String("cols", os.Getenv("LMON_COLS"), "base column set and order, e.g. NG,CSB; --ping names can be placed too (NG,VPN,M)")
 	thrFlag := fs.String("thresholds", os.Getenv("LMON_THRESHOLDS"), "per-column color thresholds COL=green/yellow/red (e.g. NET=100/200/500)")
 	// --ping повторяемый: копим сырые строки, валидируем после разбора
@@ -553,11 +563,12 @@ func parseConfig(args []string) (config, error) {
 				"--all and --cols are mutually exclusive",
 				"--all и --cols взаимоисключающие"))
 		}
-		cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "P", "H", "K"}
+		cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "P", "H", "K", "F"}
 		cpu, iowait, swap, disk, diskBusy, batt, gpu, gputemp = true, true, true, true, true, true, true, true
+		*fans = true
 		if len(gpuIdx) > 1 {
 			// при нескольких GPU вместо P/H будут динамические G0/G1, T0/T1
-			cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "K"}
+			cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "K", "F"}
 		}
 	}
 	if len(gpuIdx) > 1 && !gpu && !gputemp {
@@ -574,7 +585,7 @@ func parseConfig(args []string) (config, error) {
 		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
-		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all}, nil
+		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans}, nil
 }
 
 // rawList — повторяемый флаг: каждое вхождение добавляет строку.
@@ -682,7 +693,7 @@ func parseCols(spec string, pings []pingTarget, lang string) ([]string, error) {
 				}
 			}
 			if !onlyLetters {
-				hint := "N G L M T C I S U B P H K"
+				hint := "N G L M T C I S U B P H K F"
 				return nil, fmt.Errorf(lmsg(lang,
 					"--cols: unknown column or ping name %q (columns: %s; define a ping first: --ping %s=host)",
 					"--cols: неизвестная колонка или имя пинга %q (колонки: %s; пинг нужно сначала задать: --ping %s=host)"), up, hint, up)
@@ -694,7 +705,7 @@ func parseCols(spec string, pings []pingTarget, lang string) ([]string, error) {
 			}
 			id := string(r)
 			if _, ok := colRegistry[id]; !ok {
-				hint := "N G L M T C I S U B P H K"
+				hint := "N G L M T C I S U B P H K F"
 				if len(names) > 0 {
 					hint += ", " + strings.Join(names, " ")
 				}
@@ -746,8 +757,8 @@ func parseThresholds(spec, lang string) (map[string][3]int, error) {
 		if !ok && !isPingName(id) {
 			// не буква, не имя колонки и не имя именованного пинга
 			return none, fmt.Errorf(lmsg(lang,
-				"--thresholds: unknown column %q (available: N G L M T C I S U B P H K)",
-				"--thresholds: неизвестная колонка %q (есть: N G L M T C I S U B P H K)"), eq[0])
+				"--thresholds: unknown column %q (available: N G L M T C I S U B P H K F)",
+				"--thresholds: неизвестная колонка %q (есть: N G L M T C I S U B P H K F)"), eq[0])
 		}
 		var t [3]int
 		ns := strings.Split(eq[1], "/")
@@ -1104,6 +1115,7 @@ var colRegistry = map[string]reading{
 	"P": {id: "P", head: "GPU", green: 50, yellow: 85, red: 100},
 	"H": {id: "H", head: " G°", green: 60, yellow: 80, red: 90},
 	"K": {id: "K", head: "I/O", green: 60, yellow: 85, red: 100}, // диск занят (Windows, PDH)
+	"F": {id: "F", head: "FAN", green: 60, yellow: 85, red: 100}, // вентиляторы, % (Linux)
 }
 
 // layout возвращает колонки в порядке вывода; значения заполнит sampleRow.
@@ -1139,6 +1151,7 @@ func requestedLayout(cfg config) []reading {
 	add("S", cfg.swap)
 	add("U", cfg.disk)
 	add("K", cfg.diskBusy)
+	add("F", cfg.fans)
 	add("B", cfg.batt)
 	if len(cfg.gpuIdx) <= 1 {
 		add("P", cfg.gpu)
@@ -1375,6 +1388,9 @@ func measure(ctx context.Context, cfg config) []reading {
 	}
 	if need("K") {
 		vals["K"] = meter.DiskBusyPercent()
+	}
+	if need("F") {
+		vals["F"] = meter.FanPercent()
 	}
 	if need("B") {
 		vals["B"] = meter.BatteryPercent()

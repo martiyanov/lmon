@@ -238,6 +238,14 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 			"G°: no GPU temperature source.",
 			"G°: нет источника температуры GPU."), detail)
 	}
+	if r, ok := byID["F"]; ok && r.v < 0 {
+		detail := lmsg(lang,
+			"Linux: no PWM/fan sensors found; check `sensors` (lm-sensors) or GPU fan via nvidia-smi. On other OS fan speed is not public.",
+			"Linux: PWM/датчики вентиляторов не найдены; проверьте `sensors` (lm-sensors) или вентилятор GPU через nvidia-smi. В других ОС скорость вентиляторов публично недоступна.")
+		add(lmsg(lang,
+			"FAN: no fan speed source.",
+			"FAN: нет источника скорости вентиляторов."), detail)
+	}
 	if r, ok := byID["K"]; ok && r.v < 0 {
 		detail := lmsg(lang,
 			"Check `ioreg -r -c IOBlockStorageDriver -k Statistics -l`, or drop column K.",

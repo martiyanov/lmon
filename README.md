@@ -180,6 +180,7 @@ align exactly with the values. In plain words:
 - **IOW** — how much the CPU idles waiting for the disk (`--iowait`,
   Linux only; high — the disk is the bottleneck; hidden on macOS/Windows).
 - **SWP** — swap/pagefile in use (`--swap`; grows when memory runs out). On Windows it reads the page file through PDH, no admin needed.
+- **FAN** — fan speed, % (`--fans`; Linux: hwmon PWM outputs + NVIDIA GPU fan; other OS need external tools).
 - **I/O** — how busy the disk is, % (`--disk-busy`; Windows reads
   `\PhysicalDisk(_Total)\% Disk Time` via PDH, macOS derives it from IOKit
   `Total Time (Read/Write)`; no admin). The closest thing to Linux iowait.
@@ -275,6 +276,7 @@ machine; `...` (TUI) or `999` (`--once`) means the host is unreachable.
 | `--gpu-index` | `LMON_GPU_INDEX` | `0` | GPU index or list (`0,1`) for `--gpu`/`--gputemp`; a list adds one column per card (`G0/G1`, `T0/T1`) |
 | `--gpu-list` | `LMON_GPU_LIST` | off | list available GPUs and exit |
 | `--all` | `LMON_ALL` | off | every column the OS can provide, plus `--ping` columns; incompatible with `--cols` |
+| `--fans` | `LMON_FANS` | off | fan speed, % (Linux: hwmon PWM + NVIDIA GPU fan) |
 | `--cpu` `--iowait` `--swap` `--disk` `--batt` `--gpu` `--gputemp` | — | off | add extra columns |
 
 ```sh
@@ -284,6 +286,7 @@ lmon --ping VPN=10.8.0.1 --cols NG,VPN,M  # place a ping column anywhere
 lmon --gpu-list                    # 0: RTX 3060, 1: Intel UHD
 lmon --gpu --gputemp --gpu-index 0 # show a specific GPU
 lmon --gpu --gputemp --gpu-index 0,1 # one column per GPU
+lmon --fans                         # fan speed % (Linux)
 lmon --all                          # all supported columns at once
 tmux: set -g status-right '#(lmon --once --cols=NGMC)'
 ```

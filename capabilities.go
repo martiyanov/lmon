@@ -27,7 +27,8 @@ func columnSupportedByOS(id, goos string) bool {
 		switch id {
 		case "L", // load average в Windows отсутствует
 			"T", // нет официального API температуры CPU (только --temp-cmd)
-			"I": // iowait есть только в Linux
+			"I", // iowait есть только в Linux
+			"F": // скорость вентиляторов: нужен LHM/HWiNFO
 			return false
 		}
 		// S (pagefile) читается через PDH; P/H — NVML/nvidia-smi/PDH;
@@ -35,12 +36,15 @@ func columnSupportedByOS(id, goos string) bool {
 	case "darwin":
 		switch id {
 		case "I", // iowait на macOS ядром не отдаётся
-			"H": // GPUTempC: powermetrics под sudo — не показываем
+			"H", // GPUTempC: powermetrics под sudo — не показываем
+			"F": // вентиляторы: нужен SMC/powermetrics с правами
 			return false
 		}
 		// K (занятость диска) читается через IOKit, без sudo.
 	case "linux":
 		switch id {
+		case "F":
+			// FAN читается из hwmon PWM; если датчиков нет — колонка покажет «·».
 		case "K": // занятость диска: на Linux пока нет (для I/O есть IOW)
 			return false
 		}
@@ -48,7 +52,7 @@ func columnSupportedByOS(id, goos string) bool {
 		// зависят от железа — для них остаются подсказки при -1.
 	default:
 		switch id {
-		case "L", "T", "I", "S", "P", "H":
+		case "L", "T", "I", "S", "P", "H", "F":
 			return false
 		}
 	}
@@ -72,6 +76,8 @@ func supportedReason(id string) string {
 		return "температура GPU"
 	case "K":
 		return "занятость диска"
+	case "F":
+		return "скорость вентиляторов"
 	}
 	return id
 }
