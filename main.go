@@ -86,7 +86,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   время идёт вправо; --labels full|short — подписи.
   --rain        — направление: заголовок сверху, новые значения
                   появляются под ним и падают вниз; символы/цвета как обычно.
-  --rain --matrix — падающие символы (. , : - = + * # % & @ λ π Σ Ψ Ω),
+  --rain --matrix — падающие символы (. , : - = + * # % & @ λ π Σ Ψ Ω Ѣ Ѧ Ѫ),
                   все одним зелёным цветом.
   --matrix      — матричный стиль: зелёный + символы по визуальному весу
                   вместо цифр (работает с любым режимом).
@@ -300,7 +300,7 @@ Display modes:
                   time flows right; --labels full|short selects labels.
   --rain        — direction: header stays on top, new values appear
                   under it and fall down; symbols/colors unchanged.
-  --rain --matrix — falling glyphs (. , : - = + * # % & @ λ π Σ Ψ Ω),
+  --rain --matrix — falling glyphs (. , : - = + * # % & @ λ π Σ Ψ Ω Ѣ Ѧ Ѫ),
                   all in the same green color.
   --matrix      — matrix style: green + weight-ordered glyphs instead of digits
                   (works with any mode).
