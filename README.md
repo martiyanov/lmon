@@ -258,9 +258,9 @@ block per card (`G0`, `G1`, `T0`, `T1`).
 ### Compact mode
 
 `lmon --compact` is the most minimal view: one letter per parameter in the
-header and one block glyph (`▁…█`) per value, with no spaces between columns.
-It uses the same letters as `--cols`; multi-letter columns (pings, `PW`, `WR`)
-show their first letter. Color carries the state, shape carries the level.
+header and one colored block `█` per value, with no spaces between columns.
+The color gradient is the same as in `--bars`/`--blocks`; it uses the same
+letters as `--cols`; multi-letter columns (pings, `PW`, `WR`) show their first letter.
 
 ### Bars mode
 
@@ -294,7 +294,7 @@ machine; `...` (TUI) or `999` (`--once`) means the host is unreachable.
 | `--gw` | `LMON_GW` | auto-detect | your gateway |
 | `--interval` | `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
 | `--bars` | — | off | colored bars instead of digits (`--blocks` is a legacy alias) |
-| `--compact` | `LMON_COMPACT` | off | one letter/symbol per parameter, no gaps |
+| `--compact` | `LMON_COMPACT` | off | one letter and one colored block per parameter, no gaps |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`) and `--ping` names (`NG,VPN,M`); flags add more |
 | `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |

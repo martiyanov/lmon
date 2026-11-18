@@ -132,7 +132,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --interval 5  — период обновления 5 секунд (по умолчанию 1)
   lmon --bars        — режим цветных квадратов
   lmon --hybrid      — цифры на цветной подложке
-  lmon --compact     — минимализм: одна буква и один символ на параметр
+  lmon --compact     — минимализм: одна буква и один цветной блок на параметр
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
   lmon --gpu-list    — список видеокарт (индекс: имя)
@@ -176,7 +176,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                               RUN=8/16/32; LMON_THRESHOLDS
   --disk-busy   LMON_DISK_BUSY  занятость диска, % (Windows PDH / macOS IOKit; колонка I/O)
   --symbols     LMON_SYMBOLS    в --once: «...» вместо 999 для «нет ответа»
-  --compact     LMON_COMPACT    одна буква и один символ на параметр, без пробелов
+  --compact     LMON_COMPACT    одна буква и один цветной блок на параметр, без пробелов
   --gpu-index   LMON_GPU_INDEX  индекс или список GPU для --gpu/--gputemp: 0 или 0,1
   --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
   --all         LMON_ALL        все доступные колонки (с --ping — ещё и они)
@@ -275,7 +275,7 @@ Display modes:
                   Status is visible with peripheral vision. A dim block
                   means no sensor.
   --hybrid      — mixed mode: exact digits on the state-colored background
-  --compact     — one letter/symbol per parameter, no gaps
+  --compact     — one letter and one colored block per parameter, no gaps
                   (like the bottom ribbon, but in the data stream).
 
 Column set:
@@ -324,7 +324,7 @@ Usage:
   lmon --interval 5  — refresh period of 5 seconds (default 1)
   lmon --bars        — colored blocks mode
   lmon --hybrid      — digits on the state-colored background
-  lmon --compact     — minimal: one letter and one symbol per parameter
+  lmon --compact     — minimal: one letter and one colored block per parameter
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
   lmon --gpu-list    — list GPUs (index: name)
@@ -368,7 +368,7 @@ Settings (flags and environment variables):
                               LMON_THRESHOLDS
   --disk-busy   LMON_DISK_BUSY  disk busy time %, Windows PDH / macOS IOKit (column I/O)
   --symbols     LMON_SYMBOLS    in --once: «...» instead of 999 for “no reply”
-  --compact     LMON_COMPACT    one letter and one symbol per parameter, no gaps
+  --compact     LMON_COMPACT    one letter and one colored block per parameter, no gaps
   --gpu-index   LMON_GPU_INDEX  GPU index or list for --gpu/--gputemp: 0 or 0,1
   --gpu-list    LMON_GPU_LIST   list GPUs and exit
   --all         LMON_ALL        every available column (pings too, if --ping)
@@ -1927,8 +1927,8 @@ func (u *ui) blockCell(r reading) string {
 	return "\x1b[38;5;" + gradient256(r.severity()) + "m███" + reset
 }
 
-// compactCell — один символ на параметр, без пробелов.
-// Форма ▁..█ кодирует уровень, цвет — ту же шкалу; «·» — нет датчика.
+// compactCell — один блок на параметр, без пробелов.
+// Цвет — та же градация, что в --bars/--blocks; «·» — нет датчика.
 func (u *ui) compactCell(r reading) string {
 	if r.v < 0 {
 		if u.color {
@@ -1942,19 +1942,10 @@ func (u *ui) compactCell(r reading) string {
 		}
 		return "!"
 	}
-	glyphs := []rune("▁▂▃▄▅▆▇█")
-	idx := int(math.Round(r.severity() * 7))
-	if idx < 0 {
-		idx = 0
-	}
-	if idx > 7 {
-		idx = 7
-	}
-	g := string(glyphs[idx])
 	if !u.color {
-		return g
+		return "█"
 	}
-	return "\x1b[38;5;" + gradient256(r.severity()) + "m" + g + reset
+	return "\x1b[38;5;" + gradient256(r.severity()) + "m█" + reset
 }
 
 // hybridCell — смешанный режим: точные цифры на подложке цвета состояния
