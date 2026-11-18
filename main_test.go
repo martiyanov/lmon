@@ -1061,3 +1061,19 @@ func TestMatrixFillGlyphs(t *testing.T) {
 		t.Errorf("--rain --bars: %v", err)
 	}
 }
+
+func TestMatrixStyleReplacesDigits(t *testing.T) {
+	u := &ui{matrix: true, color: true}
+	rs := []reading{{id: "N", head: "NET", v: 120, green: 50, yellow: 150, red: 300}}
+	out := u.dataRow(rs)
+	plain := strings.NewReplacer("\x1b[38;5;46m", "", "\x1b[0m", "").Replace(out)
+	if strings.ContainsAny(plain, "0123456789") {
+		t.Errorf("matrix row contains digits: %q", out)
+	}
+	if !strings.Contains(out, "38;5;46") {
+		t.Errorf("matrix row is not green: %q", out)
+	}
+	if got := len([]rune(strings.ReplaceAll(out, "\x1b[0m", ""))); got < 3 {
+		t.Errorf("matrix row too short: %q", out)
+	}
+}

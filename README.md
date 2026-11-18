@@ -272,7 +272,7 @@ lmon --rain --matrix # green palette
 - new values appear under it and move down;
 - `--rain` works with digits, `--bars`, `--hybrid`, `--compact`;
 - it cannot be combined with `--horizontal` or `--once`;
-- `--matrix` is the green palette, independent of direction.
+- `--matrix` is the green fill-glyph style, independent of direction.
 
 `--rain --matrix` uses single-cell fill glyphs instead of digits/colors:
 
@@ -286,14 +286,16 @@ the cell; all glyphs are the same bright green (no brightness gradient).
 Repeated values cycle through equivalent glyphs so the rain keeps changing.
 The glyphs are single-width, unlike runic letters.
 
-`--matrix` is a palette and works with any mode:
+`--matrix` is a full style and works with any mode: colors become green and
+digits/blocks become single-cell fill glyphs.
 
 ```sh
-lmon --matrix              # digits in green shades
+lmon --matrix              # normal grid: fill glyphs instead of digits
 lmon --bars --matrix
 lmon --hybrid --matrix
-lmon --compact --matrix
+lmon --compact --matrix    # one fill glyph per parameter
 lmon --horizontal --matrix
+lmon --rain --matrix       # falling fill glyphs
 
 ### Horizontal timeline
 
@@ -365,7 +367,7 @@ Without color (`NO_COLOR`, pipe) the text fallbacks stay.
 | `--compact` | `LMON_COMPACT` | off | one letter and one colored block per parameter, no gaps |
 | `--horizontal` | `LMON_HORIZONTAL` | off | horizontal color timeline (TUI) |
 | `--rain` | `LMON_RAIN` | off | falling values, Braille fill, TUI only |
-| `--matrix` | `LMON_MATRIX` | off | green matrix palette (any mode) |
+| `--matrix` | `LMON_MATRIX` | off | matrix style: green + fill glyphs (any mode) |
 | `--labels` | `LMON_LABELS` | `short` | horizontal labels: `full` or `short` |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`), `--ping` names (`NG,VPN,M`), and an empty column for two commas (`NG,,M`); flags add more |

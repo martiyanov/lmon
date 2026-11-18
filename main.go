@@ -88,7 +88,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   появляются под ним и падают вниз; символы/цвета как обычно.
   --rain --matrix — падающие заполняющие символы (█, ▌, ▚, ▂…),
                   все одним зелёным цветом.
-  --matrix      — зелёная матричная палитра (можно с любым режимом).
+  --matrix      — матричный стиль: зелёный + заполняющие символы
+                  вместо цифр (работает с любым режимом).
 
 Набор колонок:
   --cols NG,CSB  — свой набор и порядок (каждая буква — колонка,
@@ -145,8 +146,9 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --horizontal  — строки-параметры, цветная история вправо
   lmon --rain          — цифры падают вниз
   lmon --rain --bars   — блоки падают вниз
-  lmon --rain --matrix — падающие значения в зелёной палитре
-  lmon --bars --matrix — блочный режим в зелёной палитре
+  lmon --rain --matrix — падающие заполняющие символы
+  lmon --matrix        — обычный режим без цифр, только заполнение
+  lmon --compact --matrix — по одному символу заполнения
   lmon --horizontal --labels full   # полные подписи
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
@@ -195,7 +197,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --horizontal  LMON_HORIZONTAL горизонтальная цветная лента (TUI)
   --labels      LMON_LABELS     подписи в горизонтальном режиме: full или short
   --rain        LMON_RAIN       направление вниз: новые значения сверху
-  --matrix      LMON_MATRIX     зелёная палитра (любой режим)
+  --matrix      LMON_MATRIX     матричный стиль (любой режим)
   --gpu-index   LMON_GPU_INDEX  индекс или список GPU для --gpu/--gputemp: 0 или 0,1
   --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
   --all         LMON_ALL        все доступные колонки (с --ping — ещё и они)
@@ -300,7 +302,8 @@ Display modes:
                   under it and fall down; symbols/colors unchanged.
   --rain --matrix — falling fill glyphs (█, ▌, ▚, ▂…),
                   all in the same green color.
-  --matrix      — green matrix palette (works with any mode).
+  --matrix      — matrix style: green + fill glyphs instead of digits
+                  (works with any mode).
 
 Column set:
   --cols NG,CSB  — your own set and order (each letter is a column;
@@ -356,8 +359,9 @@ Usage:
   lmon --horizontal  — parameter rows, color history to the right
   lmon --rain          — digits falling down
   lmon --rain --bars   — blocks falling down
-  lmon --rain --matrix — falling values in the green palette
-  lmon --bars --matrix — block mode in the green palette
+  lmon --rain --matrix — falling fill glyphs
+  lmon --matrix        — normal mode without digits, fill only
+  lmon --compact --matrix — one fill glyph per parameter
   lmon --horizontal --labels full   # full labels
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
@@ -406,7 +410,7 @@ Settings (flags and environment variables):
   --horizontal  LMON_HORIZONTAL horizontal color timeline (TUI)
   --labels      LMON_LABELS     horizontal mode labels: full or short
   --rain        LMON_RAIN       down direction: new values on top
-  --matrix      LMON_MATRIX     green palette (any mode)
+  --matrix      LMON_MATRIX     matrix style (any mode)
   --gpu-index   LMON_GPU_INDEX  GPU index or list for --gpu/--gputemp: 0 or 0,1
   --gpu-list    LMON_GPU_LIST   list GPUs and exit
   --all         LMON_ALL        every available column (pings too, if --ping)
@@ -1789,6 +1793,7 @@ func measure(ctx context.Context, cfg config) []reading {
 type hcell struct {
 	sev   float64
 	state int // 0 — обычное, -1 — нет датчика, 999 — нет ответа
+	glyph rune
 }
 
 // hview — горизонтальный цветной режим: параметр = строка, время = вправо.
@@ -1803,6 +1808,7 @@ type hview struct {
 	cols    int
 	order   []string
 	history map[string][]hcell
+	glyphs  map[string]int
 }
 
 func newHView(w io.Writer, cfg config, tty bool) *hview {
@@ -1816,6 +1822,7 @@ func newHView(w io.Writer, cfg config, tty bool) *hview {
 		rows:    termRows(),
 		cols:    termCols(),
 		history: map[string][]hcell{},
+		glyphs:  map[string]int{},
 	}
 	if v.rows <= 0 {
 		v.rows = 24
@@ -1850,6 +1857,9 @@ func (v *hview) resize() {
 
 // add добавляет новый замер в ленты; показываются только поместившиеся строки.
 func (v *hview) add(rs []reading) {
+	if v.glyphs == nil {
+		v.glyphs = map[string]int{}
+	}
 	visible := make([]reading, 0, len(rs))
 	for _, r := range rs {
 		if r.blank {
@@ -1871,6 +1881,14 @@ func (v *hview) add(rs []reading) {
 			cell.state = 999
 		default:
 			cell.sev = r.severity()
+		}
+		if cell.state != -1 {
+			sev := cell.sev
+			if cell.state == 999 {
+				sev = 1
+			}
+			cell.glyph = runeGlyph(sev, v.glyphs[r.id])
+			v.glyphs[r.id]++
 		}
 		h := append([]hcell{cell}, v.history[r.id]...)
 		if len(h) > v.cols {
@@ -1934,25 +1952,37 @@ func (v *hview) lines(rs []reading) []string {
 				continue
 			}
 			c := hist[j]
+			if v.matrix {
+				if c.state == -1 {
+					b.WriteByte(' ')
+					continue
+				}
+				sev := c.sev
+				if c.state == 999 {
+					sev = 1
+				}
+				g := string(c.glyph)
+				if g == "\x00" || c.glyph == 0 {
+					g = string(runeGlyph(sev, j))
+				}
+				if v.color {
+					b.WriteString("\x1b[38;5;46m" + g + reset)
+				} else {
+					b.WriteString(g)
+				}
+				continue
+			}
 			if !v.color {
 				b.WriteString("█")
 				continue
 			}
 			switch c.state {
 			case -1:
-				if v.matrix {
-					b.WriteString(fgSev(0, true) + "█" + reset)
-				} else {
-					b.WriteString(purple + "█" + reset)
-				}
+				b.WriteString(purple + "█" + reset)
 			case 999:
-				if v.matrix {
-					b.WriteString(fgSev(1, true) + "█" + reset)
-				} else {
-					b.WriteString(redBright + "█" + reset)
-				}
+				b.WriteString(redBright + "█" + reset)
 			default:
-				b.WriteString(fgSev(c.sev, v.matrix) + "█" + reset)
+				b.WriteString(fgSev(c.sev, false) + "█" + reset)
 			}
 		}
 		out = append(out, b.String())
@@ -2052,6 +2082,38 @@ func hLabel(r reading, full bool) string {
 
 // dataRow — строка значений (цифры или квадраты) без служебных символов.
 func (u *ui) dataRow(rs []reading) string {
+	if u.matrix {
+		width := 3
+		if u.compact {
+			width = 1
+		}
+		if u.glyphCount == nil {
+			u.glyphCount = map[string]int{}
+		}
+		cells := make([]string, len(rs))
+		for j, r := range rs {
+			if r.blank {
+				cells[j] = strings.Repeat(" ", width)
+				continue
+			}
+			if r.v < 0 {
+				cells[j] = strings.Repeat(" ", width)
+				continue
+			}
+			sev := r.severity()
+			if r.v == 999 {
+				sev = 1
+			}
+			g := runeGlyph(sev, u.glyphCount[r.id])
+			u.glyphCount[r.id]++
+			s := strings.Repeat(string(g), width)
+			if u.color {
+				s = "\x1b[38;5;46m" + s + reset
+			}
+			cells[j] = s
+		}
+		return strings.Join(cells, " ")
+	}
 	if u.compact {
 		cells := make([]string, len(rs))
 		for j, r := range rs {
@@ -2130,6 +2192,7 @@ type ui struct {
 	matrix     bool
 	rain       bool
 	rainRows   [][]reading
+	glyphCount map[string]int
 	symbols    bool // показывать «...» вместо 999 (нет ответа)
 	lang       string
 	rows       int
