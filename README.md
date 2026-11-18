@@ -274,17 +274,17 @@ lmon --rain --matrix # green palette
 - it cannot be combined with `--horizontal` or `--once`;
 - `--matrix` is the green cipher style, independent of direction.
 
-`--rain --matrix` uses single-cell cipher glyphs:
+`--rain --matrix` uses the same cell format as the normal matrix mode,
+but the stream goes down:
 
 ```sh
 lmon --rain --matrix
 ```
 
-Cells use a mixed set of keyboard symbols and Greek letters, ordered by
-visual weight: `. , : ; - = + * # % & @ i l I x X v $ λ π Σ µ σ φ Ψ Ω Ξ Φ Θ W M`. Higher values use
-heavier glyphs; all glyphs are the same bright green (no brightness
-gradient). Repeated values cycle through equivalent glyphs so the rain
-keeps changing. All glyphs are single-width.
+Each value is a digit `0–9` plus two different cipher glyphs (keyboard
+symbols and Greek letters). The digit may appear in any of the three
+positions, so the first character is not always the same. All glyphs are
+the same bright green; repeats inside one value are avoided.
 
 `--matrix` is a full style and works with any mode: colors become green and
 the value cells become cipher glyphs.

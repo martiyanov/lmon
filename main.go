@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/rand"
 	"net/netip"
 	"os"
 	"os/signal"
@@ -1161,13 +1162,6 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		}
 		return monitorHorizontal(ctx, cfg, w, dropped)
 	}
-	if cfg.rain && cfg.matrixPalette {
-		if !stdoutIsTTY() {
-			fmt.Fprintln(os.Stderr, lmsg(cfg.lang, "lmon: --rain --matrix requires a terminal", "lmon: --rain --matrix требует терминал"))
-			return 2
-		}
-		return monitorRunes(ctx, cfg, w, dropped)
-	}
 
 	termSetup()
 	defer termRestore()
@@ -2110,7 +2104,12 @@ func (u *ui) dataRow(rs []reading) string {
 				}
 				g1 := runeForRow(symbolSev, used)
 				g2 := runeForRow(symbolSev, used)
-				s = string([]rune{digit, g1, g2})
+				cell := []rune{digit, g1, g2}
+				// цифра уровня — в случайной позиции, чтобы первая цифра
+				// не была всегда одной и той же
+				rot := rand.Intn(len(cell))
+				cell = append(cell[rot:], cell[:rot]...)
+				s = string(cell)
 			} else {
 				s = string(runeForRow(sev, used))
 			}
