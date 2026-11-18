@@ -386,7 +386,7 @@ func TestColsLetters(t *testing.T) {
 	if got := strings.Join(cfg.cols, ""); got != "NU" {
 		t.Errorf("--cols n,d = %q, want NU", got)
 	}
-	if _, err := parseConfig([]string{"--cols", "NX"}); err == nil || !strings.Contains(err.Error(), "unknown column") {
+	if _, err := parseConfig([]string{"--cols", "N1"}); err == nil || !strings.Contains(err.Error(), "unknown column") {
 		t.Errorf("--cols NX: err = %v, want ошибка с перечнем букв", err)
 	}
 	// в шпаргалке help перечислены все буквы реестра — в обоих языках
@@ -722,5 +722,44 @@ func TestFansFlag(t *testing.T) {
 	}
 	if cols, _ := layoutWithDropped(config{fans: true}, "darwin"); strings.Contains(ids(cols), "F") {
 		t.Errorf("darwin layout не должен содержать F: %q", ids(cols))
+	}
+}
+
+func TestExtrasFlags(t *testing.T) {
+	for _, k := range []string{"LMON_GPU_POWER", "LMON_NVME", "LMON_DISK_IO", "LMON_NET_RATE", "LMON_PSI", "LMON_SYSTEM"} {
+		t.Setenv(k, "")
+	}
+	cfg, err := parseConfig([]string{"--gpu-power", "--nvme", "--disk-io", "--net-rate", "--psi", "--system"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.gpuPower || !cfg.nvme || !cfg.diskIO || !cfg.netRate || !cfg.psi || !cfg.system {
+		t.Errorf("extras flags: %+v", cfg)
+	}
+	cols, _ := layoutWithDropped(cfg, "linux")
+	got := ids(cols)
+	for _, want := range []string{"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("linux extras layout = %q, нет %s", got, want)
+		}
+	}
+	w, _ := layoutWithDropped(cfg, "windows")
+	if wgot := ids(w); strings.ContainsAny(wgot, "WVAQRJEZOX") {
+		t.Errorf("windows layout не должен содержать extras: %q", wgot)
+	}
+	// колонки можно выбрать и через --cols
+	cfg2, err := parseConfig([]string{"--cols", "NAQ"})
+	if err != nil || strings.Join(cfg2.cols, "") != "NAQ" {
+		t.Errorf("--cols NAQ: %v %v", cfg2.cols, err)
+	}
+}
+
+func TestFansListAllFlags(t *testing.T) {
+	for _, k := range []string{"LMON_FANS", "LMON_FANS_ALL", "LMON_FANS_LIST", "LMON_ALL"} {
+		t.Setenv(k, "")
+	}
+	cfg, err := parseConfig([]string{"--fans-all", "--fans-list"})
+	if err != nil || !cfg.fansAll || !cfg.fansList {
+		t.Errorf("fans flags: %+v %v", cfg, err)
 	}
 }

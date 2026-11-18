@@ -20,15 +20,21 @@ func columnSupportedByOS(id, goos string) bool {
 			return columnSupportedByOS("P", goos)
 		case 'T':
 			return columnSupportedByOS("H", goos)
+		case 'F':
+			return columnSupportedByOS("F", goos)
 		}
+	}
+	if id == "GF" {
+		return columnSupportedByOS("F", goos)
 	}
 	switch goos {
 	case "windows":
 		switch id {
 		case "L", // load average в Windows отсутствует
-			"T", // нет официального API температуры CPU (только --temp-cmd)
-			"I", // iowait есть только в Linux
-			"F": // скорость вентиляторов: нужен LHM/HWiNFO
+			"T",                                              // нет официального API температуры CPU (только --temp-cmd)
+			"I",                                              // iowait есть только в Linux
+			"F",                                              // скорость вентиляторов: нужен LHM/HWiNFO
+			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X": // Linux-метрики
 			return false
 		}
 		// S (pagefile) читается через PDH; P/H — NVML/nvidia-smi/PDH;
@@ -36,8 +42,9 @@ func columnSupportedByOS(id, goos string) bool {
 	case "darwin":
 		switch id {
 		case "I", // iowait на macOS ядром не отдаётся
-			"H", // GPUTempC: powermetrics под sudo — не показываем
-			"F": // вентиляторы: нужен SMC/powermetrics с правами
+			"H",                                              // GPUTempC: powermetrics под sudo — не показываем
+			"F",                                              // вентиляторы: нужен SMC/powermetrics с правами
+			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X": // Linux-метрики
 			return false
 		}
 		// K (занятость диска) читается через IOKit, без sudo.
@@ -52,7 +59,8 @@ func columnSupportedByOS(id, goos string) bool {
 		// зависят от железа — для них остаются подсказки при -1.
 	default:
 		switch id {
-		case "L", "T", "I", "S", "P", "H", "F":
+		case "L", "T", "I", "S", "P", "H", "F",
+			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X":
 			return false
 		}
 	}

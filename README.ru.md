@@ -172,6 +172,12 @@ lmon help   # вся справка: при русской локали — по
   только Linux; высокий — диск узкое место; на macOS/Windows скрыта).
 - **SWP** — занятый swap/файл подкачки (`--swap`; растёт при нехватке памяти). На Windows читается через PDH без прав администратора.
 - **FAN** — скорость вентиляторов, % (`--fans`; Linux: PWM hwmon + вентилятор NVIDIA GPU; в других ОС нужны внешние утилиты).
+- **GPW** — потребление GPU, Вт (`--gpu-power`; Linux/NVIDIA).
+- **NVM** — температура NVMe, °C (`--nvme`; Linux).
+- **LAT/QUE** — латентность диска (мс) и очередь I/O (`--disk-io`; Linux).
+- **RX/TX/ERR** — сеть, КБ/с и ошибки/дропы в секунду (`--net-rate`; Linux).
+- **PSI** — давление на память, avg10 % (`--psi`; Linux).
+- **SVC/UPD** — упавшие systemd-юниты и флаг перезагрузки (`--system`; Linux).
 - **I/O** — насколько занят диск, % (`--disk-busy`; Windows читает
   `\PhysicalDisk(_Total)\% Disk Time` через PDH, macOS считает из IOKit
   `Total Time (Read/Write)`; без админа). Ближайший аналог Linux-iowait.
@@ -188,7 +194,7 @@ lmon пишет, что скрыто и чем заменить; отключи�
 
 Три режима отображения на вкус: просто цифры (`lmon`), цветные
 квадраты без цифр (`lmon -b`), цифры на цветной подложке (`lmon --hybrid`).
-Набор и порядок колонок — любые: `lmon --cols NRMC` (буквы — в `lmon help`). Занятость диска: `lmon --disk-busy` (колонка `I/O`; Windows — PDH, macOS — IOKit, без админа). Несколько GPU: `lmon --gpu-list`, затем `lmon --gpu --gputemp --gpu-index N` (одна карта) или `--gpu-index 0,1` (по колонке на каждую). Всё сразу: `lmon --all` (все доступные колонки, плюс `--ping`; с `--cols` не сочетается). Вентиляторы: `lmon --fans` (Linux: PWM hwmon + GPU).
+Набор и порядок колонок — любые: `lmon --cols NRMC` (буквы — в `lmon help`). Занятость диска: `lmon --disk-busy` (колонка `I/O`; Windows — PDH, macOS — IOKit, без админа). Несколько GPU: `lmon --gpu-list`, затем `lmon --gpu --gputemp --gpu-index N` (одна карта) или `--gpu-index 0,1` (по колонке на каждую). Всё сразу: `lmon --all` (все доступные колонки, плюс `--ping`; с `--cols` не сочетается). Вентиляторы: `lmon --fans` (Linux: PWM hwmon + GPU) или `--fans-all` (по колонке на каждый).
 Одна строка значений для tmux-статусбара: `lmon --once` (цвет — только на терминале, в пайп идёт чистый текст). Температура CPU на Windows — через `--temp-cmd` (LMON_TEMP_CMD): команда печатает °C, lmon берёт первое число.
 
 ## FAQ

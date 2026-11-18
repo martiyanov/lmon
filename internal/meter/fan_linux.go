@@ -6,63 +6,117 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 )
 
-// FanPercent — максимальная скорость вентиляторов, %:
-// PWM-выходы hwmon (0..255 → 0..100%) плюс вентилятор выбранной NVIDIA GPU.
-// PWM — это управляющий сигнал, а не точные обороты, но он показывает
-// «насколько раскручены» вентиляторы и меняется вместе с шумом.
-func FanPercent() int {
-	best := -1
-	paths, _ := filepath.Glob("/sys/class/hwmon/hwmon*/pwm[0-9]*")
-	for _, p := range paths {
-		if !isPWMPath(p) {
-			continue
-		}
-		data, err := os.ReadFile(p)
-		if err != nil {
-			continue
-		}
-		v, err := strconv.Atoi(strings.TrimSpace(string(data)))
-		if err != nil || v < 0 || v > 255 {
-			continue
-		}
-		pct := int(math.Round(float64(v) * 100 / 255))
-		if pct > best {
-			best = pct
+// FanList — все доступные вентиляторы: hwmon (fan*_input + pwm*) и GPU.
+// Порядок стабильный: сначала hwmon в порядке путей, затем GPU.
+func FanList() []FanInfo {
+	var infos []FanInfo
+	hwmons, _ := filepath.Glob("/sys/class/hwmon/hwmon*")
+	sort.Strings(hwmons)
+	for _, h := range hwmons {
+		hwName := strings.TrimSpace(readString(filepath.Join(h, "name")))
+		fans, _ := filepath.Glob(filepath.Join(h, "fan*_input"))
+		sort.Strings(fans)
+		for _, fp := range fans {
+			base := filepath.Base(fp) // fan1_input
+			idx := strings.TrimSuffix(strings.TrimPrefix(base, "fan"), "_input")
+			if idx == "" {
+				continue
+			}
+			rpm, _ := readIntFile(fp)
+			pct := -1
+			if v, ok := readIntFile(filepath.Join(h, "pwm"+idx)); ok && v >= 0 && v <= 255 {
+				pct = int(math.Round(float64(v) * 100 / 255))
+			}
+			if rpm < 0 && pct < 0 {
+				continue
+			}
+			name := strings.TrimSpace(readString(filepath.Join(h, "fan"+idx+"_label")))
+			if name == "" {
+				name = hwName + " fan" + idx
+			}
+			kind := "rpm"
+			if rpm < 0 {
+				kind = "pct"
+			}
+			infos = append(infos, FanInfo{Name: name, RPM: rpm, Percent: pct, Kind: kind})
 		}
 	}
-	if gpu, ok := nvidiaFanPercent(); ok && gpu > best {
-		best = gpu
+	if pct, name, ok := nvidiaFanInfo(); ok {
+		infos = append(infos, FanInfo{Name: "GPU " + name, RPM: -1, Percent: pct, Kind: "pct"})
+	}
+	return infos
+}
+
+// FanValues — значения для колонок: RPM/10 для вентиляторов с оборотами,
+// проценты для GPU/PWM-only. Порядок совпадает с FanList.
+func FanValues() []int {
+	infos := FanList()
+	out := make([]int, 0, len(infos))
+	for _, fi := range infos {
+		out = append(out, fanValue(fi))
+	}
+	return out
+}
+
+func fanValue(fi FanInfo) int {
+	if fi.Kind == "rpm" {
+		if fi.RPM < 0 {
+			return -1
+		}
+		return fi.RPM / 10
+	}
+	return fi.Percent
+}
+
+// FanPercent — максимальная скорость вентиляторов, % (PWM или GPU fan).
+func FanPercent() int {
+	best := -1
+	for _, fi := range FanList() {
+		if fi.Percent > best {
+			best = fi.Percent
+		}
 	}
 	return best
 }
 
-func isPWMPath(p string) bool {
-	base := filepath.Base(p)
-	rest := strings.TrimPrefix(base, "pwm")
-	if rest == "" || rest == base {
-		return false
+func nvidiaFanInfo() (pct int, name string, ok bool) {
+	out, err := nvidiaSMI("-i", strconv.Itoa(GPUIndex()),
+		"--query-gpu=name,fan.speed", "--format=csv,noheader,nounits")
+	if err != nil {
+		return 0, "", false
 	}
-	for _, r := range rest {
-		if r < '0' || r > '9' {
-			return false
-		}
+	line := strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])
+	parts := strings.Split(line, ",")
+	if len(parts) < 2 {
+		return 0, "", false
 	}
-	return true
+	v, err := strconv.Atoi(strings.TrimSpace(parts[len(parts)-1]))
+	if err != nil || v < 0 || v > 100 {
+		return 0, "", false
+	}
+	return v, strings.TrimSpace(strings.Join(parts[:len(parts)-1], ",")), true
 }
 
-// nvidiaFanPercent — fan.speed выбранной GPU (0..100) через nvidia-smi.
-func nvidiaFanPercent() (int, bool) {
-	out, err := nvidiaSMI("-i", strconv.Itoa(GPUIndex()),
-		"--query-gpu=fan.speed", "--format=csv,noheader,nounits")
+func readString(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+func readIntFile(path string) (int, bool) {
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return 0, false
 	}
-	v, ok := firstInt(string(out))
-	if !ok || v < 0 || v > 100 {
+	v, err := strconv.Atoi(strings.TrimSpace(string(b)))
+	if err != nil {
 		return 0, false
 	}
 	return v, true

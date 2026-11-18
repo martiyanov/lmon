@@ -50,6 +50,18 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   IOW (I)  — iowait CPU, % (--iowait; только Linux, иначе «·»).
   I/O (K)  — занятость диска, % (--disk-busy; Windows — PDH, macOS — IOKit, без админа).
   FAN (F)  — скорость вентиляторов, % (--fans; Linux: PWM hwmon + вентилятор GPU).
+             --fans-all — по колонке на каждый вентилятор (F1, F2… + GF для GPU),
+             --fans-list — список с индексами и оборотами.
+  GPW (W)  — потребление GPU, Вт (--gpu-power; Linux/NVIDIA).
+  NVM (V)  — температура NVMe, °C (--nvme; Linux).
+  LAT (A)  — средняя латентность диска, мс (--disk-io; Linux).
+  QUE (Q)  — очередь запросов к диску (--disk-io; Linux).
+  RX (R)   — приём по сети, КБ/с (--net-rate; Linux).
+  TX (J)   — передача по сети, КБ/с (--net-rate; Linux).
+  ERR (E)  — ошибки/дропы сети в секунду (--net-rate; Linux).
+  PSI (Z)  — давление на память, avg10 % (--psi; Linux).
+  SVC (O)  — упавшие systemd-юниты (--system; Linux).
+  UPD (X)  — нужна перезагрузка: 0/1 (--system; Linux).
   SWP (S)  — занятые swap/файл подкачки, % (--swap; Windows читает
              pagefile через PDH, без прав администратора).
   DSK (U)  — занято на системном диске, % (--disk).
@@ -78,6 +90,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
     I — iowait    S — swap       U — диск (можно D)  B — батарея
     K — занятость диска (--disk-busy, Windows/macOS)
     F — скорость вентиляторов, % (--fans, Linux)
+    W/Y/A/Q/R/J/E/Z/O/X — GPU power, NVMe, диск, сеть, PSI, systemd
     P — загрузка GPU (%)         H — t°GPU
 
   Примеры: только сеть и память — lmon --cols NM
@@ -122,7 +135,11 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                      — по колонке на каждую GPU: G0/G1 и T0/T1
   lmon --disk-busy   — занятость диска, % (Windows/macOS)
   lmon --fans        — скорость вентиляторов, % (Linux: hwmon + GPU)
+  lmon --fans-list   — список вентиляторов: индекс, RPM, %
+  lmon --fans-all    — колонка на каждый вентилятор
   lmon --all         — все доступные колонки сразу
+  lmon --gpu-power --nvme --disk-io --net-rate --psi --system
+                     — расширенные индикаторы (Linux)
   lmon --cols TNGC   — свой набор и порядок колонок
   lmon --ping VPN=… --cols NG,VPN,M
                      — пинг-колонку тоже можно поставить в нужное место
@@ -157,6 +174,14 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
   --all         LMON_ALL        все доступные колонки (с --ping — ещё и они)
   --fans        LMON_FANS       скорость вентиляторов, % (Linux: hwmon PWM + GPU)
+  --fans-all    LMON_FANS_ALL   по колонке на каждый вентилятор (Linux)
+  --fans-list   LMON_FANS_LIST  список вентиляторов и выйти
+  --gpu-power   LMON_GPU_POWER  потребление GPU, Вт (Linux/NVIDIA)
+  --nvme        LMON_NVME       температура NVMe, °C (Linux)
+  --disk-io     LMON_DISK_IO    латентность и очередь диска (Linux)
+  --net-rate    LMON_NET_RATE   RX/TX КБ/с и ошибки сети (Linux)
+  --psi         LMON_PSI        давление на память (Linux)
+  --system      LMON_SYSTEM     упавшие юниты и reboot-required (Linux)
   --temp-cmd    LMON_TEMP_CMD  внешняя команда, печатающая температуру CPU
                               в °C (берётся первое число). Нужна на Windows,
                               где нет штатного API: например, LHM через
@@ -211,6 +236,18 @@ Columns (letter in parentheses is for --cols):
   IOW (I)  — CPU iowait, % (--iowait; Linux only, otherwise «·»).
   I/O (K)  — disk busy time, % (--disk-busy; Windows uses PDH, macOS IOKit; no admin).
   FAN (F)  — fan speed, % (--fans; Linux: hwmon PWM + GPU fan).
+             --fans-all — one column per fan (F1, F2… + GF for GPU),
+             --fans-list — list indexes and RPM.
+  GPW (W)  — GPU power, W (--gpu-power; Linux/NVIDIA).
+  NVM (V)  — NVMe temperature, °C (--nvme; Linux).
+  LAT (A)  — average disk latency, ms (--disk-io; Linux).
+  QUE (Q)  — disk I/O queue (--disk-io; Linux).
+  RX (R)   — network receive, KB/s (--net-rate; Linux).
+  TX (J)   — network transmit, KB/s (--net-rate; Linux).
+  ERR (E)  — network errors/drops per second (--net-rate; Linux).
+  PSI (Z)  — memory pressure, avg10 % (--psi; Linux).
+  SVC (O)  — failed systemd units (--system; Linux).
+  UPD (X)  — reboot required: 0/1 (--system; Linux).
   SWP (S)  — swap/pagefile in use, % (--swap; on Windows it reads
              pagefile via PDH, no admin rights).
   DSK (U)  — root disk usage, % (--disk).
@@ -239,6 +276,7 @@ Column set:
     I — iowait    S — swap       U — disk (D works too)  B — battery
     K — disk busy (--disk-busy, Windows/macOS)
     F — fan speed, % (--fans, Linux)
+    W/Y/A/Q/R/J/E/Z/O/X — GPU power, NVMe, disk, network, PSI, systemd
     P — GPU usage (%)            H — GPU °C
 
   Examples: network and memory only — lmon --cols NM
@@ -280,7 +318,11 @@ Usage:
                      — one column per GPU: G0/G1 and T0/T1
   lmon --disk-busy   — disk busy time %, Windows/macOS
   lmon --fans        — fan speed, % (Linux: hwmon + GPU)
+  lmon --fans-list   — list fans: index, RPM, %
+  lmon --fans-all    — one column per fan
   lmon --all         — every available column at once
+  lmon --gpu-power --nvme --disk-io --net-rate --psi --system
+                     — extended indicators (Linux)
   lmon --cols TNGC   — your own set and order of columns
   lmon --ping VPN=… --cols NG,VPN,M
                      — ping columns can be placed in the order too
@@ -315,6 +357,14 @@ Settings (flags and environment variables):
   --gpu-list    LMON_GPU_LIST   list GPUs and exit
   --all         LMON_ALL        every available column (pings too, if --ping)
   --fans        LMON_FANS       fan speed, % (Linux: hwmon PWM + GPU)
+  --fans-all    LMON_FANS_ALL   one column per fan (Linux)
+  --fans-list   LMON_FANS_LIST  list fans and exit
+  --gpu-power   LMON_GPU_POWER  GPU power, W (Linux/NVIDIA)
+  --nvme        LMON_NVME       NVMe temperature, °C (Linux)
+  --disk-io     LMON_DISK_IO    disk latency and queue (Linux)
+  --net-rate    LMON_NET_RATE   RX/TX KB/s and network errors (Linux)
+  --psi         LMON_PSI        memory pressure (Linux)
+  --system      LMON_SYSTEM     failed units and reboot-required (Linux)
   --temp-cmd    LMON_TEMP_CMD  external command that prints CPU temperature
                               in °C (the first number is used). Needed on
                               Windows where no native API exists; e.g. LHM
@@ -390,6 +440,14 @@ type config struct {
 	gpuList    bool              // --gpu-list: показать список GPU и выйти
 	all        bool              // --all: все доступные колонки
 	fans       bool              // --fans: скорость вентиляторов, % (Linux)
+	fansAll    bool              // --fans-all: колонка на каждый вентилятор
+	fansList   bool              // --fans-list: показать список вентиляторов
+	gpuPower   bool              // --gpu-power: GPU power, W
+	nvme       bool              // --nvme: NVMe temperature
+	diskIO     bool              // --disk-io: await + queue
+	netRate    bool              // --net-rate: RX/TX KB/s + errors
+	psi        bool              // --psi: memory pressure
+	system     bool              // --system: failed units + reboot required
 }
 
 // pingTarget — именованная пинг-колонка (--ping VPN=10.8.0.1):
@@ -424,6 +482,25 @@ func run(args []string, w io.Writer) int {
 		fmt.Fprintf(os.Stderr, "lmon: %v %s\n", err,
 			lmsg(langFromArgs(args), "(see lmon help)", "(см. lmon help)"))
 		return 2
+	}
+
+	if cfg.fansList {
+		infos := meter.FanList()
+		if len(infos) == 0 {
+			fmt.Fprintln(os.Stderr, lmsg(cfg.lang, "lmon: no fans found", "lmon: вентиляторы не найдены"))
+			return 1
+		}
+		for i, fi := range infos {
+			rpm, pct := "-", "-"
+			if fi.RPM >= 0 {
+				rpm = fmt.Sprintf("%d", fi.RPM)
+			}
+			if fi.Percent >= 0 {
+				pct = fmt.Sprintf("%d%%", fi.Percent)
+			}
+			fmt.Fprintf(w, "%d  %s  RPM=%s  %s\n", i, fi.Name, rpm, pct)
+		}
+		return 0
 	}
 
 	if cfg.gpuList {
@@ -468,6 +545,14 @@ func parseConfig(args []string) (config, error) {
 	gpuList := fs.Bool("gpu-list", envFlag("LMON_GPU_LIST"), "list available GPUs and exit")
 	all := fs.Bool("all", envFlag("LMON_ALL"), "show every available column (pings included if --ping given)")
 	fans := fs.Bool("fans", envFlag("LMON_FANS"), "add fan speed column, % (Linux: hwmon PWM + GPU fan)")
+	fansAll := fs.Bool("fans-all", envFlag("LMON_FANS_ALL"), "one column per fan (Linux)")
+	fansList := fs.Bool("fans-list", envFlag("LMON_FANS_LIST"), "list fans and exit")
+	gpuPower := fs.Bool("gpu-power", envFlag("LMON_GPU_POWER"), "add GPU power column (W)")
+	nvme := fs.Bool("nvme", envFlag("LMON_NVME"), "add NVMe temperature column")
+	diskIO := fs.Bool("disk-io", envFlag("LMON_DISK_IO"), "add disk await and queue columns")
+	netRate := fs.Bool("net-rate", envFlag("LMON_NET_RATE"), "add network RX/TX and errors columns")
+	psi := fs.Bool("psi", envFlag("LMON_PSI"), "add memory pressure column (PSI)")
+	system := fs.Bool("system", envFlag("LMON_SYSTEM"), "add failed units and reboot-required columns")
 	colsFlag := fs.String("cols", os.Getenv("LMON_COLS"), "base column set and order, e.g. NG,CSB; --ping names can be placed too (NG,VPN,M)")
 	thrFlag := fs.String("thresholds", os.Getenv("LMON_THRESHOLDS"), "per-column color thresholds COL=green/yellow/red (e.g. NET=100/200/500)")
 	// --ping повторяемый: копим сырые строки, валидируем после разбора
@@ -563,12 +648,16 @@ func parseConfig(args []string) (config, error) {
 				"--all and --cols are mutually exclusive",
 				"--all и --cols взаимоисключающие"))
 		}
-		cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "P", "H", "K", "F"}
+		cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "P", "H", "K", "F",
+			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X"}
 		cpu, iowait, swap, disk, diskBusy, batt, gpu, gputemp = true, true, true, true, true, true, true, true
+		*gpuPower, *nvme, *diskIO, *netRate, *psi, *system = true, true, true, true, true, true
 		*fans = true
+		*fansAll = true
 		if len(gpuIdx) > 1 {
 			// при нескольких GPU вместо P/H будут динамические G0/G1, T0/T1
-			cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "K", "F"}
+			cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "K", "F",
+				"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X"}
 		}
 	}
 	if len(gpuIdx) > 1 && !gpu && !gputemp {
@@ -585,7 +674,10 @@ func parseConfig(args []string) (config, error) {
 		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
-		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans}, nil
+		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans,
+		fansAll: *fansAll, fansList: *fansList,
+		gpuPower: *gpuPower, nvme: *nvme, diskIO: *diskIO,
+		netRate: *netRate, psi: *psi, system: *system}, nil
 }
 
 // rawList — повторяемый флаг: каждое вхождение добавляет строку.
@@ -693,7 +785,7 @@ func parseCols(spec string, pings []pingTarget, lang string) ([]string, error) {
 				}
 			}
 			if !onlyLetters {
-				hint := "N G L M T C I S U B P H K F"
+				hint := "N G L M T C I S U B P H K F W Y A Q R J E Z O X"
 				return nil, fmt.Errorf(lmsg(lang,
 					"--cols: unknown column or ping name %q (columns: %s; define a ping first: --ping %s=host)",
 					"--cols: неизвестная колонка или имя пинга %q (колонки: %s; пинг нужно сначала задать: --ping %s=host)"), up, hint, up)
@@ -705,7 +797,7 @@ func parseCols(spec string, pings []pingTarget, lang string) ([]string, error) {
 			}
 			id := string(r)
 			if _, ok := colRegistry[id]; !ok {
-				hint := "N G L M T C I S U B P H K F"
+				hint := "N G L M T C I S U B P H K F W Y A Q R J E Z O X"
 				if len(names) > 0 {
 					hint += ", " + strings.Join(names, " ")
 				}
@@ -757,8 +849,8 @@ func parseThresholds(spec, lang string) (map[string][3]int, error) {
 		if !ok && !isPingName(id) {
 			// не буква, не имя колонки и не имя именованного пинга
 			return none, fmt.Errorf(lmsg(lang,
-				"--thresholds: unknown column %q (available: N G L M T C I S U B P H K F)",
-				"--thresholds: неизвестная колонка %q (есть: N G L M T C I S U B P H K F)"), eq[0])
+				"--thresholds: unknown column %q (available: N G L M T C I S U B P H K F W Y A Q R J E Z O X)",
+				"--thresholds: неизвестная колонка %q (есть: N G L M T C I S U B P H K F W Y A Q R J E Z O X)"), eq[0])
 		}
 		var t [3]int
 		ns := strings.Split(eq[1], "/")
@@ -1114,8 +1206,18 @@ var colRegistry = map[string]reading{
 	"B": {id: "B", head: "BAT", green: 50, yellow: 20, red: 0, invert: true},
 	"P": {id: "P", head: "GPU", green: 50, yellow: 85, red: 100},
 	"H": {id: "H", head: " G°", green: 60, yellow: 80, red: 90},
-	"K": {id: "K", head: "I/O", green: 60, yellow: 85, red: 100}, // диск занят (Windows, PDH)
-	"F": {id: "F", head: "FAN", green: 60, yellow: 85, red: 100}, // вентиляторы, % (Linux)
+	"K": {id: "K", head: "I/O", green: 60, yellow: 85, red: 100},     // диск занят (Windows, PDH)
+	"F": {id: "F", head: "FAN", green: 60, yellow: 85, red: 100},     // вентиляторы, % (Linux)
+	"W": {id: "W", head: "GPW", green: 100, yellow: 150, red: 170},   // GPU power, W
+	"Y": {id: "Y", head: "NVM", green: 60, yellow: 75, red: 90},      // NVMe temp, °C
+	"A": {id: "A", head: "LAT", green: 10, yellow: 50, red: 100},     // disk await, ms
+	"Q": {id: "Q", head: "QUE", green: 1, yellow: 4, red: 8},         // disk queue
+	"R": {id: "R", head: " RX", green: 100, yellow: 1000, red: 5000}, // net RX, KB/s
+	"J": {id: "J", head: " TX", green: 100, yellow: 1000, red: 5000}, // net TX, KB/s
+	"E": {id: "E", head: "ERR", green: 0, yellow: 1, red: 10},        // net errors/drops per s
+	"Z": {id: "Z", head: "PSI", green: 10, yellow: 40, red: 70},      // memory pressure avg10, %
+	"O": {id: "O", head: "SVC", green: 0, yellow: 1, red: 5},         // failed systemd units
+	"X": {id: "X", head: "UPD", green: 0, yellow: 1, red: 5},         // reboot/updates required
 }
 
 // layout возвращает колонки в порядке вывода; значения заполнит sampleRow.
@@ -1153,6 +1255,38 @@ func requestedLayout(cfg config) []reading {
 	add("K", cfg.diskBusy)
 	add("F", cfg.fans)
 	add("B", cfg.batt)
+	add("W", cfg.gpuPower)
+	add("Y", cfg.nvme)
+	add("A", cfg.diskIO)
+	add("Q", cfg.diskIO)
+	add("R", cfg.netRate)
+	add("J", cfg.netRate)
+	add("E", cfg.netRate)
+	add("Z", cfg.psi)
+	add("O", cfg.system)
+	add("X", cfg.system)
+	if cfg.fansAll {
+		for i, fi := range meter.FanList() {
+			id, head := fmt.Sprintf("F%d", i+1), fmt.Sprintf("%3s", "F"+strconv.Itoa(i+1))
+			green, yellow, red := 150, 250, 400 // RPM/10
+			if fi.Kind == "pct" {
+				green, yellow, red = 60, 85, 100
+			}
+			if strings.HasPrefix(fi.Name, "GPU ") {
+				id, head = "GF", "GF"
+				green, yellow, red = 60, 85, 100
+			}
+			addR := func(r reading) {
+				for _, x := range rs {
+					if x.id == r.id {
+						return
+					}
+				}
+				rs = append(rs, r)
+			}
+			addR(reading{id: id, head: head, green: green, yellow: yellow, red: red})
+		}
+	}
 	if len(cfg.gpuIdx) <= 1 {
 		add("P", cfg.gpu)
 		add("H", cfg.gputemp)
@@ -1391,6 +1525,41 @@ func measure(ctx context.Context, cfg config) []reading {
 	}
 	if need("F") {
 		vals["F"] = meter.FanPercent()
+	}
+	if need("W") {
+		vals["W"] = meter.GPUPowerW()
+	}
+	if need("Y") {
+		vals["Y"] = meter.NVMeTempC()
+	}
+	if need("A") || need("Q") {
+		a, q := meter.DiskIO()
+		vals["A"], vals["Q"] = a, q
+	}
+	if need("R") || need("J") || need("E") {
+		rx, tx, e := meter.NetRate()
+		vals["R"], vals["J"], vals["E"] = rx, tx, e
+	}
+	if need("Z") {
+		vals["Z"] = meter.PSIMemory()
+	}
+	if need("O") {
+		vals["O"] = meter.FailedUnits()
+	}
+	if need("X") {
+		vals["X"] = meter.RebootRequired()
+	}
+	if cfg.fansAll {
+		valsList := meter.FanValues()
+		for i, fi := range meter.FanList() {
+			id := fmt.Sprintf("F%d", i+1)
+			if strings.HasPrefix(fi.Name, "GPU ") {
+				id = "GF"
+			}
+			if i < len(valsList) && need(id) {
+				vals[id] = valsList[i]
+			}
+		}
 	}
 	if need("B") {
 		vals["B"] = meter.BatteryPercent()
