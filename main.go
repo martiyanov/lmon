@@ -84,8 +84,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   без пробелов (фиолетовый — нет датчика, красный — нет ответа).
   --horizontal  — горизонтальная цветная лента: параметр = строка,
                   время идёт вправо; --labels full|short — подписи.
-  --rain        — направление: новые значения сверху, падают вниз;
-                  символы/цвета как в выбранном режиме.
+  --rain        — направление: заголовок внизу, новые значения
+                  появляются сверху и падают вниз; символы/цвета как обычно.
   --matrix      — зелёная матричная палитра (можно с любым режимом).
 
 Набор колонок:
@@ -294,8 +294,8 @@ Display modes:
                   (purple = no sensor, red = no reply).
   --horizontal  — horizontal color timeline: one row per parameter,
                   time flows right; --labels full|short selects labels.
-  --rain        — direction: new values on top, falling down;
-                  symbols/colors come from the selected mode.
+  --rain        — direction: header stays at the bottom, new values
+                  appear at the top and fall down; symbols/colors unchanged.
   --matrix      — green matrix palette (works with any mode).
 
 Column set:
@@ -2185,21 +2185,22 @@ func (u *ui) resize(rows int) {
 	u.rows = rows
 }
 
-// redrawRain рисует заголовок сверху, данные — под ним, новые сверху.
+// redrawRain: заголовок остаётся внизу, как в обычном режиме, но новые
+// значения появляются сверху и опускаются вниз (старые уходят к заголовку).
 func (u *ui) redrawRain(rows int) {
 	if rows < 2 {
 		rows = 2
 	}
 	u.rows = rows
 	fmt.Fprint(u.w, "\x1b[2J\x1b[H")
-	fmt.Fprintf(u.w, "\x1b[1;1H\x1b[2K%s", u.headerRow(u.lastRS))
 	for i, rs := range u.rainRows {
 		if i >= rows-1 {
 			break
 		}
-		fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[2K%s", i+2, u.dataRow(rs))
+		fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[2K%s", i+1, u.dataRow(rs))
 	}
-	fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[0J", min(rows, len(u.rainRows)+2))
+	fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[2K%s", rows, u.headerRow(u.lastRS))
+	fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[0J", rows)
 }
 
 func (u *ui) redraw(rows int) {
@@ -2339,6 +2340,17 @@ func (u *ui) headerRow(rs []reading) string {
 			cells[i] = bgSev(r.severity(), u.matrix) + label + reset
 		}
 		return strings.Join(cells, "")
+	}
+	if !u.color {
+		cells := make([]string, len(rs))
+		for i, r := range rs {
+			if r.blank {
+				cells[i] = "   "
+			} else {
+				cells[i] = r.head
+			}
+		}
+		return strings.Join(cells, " ")
 	}
 	cells := make([]string, len(rs))
 	for i, r := range rs {

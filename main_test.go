@@ -1017,3 +1017,14 @@ func TestMatrixPaletteWithModes(t *testing.T) {
 		t.Errorf("--matrix --once: %+v %v", cfg, err)
 	}
 }
+
+func TestRainUsesModeSymbols(t *testing.T) {
+	var b bytes.Buffer
+	u := &ui{w: &b, tty: true, rain: true, blocks: true, color: true, rows: 4}
+	u.emit([]reading{{id: "N", head: "NET", v: 1}})
+	b.Reset()
+	u.emit([]reading{{id: "N", head: "NET", v: 2}})
+	if !strings.Contains(b.String(), "███") {
+		t.Errorf("rain+bars data = %q, want blocks", b.String())
+	}
+}
