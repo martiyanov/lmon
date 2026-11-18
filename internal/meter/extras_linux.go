@@ -3,7 +3,10 @@
 package meter
 
 import (
+	"errors"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -242,4 +245,99 @@ func RebootRequired() int {
 		}
 	}
 	return 0
+}
+
+var (
+	raplMu     sync.Mutex
+	raplLastAt time.Time
+	raplLast   uint64
+)
+
+// CPUPowerW — потребление пакета CPU, Вт, из RAPL. Обычно energy_uj
+// доступен только root; при EACCES возвращается -2 (нужен root).
+func CPUPowerW() int {
+	const path = "/sys/class/powercap/intel-rapl:0/energy_uj"
+	b, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrPermission) {
+			return -2
+		}
+		return -1
+	}
+	v, err := strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64)
+	if err != nil {
+		return -1
+	}
+	now := time.Now()
+	raplMu.Lock()
+	if raplLastAt.IsZero() {
+		raplLastAt, raplLast = now, v
+		raplMu.Unlock()
+		time.Sleep(150 * time.Millisecond)
+		b, err = os.ReadFile(path)
+		if err != nil {
+			if errors.Is(err, fs.ErrPermission) {
+				return -2
+			}
+			return -1
+		}
+		v, err = strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64)
+		if err != nil {
+			return -1
+		}
+		now = time.Now()
+		raplMu.Lock()
+	}
+	defer raplMu.Unlock()
+	dt := now.Sub(raplLastAt).Seconds()
+	dv := v - raplLast
+	raplLastAt, raplLast = now, v
+	if dt <= 0 {
+		return 0
+	}
+	return int(float64(dv)/1e6/dt + 0.5)
+}
+
+// NVMeWearPct — износ NVMe, % (Percentage Used) через smartctl/nvme.
+// Без root оба инструмента получают Permission denied → -2.
+func NVMeWearPct() int {
+	dev := "/dev/nvme0"
+	if _, err := os.Stat(dev); err != nil {
+		dev = "/dev/nvme0n1"
+		if _, err := os.Stat(dev); err != nil {
+			return -1
+		}
+	}
+	// smartctl
+	if out, err := exec.Command("smartctl", "-A", dev).CombinedOutput(); err == nil {
+		if v := parseWear(string(out)); v >= 0 {
+			return v
+		}
+	} else if isPermDenied(string(out)) {
+		return -2
+	}
+	// nvme-cli
+	if out, err := exec.Command("nvme", "smart-log", dev).CombinedOutput(); err == nil {
+		if v := parseWear(string(out)); v >= 0 {
+			return v
+		}
+	} else if isPermDenied(string(out)) {
+		return -2
+	}
+	return -1
+}
+
+func parseWear(out string) int {
+	re := regexp.MustCompile(`(?i)(percentage[_ ]used|percentage used)\s*:\s*([0-9]+)%?`)
+	if m := re.FindStringSubmatch(out); len(m) == 3 {
+		if v, err := strconv.Atoi(m[2]); err == nil && v >= 0 && v <= 100 {
+			return v
+		}
+	}
+	return -1
+}
+
+func isPermDenied(out string) bool {
+	low := strings.ToLower(out)
+	return strings.Contains(low, "permission denied") || strings.Contains(low, "requires root") || strings.Contains(low, "must be root")
 }

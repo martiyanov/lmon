@@ -31,10 +31,10 @@ func columnSupportedByOS(id, goos string) bool {
 	case "windows":
 		switch id {
 		case "L", // load average в Windows отсутствует
-			"T",                                              // нет официального API температуры CPU (только --temp-cmd)
-			"I",                                              // iowait есть только в Linux
-			"F",                                              // скорость вентиляторов: нужен LHM/HWiNFO
-			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X": // Linux-метрики
+			"T",                                                          // нет официального API температуры CPU (только --temp-cmd)
+			"I",                                                          // iowait есть только в Linux
+			"F",                                                          // скорость вентиляторов: нужен LHM/HWiNFO
+			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR": // Linux-метрики
 			return false
 		}
 		// S (pagefile) читается через PDH; P/H — NVML/nvidia-smi/PDH;
@@ -42,9 +42,9 @@ func columnSupportedByOS(id, goos string) bool {
 	case "darwin":
 		switch id {
 		case "I", // iowait на macOS ядром не отдаётся
-			"H",                                              // GPUTempC: powermetrics под sudo — не показываем
-			"F",                                              // вентиляторы: нужен SMC/powermetrics с правами
-			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X": // Linux-метрики
+			"H",                                                          // GPUTempC: powermetrics под sudo — не показываем
+			"F",                                                          // вентиляторы: нужен SMC/powermetrics с правами
+			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR": // Linux-метрики
 			return false
 		}
 		// K (занятость диска) читается через IOKit, без sudo.
@@ -60,7 +60,7 @@ func columnSupportedByOS(id, goos string) bool {
 	default:
 		switch id {
 		case "L", "T", "I", "S", "P", "H", "F",
-			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X":
+			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR":
 			return false
 		}
 	}

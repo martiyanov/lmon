@@ -187,6 +187,7 @@ align exactly with the values. In plain words:
 - **RX/TX/ERR** — network KB/s and errors/drops per second (`--net-rate`; Linux).
 - **PSI** — memory pressure, avg10 % (`--psi`; Linux).
 - **SVC/UPD** — failed systemd units and reboot-required flag (`--system`; Linux).
+- **PWR/WEA** — CPU package power (RAPL) and NVMe wear (SMART), `--cpu-power`/`--nvme-smart`; Linux, require root.
 - **I/O** — how busy the disk is, % (`--disk-busy`; Windows reads
   `\PhysicalDisk(_Total)\% Disk Time` via PDH, macOS derives it from IOKit
   `Total Time (Read/Write)`; no admin). The closest thing to Linux iowait.
@@ -233,6 +234,19 @@ By default the column is appended on the right. To place it anywhere, add
 the name to `--cols`: `--cols NG,VPN,M` puts the VPN ping between the
 gateway and memory. Separators are required around ping names (commas,
 spaces or `+`); compact column sets like `NGM` still work.
+
+### Root-only metrics
+
+`PWR` (CPU package power from RAPL) and `WEA` (NVMe wear from SMART) need root:
+
+```sh
+sudo lmon --cpu-power --nvme-smart
+```
+
+Without root lmon shows `·` in those columns and prints a hint:
+`PWR: root required.` / `WEA: root required.` This is deliberate: the
+metrics are shown, but lmon tells you why they are empty. `--all` includes
+them, so `sudo lmon --all` is the full picture.
 
 ### All columns at once
 
@@ -291,6 +305,8 @@ machine; `...` (TUI) or `999` (`--once`) means the host is unreachable.
 | `--net-rate` | `LMON_NET_RATE` | off | RX/TX KB/s and errors (Linux) |
 | `--psi` | `LMON_PSI` | off | memory pressure (Linux) |
 | `--system` | `LMON_SYSTEM` | off | failed units and reboot-required (Linux) |
+| `--cpu-power` | `LMON_CPU_POWER` | off | CPU package power, W (Linux, root/RAPL) |
+| `--nvme-smart` | `LMON_NVME_SMART` | off | NVMe wear, % (Linux, root/SMART) |
 | `--cpu` `--iowait` `--swap` `--disk` `--batt` `--gpu` `--gputemp` | — | off | add extra columns |
 
 ```sh
@@ -303,6 +319,7 @@ lmon --gpu --gputemp --gpu-index 0,1 # one column per GPU
 lmon --fans                         # fan speed % (Linux)
 lmon --fans-all                     # one column per fan
 lmon --gpu-power --nvme --disk-io --net-rate --psi --system
+lmon --cpu-power --nvme-smart  # root-only metrics
 lmon --all                          # all supported columns at once
 tmux: set -g status-right '#(lmon --once --cols=NGMC)'
 ```

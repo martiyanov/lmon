@@ -763,3 +763,29 @@ func TestFansListAllFlags(t *testing.T) {
 		t.Errorf("fans flags: %+v %v", cfg, err)
 	}
 }
+
+func TestRootMetricsFlags(t *testing.T) {
+	for _, k := range []string{"LMON_CPU_POWER", "LMON_NVME_SMART"} {
+		t.Setenv(k, "")
+	}
+	cfg, err := parseConfig([]string{"--cpu-power", "--nvme-smart"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.cpuPower || !cfg.nvmeSmart {
+		t.Errorf("root flags: %+v", cfg)
+	}
+	cols, _ := layoutWithDropped(cfg, "linux")
+	got := ids(cols)
+	if !strings.Contains(got, "PW") || !strings.Contains(got, "WR") {
+		t.Errorf("linux root layout = %q, нет PW/WR", got)
+	}
+	w, _ := layoutWithDropped(cfg, "windows")
+	if wgot := ids(w); strings.Contains(wgot, "PW") || strings.Contains(wgot, "WR") {
+		t.Errorf("windows layout не должен содержать root-метрики: %q", wgot)
+	}
+	cfg2, err := parseConfig([]string{"--cols", "PW,WR"})
+	if err != nil || strings.Join(cfg2.cols, ",") != "PW,WR" {
+		t.Errorf("--cols PW,WR: %v %v", cfg2.cols, err)
+	}
+}

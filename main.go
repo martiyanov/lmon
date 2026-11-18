@@ -62,6 +62,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   PSI (Z)  — давление на память, avg10 % (--psi; Linux).
   SVC (O)  — упавшие systemd-юниты (--system; Linux).
   UPD (X)  — нужна перезагрузка: 0/1 (--system; Linux).
+  PWR (PW) — потребление пакета CPU, Вт (--cpu-power; Linux, нужен root).
+  WEA (WR) — износ NVMe, % (--nvme-smart; Linux, нужен root/smartctl).
   SWP (S)  — занятые swap/файл подкачки, % (--swap; Windows читает
              pagefile через PDH, без прав администратора).
   DSK (U)  — занято на системном диске, % (--disk).
@@ -91,6 +93,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
     K — занятость диска (--disk-busy, Windows/macOS)
     F — скорость вентиляторов, % (--fans, Linux)
     W/Y/A/Q/R/J/E/Z/O/X — GPU power, NVMe, диск, сеть, PSI, systemd
+    PW/WR — CPU power и износ NVMe (нужен root)
     P — загрузка GPU (%)         H — t°GPU
 
   Примеры: только сеть и память — lmon --cols NM
@@ -182,6 +185,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --net-rate    LMON_NET_RATE   RX/TX КБ/с и ошибки сети (Linux)
   --psi         LMON_PSI        давление на память (Linux)
   --system      LMON_SYSTEM     упавшие юниты и reboot-required (Linux)
+  --cpu-power   LMON_CPU_POWER  потребление CPU, Вт (Linux, нужен root)
+  --nvme-smart  LMON_NVME_SMART износ NVMe, % (Linux, нужен root)
   --temp-cmd    LMON_TEMP_CMD  внешняя команда, печатающая температуру CPU
                               в °C (берётся первое число). Нужна на Windows,
                               где нет штатного API: например, LHM через
@@ -248,6 +253,8 @@ Columns (letter in parentheses is for --cols):
   PSI (Z)  — memory pressure, avg10 % (--psi; Linux).
   SVC (O)  — failed systemd units (--system; Linux).
   UPD (X)  — reboot required: 0/1 (--system; Linux).
+  PWR (PW) — CPU package power, W (--cpu-power; Linux, root required).
+  WEA (WR) — NVMe wear, % (--nvme-smart; Linux, root required).
   SWP (S)  — swap/pagefile in use, % (--swap; on Windows it reads
              pagefile via PDH, no admin rights).
   DSK (U)  — root disk usage, % (--disk).
@@ -277,6 +284,7 @@ Column set:
     K — disk busy (--disk-busy, Windows/macOS)
     F — fan speed, % (--fans, Linux)
     W/Y/A/Q/R/J/E/Z/O/X — GPU power, NVMe, disk, network, PSI, systemd
+    PW/WR — CPU power and NVMe wear (root required)
     P — GPU usage (%)            H — GPU °C
 
   Examples: network and memory only — lmon --cols NM
@@ -365,6 +373,8 @@ Settings (flags and environment variables):
   --net-rate    LMON_NET_RATE   RX/TX KB/s and network errors (Linux)
   --psi         LMON_PSI        memory pressure (Linux)
   --system      LMON_SYSTEM     failed units and reboot-required (Linux)
+  --cpu-power   LMON_CPU_POWER  CPU package power, W (Linux, root)
+  --nvme-smart  LMON_NVME_SMART NVMe wear, % (Linux, root)
   --temp-cmd    LMON_TEMP_CMD  external command that prints CPU temperature
                               in °C (the first number is used). Needed on
                               Windows where no native API exists; e.g. LHM
@@ -448,6 +458,8 @@ type config struct {
 	netRate    bool              // --net-rate: RX/TX KB/s + errors
 	psi        bool              // --psi: memory pressure
 	system     bool              // --system: failed units + reboot required
+	cpuPower   bool              // --cpu-power: CPU package W (root/RAPL)
+	nvmeSmart  bool              // --nvme-smart: NVMe wear % (root/SMART)
 }
 
 // pingTarget — именованная пинг-колонка (--ping VPN=10.8.0.1):
@@ -553,6 +565,8 @@ func parseConfig(args []string) (config, error) {
 	netRate := fs.Bool("net-rate", envFlag("LMON_NET_RATE"), "add network RX/TX and errors columns")
 	psi := fs.Bool("psi", envFlag("LMON_PSI"), "add memory pressure column (PSI)")
 	system := fs.Bool("system", envFlag("LMON_SYSTEM"), "add failed units and reboot-required columns")
+	cpuPower := fs.Bool("cpu-power", envFlag("LMON_CPU_POWER"), "add CPU package power, W (root/RAPL)")
+	nvmeSmart := fs.Bool("nvme-smart", envFlag("LMON_NVME_SMART"), "add NVMe wear, % (root/SMART)")
 	colsFlag := fs.String("cols", os.Getenv("LMON_COLS"), "base column set and order, e.g. NG,CSB; --ping names can be placed too (NG,VPN,M)")
 	thrFlag := fs.String("thresholds", os.Getenv("LMON_THRESHOLDS"), "per-column color thresholds COL=green/yellow/red (e.g. NET=100/200/500)")
 	// --ping повторяемый: копим сырые строки, валидируем после разбора
@@ -649,15 +663,16 @@ func parseConfig(args []string) (config, error) {
 				"--all и --cols взаимоисключающие"))
 		}
 		cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "P", "H", "K", "F",
-			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X"}
+			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR"}
 		cpu, iowait, swap, disk, diskBusy, batt, gpu, gputemp = true, true, true, true, true, true, true, true
 		*gpuPower, *nvme, *diskIO, *netRate, *psi, *system = true, true, true, true, true, true
+		*cpuPower, *nvmeSmart = true, true
 		*fans = true
 		*fansAll = true
 		if len(gpuIdx) > 1 {
 			// при нескольких GPU вместо P/H будут динамические G0/G1, T0/T1
 			cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "K", "F",
-				"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X"}
+				"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR"}
 		}
 	}
 	if len(gpuIdx) > 1 && !gpu && !gputemp {
@@ -677,7 +692,8 @@ func parseConfig(args []string) (config, error) {
 		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans,
 		fansAll: *fansAll, fansList: *fansList,
 		gpuPower: *gpuPower, nvme: *nvme, diskIO: *diskIO,
-		netRate: *netRate, psi: *psi, system: *system}, nil
+		netRate: *netRate, psi: *psi, system: *system,
+		cpuPower: *cpuPower, nvmeSmart: *nvmeSmart}, nil
 }
 
 // rawList — повторяемый флаг: каждое вхождение добавляет строку.
@@ -771,6 +787,13 @@ func parseCols(spec string, pings []pingTarget, lang string) ([]string, error) {
 			}
 			continue
 		}
+		// Многосимвольные штатные колонки (PW, WR) — не компактный набор букв.
+		if _, ok := colRegistry[up]; ok && len(up) > 1 {
+			if err := add(up); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		// Токен из нескольких символов, который не имя пинга: это либо
 		// компактный набор букв (NGM), либо опечатка/незаданный пинг.
 		if len(up) > 1 {
@@ -785,7 +808,7 @@ func parseCols(spec string, pings []pingTarget, lang string) ([]string, error) {
 				}
 			}
 			if !onlyLetters {
-				hint := "N G L M T C I S U B P H K F W Y A Q R J E Z O X"
+				hint := "N G L M T C I S U B P H K F W Y A Q R J E Z O X PW WR"
 				return nil, fmt.Errorf(lmsg(lang,
 					"--cols: unknown column or ping name %q (columns: %s; define a ping first: --ping %s=host)",
 					"--cols: неизвестная колонка или имя пинга %q (колонки: %s; пинг нужно сначала задать: --ping %s=host)"), up, hint, up)
@@ -797,7 +820,7 @@ func parseCols(spec string, pings []pingTarget, lang string) ([]string, error) {
 			}
 			id := string(r)
 			if _, ok := colRegistry[id]; !ok {
-				hint := "N G L M T C I S U B P H K F W Y A Q R J E Z O X"
+				hint := "N G L M T C I S U B P H K F W Y A Q R J E Z O X PW WR"
 				if len(names) > 0 {
 					hint += ", " + strings.Join(names, " ")
 				}
@@ -849,8 +872,8 @@ func parseThresholds(spec, lang string) (map[string][3]int, error) {
 		if !ok && !isPingName(id) {
 			// не буква, не имя колонки и не имя именованного пинга
 			return none, fmt.Errorf(lmsg(lang,
-				"--thresholds: unknown column %q (available: N G L M T C I S U B P H K F W Y A Q R J E Z O X)",
-				"--thresholds: неизвестная колонка %q (есть: N G L M T C I S U B P H K F W Y A Q R J E Z O X)"), eq[0])
+				"--thresholds: unknown column %q (available: N G L M T C I S U B P H K F W Y A Q R J E Z O X PW WR)",
+				"--thresholds: неизвестная колонка %q (есть: N G L M T C I S U B P H K F W Y A Q R J E Z O X PW WR)"), eq[0])
 		}
 		var t [3]int
 		ns := strings.Split(eq[1], "/")
@@ -1194,30 +1217,32 @@ type reading struct {
 
 // colRegistry — все известные колонки; ключ — однобуквенный id из --cols.
 var colRegistry = map[string]reading{
-	"N": {id: "N", head: "NET", green: 50, yellow: 150, red: 300},
-	"G": {id: "G", head: "GTW", green: 10, yellow: 50, red: 100},
-	"L": {id: "L", head: "RUN", green: 4, yellow: 8, red: 16},
-	"M": {id: "M", head: "MEM", green: 60, yellow: 85, red: 97},
-	"T": {id: "T", head: " C°", green: 60, yellow: 75, red: 90},
-	"C": {id: "C", head: "CPU", green: 50, yellow: 80, red: 100},
-	"I": {id: "I", head: "IOW", green: 5, yellow: 20, red: 50},
-	"S": {id: "S", head: "SWP", green: 30, yellow: 70, red: 100},
-	"U": {id: "U", head: "DSK", green: 80, yellow: 90, red: 100},
-	"B": {id: "B", head: "BAT", green: 50, yellow: 20, red: 0, invert: true},
-	"P": {id: "P", head: "GPU", green: 50, yellow: 85, red: 100},
-	"H": {id: "H", head: " G°", green: 60, yellow: 80, red: 90},
-	"K": {id: "K", head: "I/O", green: 60, yellow: 85, red: 100},     // диск занят (Windows, PDH)
-	"F": {id: "F", head: "FAN", green: 60, yellow: 85, red: 100},     // вентиляторы, % (Linux)
-	"W": {id: "W", head: "GPW", green: 100, yellow: 150, red: 170},   // GPU power, W
-	"Y": {id: "Y", head: "NVM", green: 60, yellow: 75, red: 90},      // NVMe temp, °C
-	"A": {id: "A", head: "LAT", green: 10, yellow: 50, red: 100},     // disk await, ms
-	"Q": {id: "Q", head: "QUE", green: 1, yellow: 4, red: 8},         // disk queue
-	"R": {id: "R", head: " RX", green: 100, yellow: 1000, red: 5000}, // net RX, KB/s
-	"J": {id: "J", head: " TX", green: 100, yellow: 1000, red: 5000}, // net TX, KB/s
-	"E": {id: "E", head: "ERR", green: 0, yellow: 1, red: 10},        // net errors/drops per s
-	"Z": {id: "Z", head: "PSI", green: 10, yellow: 40, red: 70},      // memory pressure avg10, %
-	"O": {id: "O", head: "SVC", green: 0, yellow: 1, red: 5},         // failed systemd units
-	"X": {id: "X", head: "UPD", green: 0, yellow: 1, red: 5},         // reboot/updates required
+	"N":  {id: "N", head: "NET", green: 50, yellow: 150, red: 300},
+	"G":  {id: "G", head: "GTW", green: 10, yellow: 50, red: 100},
+	"L":  {id: "L", head: "RUN", green: 4, yellow: 8, red: 16},
+	"M":  {id: "M", head: "MEM", green: 60, yellow: 85, red: 97},
+	"T":  {id: "T", head: " C°", green: 60, yellow: 75, red: 90},
+	"C":  {id: "C", head: "CPU", green: 50, yellow: 80, red: 100},
+	"I":  {id: "I", head: "IOW", green: 5, yellow: 20, red: 50},
+	"S":  {id: "S", head: "SWP", green: 30, yellow: 70, red: 100},
+	"U":  {id: "U", head: "DSK", green: 80, yellow: 90, red: 100},
+	"B":  {id: "B", head: "BAT", green: 50, yellow: 20, red: 0, invert: true},
+	"P":  {id: "P", head: "GPU", green: 50, yellow: 85, red: 100},
+	"H":  {id: "H", head: " G°", green: 60, yellow: 80, red: 90},
+	"K":  {id: "K", head: "I/O", green: 60, yellow: 85, red: 100},     // диск занят (Windows, PDH)
+	"F":  {id: "F", head: "FAN", green: 60, yellow: 85, red: 100},     // вентиляторы, % (Linux)
+	"W":  {id: "W", head: "GPW", green: 100, yellow: 150, red: 170},   // GPU power, W
+	"Y":  {id: "Y", head: "NVM", green: 60, yellow: 75, red: 90},      // NVMe temp, °C
+	"A":  {id: "A", head: "LAT", green: 10, yellow: 50, red: 100},     // disk await, ms
+	"Q":  {id: "Q", head: "QUE", green: 1, yellow: 4, red: 8},         // disk queue
+	"R":  {id: "R", head: " RX", green: 100, yellow: 1000, red: 5000}, // net RX, KB/s
+	"J":  {id: "J", head: " TX", green: 100, yellow: 1000, red: 5000}, // net TX, KB/s
+	"E":  {id: "E", head: "ERR", green: 0, yellow: 1, red: 10},        // net errors/drops per s
+	"Z":  {id: "Z", head: "PSI", green: 10, yellow: 40, red: 70},      // memory pressure avg10, %
+	"O":  {id: "O", head: "SVC", green: 0, yellow: 1, red: 5},         // failed systemd units
+	"X":  {id: "X", head: "UPD", green: 0, yellow: 1, red: 5},         // reboot/updates required
+	"PW": {id: "PW", head: "PWR", green: 40, yellow: 65, red: 85},     // CPU package, W (root/RAPL)
+	"WR": {id: "WR", head: "WEA", green: 20, yellow: 50, red: 80},     // NVMe wear, % (root/SMART)
 }
 
 // layout возвращает колонки в порядке вывода; значения заполнит sampleRow.
@@ -1265,6 +1290,8 @@ func requestedLayout(cfg config) []reading {
 	add("Z", cfg.psi)
 	add("O", cfg.system)
 	add("X", cfg.system)
+	add("PW", cfg.cpuPower)
+	add("WR", cfg.nvmeSmart)
 	if cfg.fansAll {
 		for i, fi := range meter.FanList() {
 			id, head := fmt.Sprintf("F%d", i+1), fmt.Sprintf("%3s", "F"+strconv.Itoa(i+1))
@@ -1548,6 +1575,12 @@ func measure(ctx context.Context, cfg config) []reading {
 	}
 	if need("X") {
 		vals["X"] = meter.RebootRequired()
+	}
+	if need("PW") {
+		vals["PW"] = meter.CPUPowerW()
+	}
+	if need("WR") {
+		vals["WR"] = meter.NVMeWearPct()
 	}
 	if cfg.fansAll {
 		valsList := meter.FanValues()

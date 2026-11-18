@@ -238,6 +238,30 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 			"G°: no GPU temperature source.",
 			"G°: нет источника температуры GPU."), detail)
 	}
+	if r, ok := byID["PW"]; ok {
+		switch r.v {
+		case -2:
+			add(lmsg(lang, "PWR: root required.", "PWR: нужен root."),
+				lmsg(lang, "CPU package power is read from RAPL energy_uj, which is root-only here. Run `sudo lmon ...` or drop PWR.",
+					"Потребление CPU читается из RAPL energy_uj, а он доступен только root. Запусти `sudo lmon ...` или убери PWR."))
+		case -1:
+			add(lmsg(lang, "PWR: RAPL unavailable.", "PWR: RAPL недоступен."),
+				lmsg(lang, "No readable intel-rapl energy_uj; CPU power is not exposed on this machine.",
+					"Нет доступного intel-rapl energy_uj; потребление CPU на этой машине не отдаётся."))
+		}
+	}
+	if r, ok := byID["WR"]; ok {
+		switch r.v {
+		case -2:
+			add(lmsg(lang, "WEA: root required.", "WEA: нужен root."),
+				lmsg(lang, "NVMe wear is read via smartctl/nvme, which need root to open /dev/nvme0. Run `sudo lmon ...` or drop WEA.",
+					"Износ NVMe читается через smartctl/nvme, которым нужен root для /dev/nvme0. Запусти `sudo lmon ...` или убери WEA."))
+		case -1:
+			add(lmsg(lang, "WEA: SMART unavailable.", "WEA: SMART недоступен."),
+				lmsg(lang, "Install smartmontools or nvme-cli, or the NVMe device was not found.",
+					"Поставь smartmontools или nvme-cli, либо NVMe-устройство не найдено."))
+		}
+	}
 	if r, ok := byID["F"]; ok && r.v < 0 {
 		detail := lmsg(lang,
 			"Linux: no PWM/fan sensors found; check `sensors` (lm-sensors) or GPU fan via nvidia-smi. On other OS fan speed is not public.",
