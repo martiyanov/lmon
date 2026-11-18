@@ -5,11 +5,11 @@
 <p align="center">
   <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-digits.png" width="340" alt="lmon: цифры цветом состояния над закреплённой снизу цветной лентой"></a>
   &nbsp;
-  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-blocks.png" width="340" alt="lmon -b: цветные квадраты без цифр"></a>
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-blocks.png" width="340" alt="lmon --bars: цветные квадраты без цифр"></a>
   &nbsp;
   <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-hybrid.png" width="340" alt="lmon --hybrid: цифры на цветной подложке"></a>
 </p>
-<p align="center"><sub>Три режима — цифры, цветные квадраты (<code>-b</code>) и гибрид (<code>--hybrid</code>); значения настоящие, снятые на macOS. Окно можно ужать до ширины индикаторов:</sub></p>
+<p align="center"><sub>Три режима — цифры, цветные квадраты (<code>--bars</code>) и гибрид (<code>--hybrid</code>); значения настоящие, снятые на macOS. Окно можно ужать до ширины индикаторов:</sub></p>
 <p align="center">
   <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-corner.png" width="330" alt="компактное окно lmon по ширине индикаторов, в углу экрана"></a>
 </p>
@@ -194,7 +194,7 @@ lmon help   # вся справка: при русской локали — по
 lmon пишет, что скрыто и чем заменить; отключить подсказки: `--no-hints`.
 
 Три режима отображения на вкус: просто цифры (`lmon`), цветные
-квадраты без цифр (`lmon -b`), цифры на цветной подложке (`lmon --hybrid`).
+квадраты без цифр (`lmon --bars`), цифры на цветной подложке (`lmon --hybrid`).
 Набор и порядок колонок — любые: `lmon --cols NRMC` (буквы — в `lmon help`). Занятость диска: `lmon --disk-busy` (колонка `I/O`; Windows — PDH, macOS — IOKit, без админа). Несколько GPU: `lmon --gpu-list`, затем `lmon --gpu --gputemp --gpu-index N` (одна карта) или `--gpu-index 0,1` (по колонке на каждую). Всё сразу: `lmon --all` (все доступные колонки, плюс `--ping`; с `--cols` не сочетается). Вентиляторы: `lmon --fans` (Linux: PWM hwmon + GPU) или `--fans-all` (по колонке на каждый). Root-метрики: `sudo lmon --cpu-power --nvme-smart` (без root — `·` и подсказка).
 Одна строка значений для tmux-статусбара: `lmon --once` (цвет — только на терминале, в пайп идёт чистый текст). Температура CPU на Windows — через `--temp-cmd` (LMON_TEMP_CMD): команда печатает °C, lmon берёт первое число.
 

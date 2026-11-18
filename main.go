@@ -74,7 +74,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
              macOS/Windows — «·», датчика без прав администратора нет).
 
 Режимы отображения:
-  -b, --blocks  — вместо цифр цветные квадраты ███, градация цвета
+  --bars        — вместо цифр цветные квадраты ███, градация цвета
+                  (старое имя --blocks тоже работает)
                   от зелёного через жёлтый к красному по шкале каждой
                   колонки. Статус видно боковым зрением. Тусклый
                   квадрат — датчика нет.
@@ -128,7 +129,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon               — бесконечно, примерно раз в секунду
   lmon 20            — 20 строк и выход
   lmon --interval 5  — период обновления 5 секунд (по умолчанию 1)
-  lmon -b            — режим цветных квадратов
+  lmon --bars        — режим цветных квадратов
   lmon --hybrid      — цифры на цветной подложке
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
@@ -194,7 +195,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
 
 Примеры:
   lmon --target 1.1.1.1
-  lmon -b --cpu --batt 30
+  lmon --bars --cpu --batt 30
   LMON_COLS=NGMC lmon --once
 
 Колонки, которых в системе нет, скрываются автоматически (например,
@@ -265,7 +266,8 @@ Columns (letter in parentheses is for --cols):
              macOS/Windows — «·», no sensor without admin rights).
 
 Display modes:
-  -b, --blocks  — colored blocks ███ instead of digits; color grades from
+  --bars        — colored blocks ███ instead of digits; color grades from
+                  (--blocks is kept as a legacy alias)
                   green through yellow to red along each column's scale.
                   Status is visible with peripheral vision. A dim block
                   means no sensor.
@@ -316,7 +318,7 @@ Usage:
   lmon               — forever, about once per second
   lmon 20            — 20 lines, then exit
   lmon --interval 5  — refresh period of 5 seconds (default 1)
-  lmon -b            — colored blocks mode
+  lmon --bars        — colored blocks mode
   lmon --hybrid      — digits on the state-colored background
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
@@ -382,7 +384,7 @@ Settings (flags and environment variables):
 
 Examples:
   lmon --target 1.1.1.1
-  lmon -b --cpu --batt 30
+  lmon --bars --cpu --batt 30
   LMON_COLS=NGMC lmon --once
 
 Columns unsupported by the OS are hidden automatically (e.g. RUN and C°
@@ -540,8 +542,8 @@ func parseConfig(args []string) (config, error) {
 	gw := fs.String("gw", envStr("LMON_GW", ""), "gateway (auto-detected by default)")
 	interval := fs.Float64("interval", envFloat("LMON_INTERVAL", 1), "seconds between lines")
 	var blocks, hybrid bool
-	fs.BoolVar(&blocks, "blocks", false, "colored blocks instead of digits")
-	fs.BoolVar(&blocks, "b", false, "shorthand for --blocks")
+	fs.BoolVar(&blocks, "bars", false, "colored bars instead of digits")
+	fs.BoolVar(&blocks, "blocks", false, "alias for --bars (legacy name)")
 	fs.BoolVar(&hybrid, "hybrid", false, "digits on the state-colored background")
 	lang := fs.String("lang", langAuto(), "message language: en or ru")
 	var cpu, iowait, swap, disk, diskBusy, batt, gpu, gputemp bool
@@ -592,7 +594,7 @@ func parseConfig(args []string) (config, error) {
 		return config{}, fmt.Errorf(lmsg(lg, "--lang=%q: expected en or ru", "--lang=%q: ожидается en или ru"), lg)
 	}
 	if blocks && hybrid {
-		return config{}, errors.New(lmsg(lg, "--blocks and --hybrid are mutually exclusive", "--blocks и --hybrid взаимоисключающи"))
+		return config{}, errors.New(lmsg(lg, "--bars/--blocks and --hybrid are mutually exclusive", "--bars/--blocks и --hybrid взаимоисключающи"))
 	}
 
 	var iters int

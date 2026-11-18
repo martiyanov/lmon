@@ -37,7 +37,7 @@
 ```sh
 go vet ./... && go test ./...     # проверка
 go build -o lmon .                # сборка
-./lmon --cpu --swap -b 5          # быстрая проверка руками
+./lmon --cpu --swap --bars 5          # быстрая проверка руками
 ./scripts/test-all.sh             # полная локальная матрица (см. ниже)
 ./scripts/release-local.sh v1.2.3 --notes-file /tmp/notes.md  # релиз
 ```

@@ -5,11 +5,11 @@
 <p align="center">
   <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-digits.png" width="340" alt="lmon: digits colored by state above the pinned colored header ribbon"></a>
   &nbsp;
-  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-blocks.png" width="340" alt="lmon -b: colored blocks, no digits"></a>
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-blocks.png" width="340" alt="lmon --bars: colored blocks, no digits"></a>
   &nbsp;
   <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-hybrid.png" width="340" alt="lmon --hybrid: digits on state-colored backgrounds"></a>
 </p>
-<p align="center"><sub>Three display modes — plain digits, color blocks (<code>-b</code>) and hybrid (<code>--hybrid</code>) — real values captured on macOS. The window can shrink to the width of the indicators:</sub></p>
+<p align="center"><sub>Three display modes — plain digits, color blocks (<code>--bars</code>) and hybrid (<code>--hybrid</code>) — real values captured on macOS. The window can shrink to the width of the indicators:</sub></p>
 <p align="center">
   <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-corner.png" width="330" alt="compact lmon window sized to the indicators, tucked into a screen corner"></a>
 </p>
@@ -152,7 +152,7 @@ sysfs (`hwmon` / `thermal_zone`), no extra tools required.
 ```sh
 lmon                    # run forever, one line per second
 lmon 20                 # print 20 lines and exit
-lmon -b                 # color blocks instead of digits
+lmon --bars                 # color blocks instead of digits
 lmon --cpu --swap       # add extra columns
 lmon --no-hints         # start without hints about hidden columns
 lmon help               # built-in reference (English; Russian via --lang ru
@@ -255,12 +255,12 @@ GPU, I/O, pings from `--ping`) and silently drops what the OS does not expose.
 It cannot be combined with `--cols`; with `--gpu-index 0,1` you get one GPU
 block per card (`G0`, `G1`, `T0`, `T1`).
 
-### Blocks mode
+### Bars mode
 
 `lmon --hybrid` combines both: exact digits printed on the state-colored
 background (the bottom ribbon look, but in the data stream).
 
-`lmon -b` (`--blocks`) replaces digits with colored squares `███` —
+`lmon --bars` (`--blocks`) replaces digits with colored squares `███` —
 one per column, with a continuous green → yellow → red gradient along
 each column's scale. You read the status with peripheral vision instead
 of parsing numbers. A dim square (or `·`) means no sensor on this
@@ -286,7 +286,7 @@ machine; `...` (TUI) or `999` (`--once`) means the host is unreachable.
 | `--target` | `LMON_TARGET` | `8.8.8.8` | external host: IPv4, DNS name or an IPv6 literal (e.g. `fe80::1%en0`; the gateway follows the same address family) |
 | `--gw` | `LMON_GW` | auto-detect | your gateway |
 | `--interval` | `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
-| `-b`, `--blocks` | — | off | color blocks instead of digits |
+| `--bars` | — | off | colored bars instead of digits (`--blocks` is a legacy alias) |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`) and `--ping` names (`NG,VPN,M`); flags add more |
 | `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |
@@ -311,7 +311,7 @@ machine; `...` (TUI) or `999` (`--once`) means the host is unreachable.
 
 ```sh
 lmon --target 1.1.1.1 --interval 2 10
-lmon -b --cols TNGC --cpu          # own set and order, flags add more
+lmon --bars --cols TNGC --cpu          # own set and order, flags add more
 lmon --ping VPN=10.8.0.1 --cols NG,VPN,M  # place a ping column anywhere
 lmon --gpu-list                    # 0: RTX 3060, 1: Intel UHD
 lmon --gpu --gputemp --gpu-index 0 # show a specific GPU
