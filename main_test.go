@@ -1117,3 +1117,18 @@ func TestMatrixZeroHasThreeSymbols(t *testing.T) {
 		seen[r] = true
 	}
 }
+
+func TestCompactMatrixAlignment(t *testing.T) {
+	u := &ui{matrix: true, compact: true, color: false}
+	rs := []reading{
+		{id: "N", head: "NET", v: 120, green: 50, yellow: 150, red: 300},
+		{id: "M", head: "MEM", v: 220, green: 50, yellow: 150, red: 300},
+	}
+	row := u.dataRow(rs)
+	if got := len([]rune(row)); got != len(rs) {
+		t.Errorf("compact matrix row = %q (%d runes), want %d", row, got, len(rs))
+	}
+	if strings.ContainsRune(row, ' ') {
+		t.Errorf("compact matrix row contains space: %q", row)
+	}
+}

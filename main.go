@@ -2118,7 +2118,11 @@ func (u *ui) dataRow(rs []reading) string {
 			}
 			cells[j] = s
 		}
-		return strings.Join(cells, " ")
+		sep := " "
+		if u.compact {
+			sep = ""
+		}
+		return strings.Join(cells, sep)
 	}
 	if u.compact {
 		cells := make([]string, len(rs))
