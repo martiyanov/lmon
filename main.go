@@ -84,6 +84,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   без пробелов (фиолетовый — нет датчика, красный — нет ответа).
   --horizontal  — горизонтальная цветная лента: параметр = строка,
                   время идёт вправо; --labels full|short — подписи.
+  --matrix      — матрица: подписи сверху, значения падают вниз,
+                  только зелёный, заполнение Braille-символами.
 
 Набор колонок:
   --cols NG,CSB  — свой набор и порядок (каждая буква — колонка,
@@ -138,6 +140,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --hybrid      — цифры на цветной подложке
   lmon --compact     — минимализм: одна буква и один цветной блок на параметр
   lmon --horizontal  — строки-параметры, цветная история вправо
+  lmon --matrix      — зелёный дождь значений сверху вниз
   lmon --horizontal --labels full   # полные подписи
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
@@ -185,6 +188,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --compact     LMON_COMPACT    одна буква и один цветной блок на параметр, без пробелов
   --horizontal  LMON_HORIZONTAL горизонтальная цветная лента (TUI)
   --labels      LMON_LABELS     подписи в горизонтальном режиме: full или short
+  --matrix      LMON_MATRIX     матричный режим (TUI)
   --gpu-index   LMON_GPU_INDEX  индекс или список GPU для --gpu/--gputemp: 0 или 0,1
   --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
   --all         LMON_ALL        все доступные колонки (с --ping — ещё и они)
@@ -285,6 +289,8 @@ Display modes:
                   (purple = no sensor, red = no reply).
   --horizontal  — horizontal color timeline: one row per parameter,
                   time flows right; --labels full|short selects labels.
+  --matrix      — matrix: labels on top, values fall down, green only,
+                  cells filled with Braille patterns.
 
 Column set:
   --cols NG,CSB  — your own set and order (each letter is a column;
@@ -338,6 +344,7 @@ Usage:
   lmon --hybrid      — digits on the state-colored background
   lmon --compact     — minimal: one letter and one colored block per parameter
   lmon --horizontal  — parameter rows, color history to the right
+  lmon --matrix      — green value rain from top to bottom
   lmon --horizontal --labels full   # full labels
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
@@ -385,6 +392,7 @@ Settings (flags and environment variables):
   --compact     LMON_COMPACT    one letter and one colored block per parameter, no gaps
   --horizontal  LMON_HORIZONTAL horizontal color timeline (TUI)
   --labels      LMON_LABELS     horizontal mode labels: full or short
+  --matrix      LMON_MATRIX     matrix mode (TUI)
   --gpu-index   LMON_GPU_INDEX  GPU index or list for --gpu/--gputemp: 0 or 0,1
   --gpu-list    LMON_GPU_LIST   list GPUs and exit
   --all         LMON_ALL        every available column (pings too, if --ping)
@@ -462,6 +470,7 @@ type config struct {
 	compact    bool
 	horizontal bool
 	labelsFull bool
+	matrix     bool
 	cpu        bool
 	iowait     bool
 	swap       bool
@@ -570,11 +579,12 @@ func parseConfig(args []string) (config, error) {
 	target := fs.String("target", envStr("LMON_TARGET", "8.8.8.8"), "external host")
 	gw := fs.String("gw", envStr("LMON_GW", ""), "gateway (auto-detected by default)")
 	interval := fs.Float64("interval", envFloat("LMON_INTERVAL", 1), "seconds between lines")
-	var blocks, hybrid, compact bool
+	var blocks, hybrid, compact, matrix bool
 	fs.BoolVar(&blocks, "bars", false, "colored bars instead of digits")
 	fs.BoolVar(&blocks, "blocks", false, "alias for --bars (legacy name)")
 	fs.BoolVar(&hybrid, "hybrid", false, "digits on the state-colored background")
 	fs.BoolVar(&compact, "compact", envFlag("LMON_COMPACT"), "one character per column, no gaps")
+	fs.BoolVar(&matrix, "matrix", envFlag("LMON_MATRIX"), "matrix rain: headers on top, values fall down, green only")
 	horizontal := fs.Bool("horizontal", envFlag("LMON_HORIZONTAL"), "horizontal color timeline (TUI)")
 	labels := fs.String("labels", envStr("LMON_LABELS", "short"), "horizontal labels: full or short")
 	lang := fs.String("lang", langAuto(), "message language: en or ru")
@@ -640,6 +650,12 @@ func parseConfig(args []string) (config, error) {
 	}
 	if *horizontal && once {
 		return config{}, errors.New(lmsg(lg, "--horizontal cannot be combined with --once; use the normal --once output", "--horizontal не сочетается с --once; используйте обычный вывод --once"))
+	}
+	if matrix && (blocks || hybrid || compact || *horizontal) {
+		return config{}, errors.New(lmsg(lg, "--matrix cannot be combined with other display modes", "--matrix не сочетается с другими режимами отображения"))
+	}
+	if matrix && once {
+		return config{}, errors.New(lmsg(lg, "--matrix cannot be combined with --once; use the normal --once output", "--matrix не сочетается с --once; используйте обычный вывод --once"))
 	}
 
 	var iters int
@@ -733,7 +749,7 @@ func parseConfig(args []string) (config, error) {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
-		blocks: blocks, hybrid: hybrid, compact: compact, horizontal: *horizontal, labelsFull: labelsMode == "full", cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
+		blocks: blocks, hybrid: hybrid, compact: compact, horizontal: *horizontal, labelsFull: labelsMode == "full", matrix: matrix, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
 		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans,
@@ -1122,6 +1138,13 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 			return 2
 		}
 		return monitorHorizontal(ctx, cfg, w, dropped)
+	}
+	if cfg.matrix {
+		if !stdoutIsTTY() {
+			fmt.Fprintln(os.Stderr, lmsg(cfg.lang, "lmon: --matrix requires a terminal", "lmon: --matrix требует терминал"))
+			return 2
+		}
+		return monitorMatrix(ctx, cfg, w, dropped)
 	}
 
 	termSetup()

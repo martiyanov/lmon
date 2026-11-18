@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"math/bits"
 	"runtime"
 	"strings"
 	"testing"
@@ -960,5 +961,57 @@ func TestHorizontalFlags(t *testing.T) {
 	}
 	if _, err := parseConfig([]string{"--labels", "wide"}); err == nil {
 		t.Error("--labels wide: ожидалась ошибка")
+	}
+}
+
+func TestMatrixView(t *testing.T) {
+	if len(matrixGlyphs) != 256 {
+		t.Fatalf("matrixGlyphs = %d, want 256", len(matrixGlyphs))
+	}
+	if matrixGlyphs[0] != 0x2800 || matrixGlyphs[255] != 0x28FF {
+		t.Errorf("matrix ramp endpoints = %U/%U", matrixGlyphs[0], matrixGlyphs[255])
+	}
+	prev := -1
+	for i, r := range matrixGlyphs {
+		n := bits.OnesCount8(uint8(r - 0x2800))
+		if n < prev {
+			t.Errorf("ramp[%d] density %d < %d", i, n, prev)
+		}
+		prev = n
+	}
+	var b bytes.Buffer
+	v := &mview{w: &b, rows: 5, cols: 3, history: map[string][]hcell{}}
+	rs := []reading{
+		{id: "N", head: "NET", v: 0},
+		{id: "M", head: "MEM", v: 95, green: 60, yellow: 85, red: 97},
+		{id: "T", head: " C°", v: -1},
+	}
+	v.add(rs)
+	v.draw(rs)
+	out := b.String()
+	if !strings.Contains(out, "NMT") {
+		t.Errorf("matrix headers = %q", out)
+	}
+	braille := false
+	for _, r := range out {
+		if r >= 0x2801 && r <= 0x28FF {
+			braille = true
+			break
+		}
+	}
+	if !braille {
+		t.Errorf("matrix values = %q, нет Braille-заполнения", out)
+	}
+	if strings.ContainsAny(out, "0123456789") {
+		t.Errorf("matrix output содержит цифры: %q", out)
+	}
+
+	cases := []string{"--matrix", "--matrix", "--matrix"}
+	_ = cases
+	if _, err := parseConfig([]string{"--matrix", "--once"}); err == nil {
+		t.Error("--matrix + --once: ожидалась ошибка")
+	}
+	if _, err := parseConfig([]string{"--matrix", "--horizontal"}); err == nil {
+		t.Error("--matrix + --horizontal: ожидалась ошибка")
 	}
 }
