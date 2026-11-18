@@ -608,3 +608,99 @@ func TestSymbolsFlagAndEnv(t *testing.T) {
 		t.Error("LMON_SYMBOLS=1 не установил флаг")
 	}
 }
+
+func TestParseGPUFlags(t *testing.T) {
+	for _, k := range []string{"LMON_GPU_INDEX", "LMON_GPU_LIST"} {
+		t.Setenv(k, "")
+	}
+	cfg, err := parseConfig([]string{"--gpu", "--gputemp", "--gpu-index", "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.gpuIdx) != 1 || cfg.gpuIdx[0] != 1 || !cfg.gpu || !cfg.gputemp {
+		t.Errorf("gpu flags: idx=%v gpu=%v gputemp=%v", cfg.gpuIdx, cfg.gpu, cfg.gputemp)
+	}
+	if _, err := parseConfig([]string{"--gpu-index", "-1"}); err == nil {
+		t.Error("--gpu-index -1: ожидалась ошибка")
+	}
+	cfg, err = parseConfig([]string{"--gpu", "--gputemp", "--gpu-index", "0,1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.gpuIdx) != 2 || cfg.gpuIdx[0] != 0 || cfg.gpuIdx[1] != 1 {
+		t.Errorf("multi gpu idx = %v, want [0 1]", cfg.gpuIdx)
+	}
+	if _, err := parseConfig([]string{"--gpu-index", "0,1"}); err == nil {
+		t.Error("несколько GPU без --gpu/--gputemp: ожидалась ошибка")
+	}
+	cfg, err = parseConfig([]string{"--gpu-list"})
+	if err != nil || !cfg.gpuList {
+		t.Errorf("--gpu-list: cfg=%+v err=%v", cfg.gpuList, err)
+	}
+	t.Setenv("LMON_GPU_INDEX", "2")
+	t.Setenv("LMON_GPU_LIST", "1")
+	cfg, err = parseConfig(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.gpuIdx) != 1 || cfg.gpuIdx[0] != 2 || !cfg.gpuList {
+		t.Errorf("env GPU: idx=%v list=%v", cfg.gpuIdx, cfg.gpuList)
+	}
+}
+
+func TestLayoutMultiGPU(t *testing.T) {
+	cfg := config{gpu: true, gputemp: true, gpuIdx: []int{0, 1}}
+	cols, _ := layoutWithDropped(cfg, "windows")
+	got := ids(cols)
+	for _, want := range []string{"G0", "G1", "T0", "T1"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("multi-GPU layout = %q, нет %s", got, want)
+		}
+	}
+	// одна карта — прежние P/H
+	one, _ := layoutWithDropped(config{gpu: true, gputemp: true, gpuIdx: []int{1}}, "windows")
+	if got := ids(one); !strings.Contains(got, "P") || !strings.Contains(got, "H") {
+		t.Errorf("single-GPU layout = %q, want P/H", got)
+	}
+}
+
+func TestAllFlag(t *testing.T) {
+	for _, k := range []string{"LMON_ALL", "LMON_COLS", "LMON_GPU_INDEX"} {
+		t.Setenv(k, "")
+	}
+	cfg, err := parseConfig([]string{"--all"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.all || !cfg.cpu || !cfg.iowait || !cfg.swap || !cfg.disk ||
+		!cfg.diskBusy || !cfg.batt || !cfg.gpu || !cfg.gputemp {
+		t.Errorf("--all не включил все колонки: %+v", cfg)
+	}
+	cols, _ := layoutWithDropped(cfg, "windows")
+	got := ids(cols)
+	for _, want := range []string{"N", "G", "M", "C", "S", "U", "B", "P", "H", "K"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("--all layout = %q, нет %s", got, want)
+		}
+	}
+	if strings.Contains(got, "L") || strings.Contains(got, "T") || strings.Contains(got, "I") {
+		t.Errorf("--all layout = %q, на Windows L/T/I должны быть скрыты", got)
+	}
+	if _, err := parseConfig([]string{"--all", "--cols", "NG"}); err == nil {
+		t.Error("--all + --cols: ожидалась ошибка")
+	}
+	cfg, err = parseConfig([]string{"--all", "--gpu-index", "0,1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	multi, _ := layoutWithDropped(cfg, "windows")
+	mgot := ids(multi)
+	for _, want := range []string{"G0", "G1", "T0", "T1"} {
+		if !strings.Contains(mgot, want) {
+			t.Errorf("--all multi layout = %q, нет %s", mgot, want)
+		}
+	}
+	if strings.Contains(mgot, "P") || strings.Contains(mgot, "H") {
+		t.Errorf("--all multi layout = %q, не должно быть P/H", mgot)
+	}
+}

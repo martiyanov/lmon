@@ -114,7 +114,12 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --hybrid      — цифры на цветной подложке
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
+  lmon --gpu-list    — список видеокарт (индекс: имя)
+  lmon --gpu-index 1 — какую карту показывать (по умолчанию 0)
+  lmon --gpu-index 0,1 --gpu --gputemp
+                     — по колонке на каждую GPU: G0/G1 и T0/T1
   lmon --disk-busy   — занятость диска, % (Windows/macOS)
+  lmon --all         — все доступные колонки сразу
   lmon --cols TNGC   — свой набор и порядок колонок
   lmon --ping VPN=… --cols NG,VPN,M
                      — пинг-колонку тоже можно поставить в нужное место
@@ -145,6 +150,9 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                               RUN=8/16/32; LMON_THRESHOLDS
   --disk-busy   LMON_DISK_BUSY  занятость диска, % (Windows PDH / macOS IOKit; колонка I/O)
   --symbols     LMON_SYMBOLS    в --once: «...» вместо 999 для «нет ответа»
+  --gpu-index   LMON_GPU_INDEX  индекс или список GPU для --gpu/--gputemp: 0 или 0,1
+  --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
+  --all         LMON_ALL        все доступные колонки (с --ping — ещё и они)
   --temp-cmd    LMON_TEMP_CMD  внешняя команда, печатающая температуру CPU
                               в °C (берётся первое число). Нужна на Windows,
                               где нет штатного API: например, LHM через
@@ -260,7 +268,12 @@ Usage:
   lmon --hybrid      — digits on the state-colored background
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
+  lmon --gpu-list    — list GPUs (index: name)
+  lmon --gpu-index 1 — which GPU to show (default 0)
+  lmon --gpu-index 0,1 --gpu --gputemp
+                     — one column per GPU: G0/G1 and T0/T1
   lmon --disk-busy   — disk busy time %, Windows/macOS
+  lmon --all         — every available column at once
   lmon --cols TNGC   — your own set and order of columns
   lmon --ping VPN=… --cols NG,VPN,M
                      — ping columns can be placed in the order too
@@ -291,6 +304,9 @@ Settings (flags and environment variables):
                               LMON_THRESHOLDS
   --disk-busy   LMON_DISK_BUSY  disk busy time %, Windows PDH / macOS IOKit (column I/O)
   --symbols     LMON_SYMBOLS    in --once: «...» instead of 999 for “no reply”
+  --gpu-index   LMON_GPU_INDEX  GPU index or list for --gpu/--gputemp: 0 or 0,1
+  --gpu-list    LMON_GPU_LIST   list GPUs and exit
+  --all         LMON_ALL        every available column (pings too, if --ping)
   --temp-cmd    LMON_TEMP_CMD  external command that prints CPU temperature
                               in °C (the first number is used). Needed on
                               Windows where no native API exists; e.g. LHM
@@ -362,6 +378,9 @@ type config struct {
 	noHints    bool              // --no-hints / LMON_NO_HINTS: без стартовых подсказок
 	tempCmd    string            // --temp-cmd: внешняя команда температуры (°C)
 	symbols    bool              // --symbols: «...» вместо 999 в --once
+	gpuIdx     []int             // --gpu-index: какие GPU показывать (0 — первая)
+	gpuList    bool              // --gpu-list: показать список GPU и выйти
+	all        bool              // --all: все доступные колонки
 }
 
 // pingTarget — именованная пинг-колонка (--ping VPN=10.8.0.1):
@@ -398,6 +417,18 @@ func run(args []string, w io.Writer) int {
 		return 2
 	}
 
+	if cfg.gpuList {
+		lines := meter.GPUList()
+		if len(lines) == 0 {
+			fmt.Fprintln(os.Stderr, lmsg(cfg.lang, "lmon: no GPUs found", "lmon: видеокарты не найдены"))
+			return 1
+		}
+		for _, l := range lines {
+			fmt.Fprintln(w, l)
+		}
+		return 0
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -424,6 +455,9 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&batt, "batt", false, "add battery charge column")
 	fs.BoolVar(&gpu, "gpu", false, "add GPU utilization column")
 	fs.BoolVar(&gputemp, "gputemp", false, "add GPU temperature column")
+	gpuIdxFlag := fs.String("gpu-index", envStr("LMON_GPU_INDEX", "0"), "GPU index or comma list for --gpu/--gputemp (see --gpu-list)")
+	gpuList := fs.Bool("gpu-list", envFlag("LMON_GPU_LIST"), "list available GPUs and exit")
+	all := fs.Bool("all", envFlag("LMON_ALL"), "show every available column (pings included if --ping given)")
 	colsFlag := fs.String("cols", os.Getenv("LMON_COLS"), "base column set and order, e.g. NG,CSB; --ping names can be placed too (NG,VPN,M)")
 	thrFlag := fs.String("thresholds", os.Getenv("LMON_THRESHOLDS"), "per-column color thresholds COL=green/yellow/red (e.g. NET=100/200/500)")
 	// --ping повторяемый: копим сырые строки, валидируем после разбора
@@ -506,6 +540,32 @@ func parseConfig(args []string) (config, error) {
 		return config{}, err
 	}
 
+	// --gpu-index: один индекс или список для нескольких GPU.
+	gpuIdx, err := parseGPUIdx(*gpuIdxFlag, lg)
+	if err != nil {
+		return config{}, err
+	}
+	// --all: всё, что можно показать на этой машине, плюс именованные пинги.
+	// --cols задаёт вручную — вместе с --all не сочетается.
+	if *all {
+		if *colsFlag != "" {
+			return config{}, errors.New(lmsg(lg,
+				"--all and --cols are mutually exclusive",
+				"--all и --cols взаимоисключающие"))
+		}
+		cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "P", "H", "K"}
+		cpu, iowait, swap, disk, diskBusy, batt, gpu, gputemp = true, true, true, true, true, true, true, true
+		if len(gpuIdx) > 1 {
+			// при нескольких GPU вместо P/H будут динамические G0/G1, T0/T1
+			cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "K"}
+		}
+	}
+	if len(gpuIdx) > 1 && !gpu && !gputemp {
+		return config{}, errors.New(lmsg(lg,
+			"--gpu-index with several GPUs: add --gpu and/or --gputemp",
+			"--gpu-index с несколькими GPU: добавьте --gpu и/или --gputemp"))
+	}
+
 	d := time.Duration(*interval * float64(time.Second))
 	if d <= 0 {
 		d = time.Second
@@ -513,7 +573,8 @@ func parseConfig(args []string) (config, error) {
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
 		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
-		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols}, nil
+		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
+		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all}, nil
 }
 
 // rawList — повторяемый флаг: каждое вхождение добавляет строку.
@@ -819,6 +880,16 @@ func envFlag(name string) bool {
 	return false
 }
 
+// envInt читает целое из окружения; отрицательные/мусор — значение по умолчанию.
+func envInt(name string, def int) int {
+	if v := strings.TrimSpace(os.Getenv(name)); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			return n
+		}
+	}
+	return def
+}
+
 func envFloat(name string, def float64) float64 {
 	if v := os.Getenv(name); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
@@ -829,6 +900,9 @@ func envFloat(name string, def float64) float64 {
 }
 
 func monitor(ctx context.Context, cfg config, w io.Writer) int {
+	if len(cfg.gpuIdx) > 0 {
+		meter.SetGPUIndex(cfg.gpuIdx[0])
+	}
 	// шлюз нужен только если показывается колонка GW
 	cols, dropped := layoutWithDropped(cfg, runtime.GOOS)
 	wantGW := false
@@ -1066,8 +1140,28 @@ func requestedLayout(cfg config) []reading {
 	add("U", cfg.disk)
 	add("K", cfg.diskBusy)
 	add("B", cfg.batt)
-	add("P", cfg.gpu)
-	add("H", cfg.gputemp)
+	if len(cfg.gpuIdx) <= 1 {
+		add("P", cfg.gpu)
+		add("H", cfg.gputemp)
+	} else {
+		// несколько GPU: по колонке на каждую (G0/G1 — загрузка, T0/T1 — температура)
+		addR := func(r reading) {
+			for _, x := range rs {
+				if x.id == r.id {
+					return
+				}
+			}
+			rs = append(rs, r)
+		}
+		for _, idx := range cfg.gpuIdx {
+			if cfg.gpu {
+				addR(reading{id: fmt.Sprintf("G%d", idx), head: fmt.Sprintf("%3s", "G"+strconv.Itoa(idx)), green: 50, yellow: 85, red: 100})
+			}
+			if cfg.gputemp {
+				addR(reading{id: fmt.Sprintf("T%d", idx), head: fmt.Sprintf("%3s", "T"+strconv.Itoa(idx)), green: 60, yellow: 80, red: 90})
+			}
+		}
+	}
 	// именованные пинги, не указанные в --cols, — справа, порогами как у NET
 	for _, p := range cfg.pings {
 		r := pingReading(p)
@@ -1285,11 +1379,26 @@ func measure(ctx context.Context, cfg config) []reading {
 	if need("B") {
 		vals["B"] = meter.BatteryPercent()
 	}
-	if need("P") {
-		vals["P"] = meter.GPUPercent()
-	}
-	if need("H") {
-		vals["H"] = meter.GPUTempC()
+	if len(cfg.gpuIdx) <= 1 {
+		idx := 0
+		if len(cfg.gpuIdx) == 1 {
+			idx = cfg.gpuIdx[0]
+		}
+		if need("P") {
+			vals["P"] = meter.GPUPercentAt(idx)
+		}
+		if need("H") {
+			vals["H"] = meter.GPUTempCAt(idx)
+		}
+	} else {
+		for _, idx := range cfg.gpuIdx {
+			if need(fmt.Sprintf("G%d", idx)) {
+				vals[fmt.Sprintf("G%d", idx)] = meter.GPUPercentAt(idx)
+			}
+			if need(fmt.Sprintf("T%d", idx)) {
+				vals[fmt.Sprintf("T%d", idx)] = meter.GPUTempCAt(idx)
+			}
+		}
 	}
 	for i := range rs {
 		rs[i].v = vals[rs[i].id] // отсутствует в map → 0 не бывает: need() покрыл все
@@ -1544,4 +1653,35 @@ func (u *ui) hybridCell(r reading) string {
 func stdoutIsTTY() bool {
 	fi, err := os.Stdout.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
+// parseGPUIdx разбирает --gpu-index: «1» или «0,1». Пустой список → [0].
+func parseGPUIdx(spec, lang string) ([]int, error) {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return []int{0}, nil
+	}
+	seen := map[int]bool{}
+	var out []int
+	for _, part := range strings.Split(spec, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		n, err := strconv.Atoi(part)
+		if err != nil || n < 0 {
+			return nil, fmt.Errorf(lmsg(lang,
+				"--gpu-index: expected a non-negative number, got %q",
+				"--gpu-index: ожидается неотрицательное число, получено %q"), part)
+		}
+		if seen[n] {
+			continue
+		}
+		seen[n] = true
+		out = append(out, n)
+	}
+	if len(out) == 0 {
+		return nil, errors.New(lmsg(lang, "--gpu-index: empty GPU list", "--gpu-index: пустой список GPU"))
+	}
+	return out, nil
 }

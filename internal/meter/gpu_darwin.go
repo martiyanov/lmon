@@ -11,7 +11,10 @@ var gpuUtilRe = regexp.MustCompile(`"Device Utilization %"=(\d+)`)
 
 // GPUPercent — загрузка GPU (Apple Silicon/Intel: ioreg IOAccelerator,
 // без sudo; берём максимальный из ускорителей). Нет данных — -1.
-func GPUPercent() int {
+func GPUPercentAt(index int) int {
+	if index != 0 {
+		return -1 // несколько GPU на macOS пока не различаем
+	}
 	out, err := runCmd("ioreg", "-r", "-d", "1", "-w", "0", "-c", "IOAccelerator")
 	if err != nil {
 		return -1
@@ -32,4 +35,9 @@ func parseGPUUtil(out string) int {
 
 // GPUTempC — температура GPU на macOS доступна только через powermetrics
 // под sudo; честно показываем «нет данных».
-func GPUTempC() int { return -1 }
+func GPUTempCAt(_ int) int { return -1 }
+
+// GPUList — на macOS обычно одна GPU; перечисляем IOAccelerator как 0.
+func GPUList() []string {
+	return []string{"0: macOS GPU (IOAccelerator)"}
+}

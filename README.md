@@ -185,7 +185,7 @@ align exactly with the values. In plain words:
   `Total Time (Read/Write)`; no admin). The closest thing to Linux iowait.
 - **DSK** — how full the system disk is (`--disk`; above 90% — time to clean).
 - **BAT** — battery charge (`--batt`; red below 20%).
-- **GPU** — how busy the video card is, % (`--gpu`). Windows: NVML/nvidia-smi (NVIDIA) or PDH GPU Engine counters (other vendors).
+- **GPU** — how busy the video card is, % (`--gpu`). Windows: NVML/nvidia-smi (NVIDIA) or PDH GPU Engine counters (other vendors). Several cards: `--gpu-list` shows indexes; `--gpu-index N` picks one for `GPU`/`G°`, while `--gpu-index 0,1 --gpu --gputemp` adds a column per card (`G0/G1`, `T0/T1`).
 - **G°** — GPU temperature (`--gputemp`; hidden on macOS/Windows — no
   unprivileged source).
 
@@ -227,6 +227,13 @@ the name to `--cols`: `--cols NG,VPN,M` puts the VPN ping between the
 gateway and memory. Separators are required around ping names (commas,
 spaces or `+`); compact column sets like `NGM` still work.
 
+### All columns at once
+
+`lmon --all` enables every column this OS can provide (CPU, swap, disk, battery,
+GPU, I/O, pings from `--ping`) and silently drops what the OS does not expose.
+It cannot be combined with `--cols`; with `--gpu-index 0,1` you get one GPU
+block per card (`G0`, `G1`, `T0`, `T1`).
+
 ### Blocks mode
 
 `lmon --hybrid` combines both: exact digits printed on the state-colored
@@ -265,12 +272,19 @@ machine; `...` (TUI) or `999` (`--once`) means the host is unreachable.
 | `--temp-cmd` | `LMON_TEMP_CMD` | — | external command printing CPU temp in °C (e.g. LibreHardwareMonitor via PowerShell on Windows) |
 | `--disk-busy` | `LMON_DISK_BUSY` | off | disk busy time %: Windows PDH `PhysicalDisk`, macOS IOKit |
 | `--symbols` | `LMON_SYMBOLS` | off | in `--once`, show `...` instead of `999` for “no reply” |
+| `--gpu-index` | `LMON_GPU_INDEX` | `0` | GPU index or list (`0,1`) for `--gpu`/`--gputemp`; a list adds one column per card (`G0/G1`, `T0/T1`) |
+| `--gpu-list` | `LMON_GPU_LIST` | off | list available GPUs and exit |
+| `--all` | `LMON_ALL` | off | every column the OS can provide, plus `--ping` columns; incompatible with `--cols` |
 | `--cpu` `--iowait` `--swap` `--disk` `--batt` `--gpu` `--gputemp` | — | off | add extra columns |
 
 ```sh
 lmon --target 1.1.1.1 --interval 2 10
 lmon -b --cols TNGC --cpu          # own set and order, flags add more
 lmon --ping VPN=10.8.0.1 --cols NG,VPN,M  # place a ping column anywhere
+lmon --gpu-list                    # 0: RTX 3060, 1: Intel UHD
+lmon --gpu --gputemp --gpu-index 0 # show a specific GPU
+lmon --gpu --gputemp --gpu-index 0,1 # one column per GPU
+lmon --all                          # all supported columns at once
 tmux: set -g status-right '#(lmon --once --cols=NGMC)'
 ```
 

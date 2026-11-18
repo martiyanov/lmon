@@ -61,7 +61,7 @@ type nvmlUtilization struct {
 
 // nvmlProbe возвращает загрузку и температуру первого GPU.
 // ok=false — NVML недоступна (нет NVIDIA или драйвера).
-func nvmlProbe() (util, temp int, ok bool) {
+func nvmlProbe(index int) (util, temp int, ok bool) {
 	n := loadNVML()
 	if n == nil {
 		return -1, -1, false
@@ -70,8 +70,12 @@ func nvmlProbe() (util, temp int, ok bool) {
 	if r, _, _ := n.count.Call(uintptr(unsafe.Pointer(&count))); uint32(r) != 0 || count == 0 {
 		return -1, -1, false
 	}
+	idx := uintptr(index)
+	if idx >= uintptr(count) {
+		return -1, -1, false
+	}
 	var device uintptr
-	if r, _, _ := n.handle.Call(0, uintptr(unsafe.Pointer(&device))); uint32(r) != 0 || device == 0 {
+	if r, _, _ := n.handle.Call(idx, uintptr(unsafe.Pointer(&device))); uint32(r) != 0 || device == 0 {
 		return -1, -1, false
 	}
 	util, temp = -1, -1

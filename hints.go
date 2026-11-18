@@ -204,17 +204,17 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 	}
 	if r, ok := byID["P"]; ok && r.v < 0 {
 		detail := lmsg(lang,
-			"Windows: NVIDIA driver (NVML/nvidia-smi) or Windows 10 1709+ for PDH GPU Engine counters; otherwise drop column P.",
-			"Windows: драйвер NVIDIA (NVML/nvidia-smi) или Windows 10 1709+ для счётчиков PDH GPU Engine; иначе уберите колонку P.")
+			"Windows: NVIDIA driver (NVML/nvidia-smi) or Windows 10 1709+ for PDH GPU Engine counters; --gpu-list shows cards, --gpu-index N picks one, --gpu-index 0,1 with --gpu/--gputemp adds a column per card; otherwise drop column P.",
+			"Windows: драйвер NVIDIA (NVML/nvidia-smi) или Windows 10 1709+ для счётчиков PDH GPU Engine; список карт — --gpu-list, выбор — --gpu-index N, несколько — --gpu-index 0,1 с --gpu/--gputemp; иначе уберите колонку P.")
 		switch goos {
 		case "linux":
 			detail = lmsg(lang,
-				"NVIDIA: install the proprietary driver and check `nvidia-smi`; AMD: check /sys/class/drm/card*/device/gpu_busy_percent; Intel: not supported.",
-				"NVIDIA: поставьте проприетарный драйвер и проверьте `nvidia-smi`; AMD: проверьте /sys/class/drm/card*/device/gpu_busy_percent; Intel: не поддерживается.")
+				"NVIDIA: install the proprietary driver and check `nvidia-smi`; AMD: check /sys/class/drm/card*/device/gpu_busy_percent; Intel: not supported. See --gpu-list and --gpu-index N.",
+				"NVIDIA: поставьте проприетарный драйвер и проверьте `nvidia-smi`; AMD: проверьте /sys/class/drm/card*/device/gpu_busy_percent; Intel: не поддерживается. Список карт — --gpu-list, выбор — --gpu-index N.")
 		case "darwin":
 			detail = lmsg(lang,
-				"macOS: reads ioreg IOAccelerator; if there is no GPU, drop column P.",
-				"macOS: читает ioreg IOAccelerator; если GPU нет — уберите колонку P.")
+				"macOS: reads ioreg IOAccelerator; if there is no GPU, drop column P. --gpu-list shows the detected GPU.",
+				"macOS: читает ioreg IOAccelerator; если GPU нет — уберите колонку P. --gpu-list покажет найденную GPU.")
 		}
 		add(lmsg(lang,
 			"GPU: no GPU utilization source.",
@@ -222,13 +222,13 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 	}
 	if r, ok := byID["H"]; ok && r.v < 0 {
 		detail := lmsg(lang,
-			"Windows: NVIDIA via NVML/nvidia-smi; AMD/Intel need an external monitor (not supported yet); otherwise drop column H.",
-			"Windows: NVIDIA через NVML/nvidia-smi; AMD/Intel — только внешний монитор (пока не поддержано); иначе уберите колонку H.")
+			"Windows: NVIDIA via NVML/nvidia-smi; AMD/Intel need an external monitor (not supported yet); use --gpu-list/--gpu-index N; otherwise drop column H.",
+			"Windows: NVIDIA через NVML/nvidia-smi; AMD/Intel — только внешний монитор (пока не поддержано); список/выбор — --gpu-list и --gpu-index N; иначе уберите колонку H.")
 		switch goos {
 		case "linux":
 			detail = lmsg(lang,
-				"NVIDIA: nvidia-smi (proprietary driver); AMD: amdgpu hwmon temp1_input; Intel: no public sensor.",
-				"NVIDIA: nvidia-smi (проприетарный драйвер); AMD: hwmon amdgpu, temp1_input; Intel: публичного датчика нет.")
+				"NVIDIA: nvidia-smi (proprietary driver); AMD: amdgpu hwmon temp1_input; Intel: no public sensor. Use --gpu-index N for the right card.",
+				"NVIDIA: nvidia-smi (проприетарный драйвер); AMD: hwmon amdgpu, temp1_input; Intel: публичного датчика нет. Для нужной карты — --gpu-index N.")
 		case "darwin":
 			detail = lmsg(lang,
 				"macOS does not expose GPU temperature through public APIs; drop column H.",

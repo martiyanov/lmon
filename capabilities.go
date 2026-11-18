@@ -13,6 +13,15 @@ type droppedColumn struct {
 // для колонки в данной ОС. Неподдерживаемые колонки не показываются:
 // «·» на месте датчика только путает.
 func columnSupportedByOS(id, goos string) bool {
+	// Динамические колонки нескольких GPU: G0/G1 — как P, T0/T1 — как H.
+	if len(id) == 2 && id[1] >= '0' && id[1] <= '9' {
+		switch id[0] {
+		case 'G':
+			return columnSupportedByOS("P", goos)
+		case 'T':
+			return columnSupportedByOS("H", goos)
+		}
+	}
 	switch goos {
 	case "windows":
 		switch id {
