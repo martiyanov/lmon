@@ -80,6 +80,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   колонки. Статус видно боковым зрением. Тусклый
                   квадрат — датчика нет.
   --hybrid      — смешанный режим: точные цифры на подложке цвета
+  --compact     — по одной букве/символу на параметр, без пробелов
                   состояния (как нижняя лента, но в потоке данных).
 
 Набор колонок:
@@ -131,6 +132,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --interval 5  — период обновления 5 секунд (по умолчанию 1)
   lmon --bars        — режим цветных квадратов
   lmon --hybrid      — цифры на цветной подложке
+  lmon --compact     — минимализм: одна буква и один символ на параметр
   lmon --cpu --swap  — добавить колонки CPU и swap
   lmon --gpu         — добавить колонку загрузки GPU
   lmon --gpu-list    — список видеокарт (индекс: имя)
@@ -174,6 +176,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                               RUN=8/16/32; LMON_THRESHOLDS
   --disk-busy   LMON_DISK_BUSY  занятость диска, % (Windows PDH / macOS IOKit; колонка I/O)
   --symbols     LMON_SYMBOLS    в --once: «...» вместо 999 для «нет ответа»
+  --compact     LMON_COMPACT    одна буква и один символ на параметр, без пробелов
   --gpu-index   LMON_GPU_INDEX  индекс или список GPU для --gpu/--gputemp: 0 или 0,1
   --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
   --all         LMON_ALL        все доступные колонки (с --ping — ещё и они)
@@ -272,6 +275,7 @@ Display modes:
                   Status is visible with peripheral vision. A dim block
                   means no sensor.
   --hybrid      — mixed mode: exact digits on the state-colored background
+  --compact     — one letter/symbol per parameter, no gaps
                   (like the bottom ribbon, but in the data stream).
 
 Column set:
@@ -320,6 +324,7 @@ Usage:
   lmon --interval 5  — refresh period of 5 seconds (default 1)
   lmon --bars        — colored blocks mode
   lmon --hybrid      — digits on the state-colored background
+  lmon --compact     — minimal: one letter and one symbol per parameter
   lmon --cpu --swap  — add CPU and swap columns
   lmon --gpu         — add the GPU utilization column
   lmon --gpu-list    — list GPUs (index: name)
@@ -363,6 +368,7 @@ Settings (flags and environment variables):
                               LMON_THRESHOLDS
   --disk-busy   LMON_DISK_BUSY  disk busy time %, Windows PDH / macOS IOKit (column I/O)
   --symbols     LMON_SYMBOLS    in --once: «...» instead of 999 for “no reply”
+  --compact     LMON_COMPACT    one letter and one symbol per parameter, no gaps
   --gpu-index   LMON_GPU_INDEX  GPU index or list for --gpu/--gputemp: 0 or 0,1
   --gpu-list    LMON_GPU_LIST   list GPUs and exit
   --all         LMON_ALL        every available column (pings too, if --ping)
@@ -433,6 +439,7 @@ type config struct {
 	once       bool
 	blocks     bool
 	hybrid     bool
+	compact    bool
 	cpu        bool
 	iowait     bool
 	swap       bool
@@ -541,10 +548,11 @@ func parseConfig(args []string) (config, error) {
 	target := fs.String("target", envStr("LMON_TARGET", "8.8.8.8"), "external host")
 	gw := fs.String("gw", envStr("LMON_GW", ""), "gateway (auto-detected by default)")
 	interval := fs.Float64("interval", envFloat("LMON_INTERVAL", 1), "seconds between lines")
-	var blocks, hybrid bool
+	var blocks, hybrid, compact bool
 	fs.BoolVar(&blocks, "bars", false, "colored bars instead of digits")
 	fs.BoolVar(&blocks, "blocks", false, "alias for --bars (legacy name)")
 	fs.BoolVar(&hybrid, "hybrid", false, "digits on the state-colored background")
+	fs.BoolVar(&compact, "compact", envFlag("LMON_COMPACT"), "one character per column, no gaps")
 	lang := fs.String("lang", langAuto(), "message language: en or ru")
 	var cpu, iowait, swap, disk, diskBusy, batt, gpu, gputemp bool
 	fs.BoolVar(&cpu, "cpu", false, "add CPU usage column")
@@ -595,6 +603,9 @@ func parseConfig(args []string) (config, error) {
 	}
 	if blocks && hybrid {
 		return config{}, errors.New(lmsg(lg, "--bars/--blocks and --hybrid are mutually exclusive", "--bars/--blocks и --hybrid взаимоисключающи"))
+	}
+	if compact && (blocks || hybrid) {
+		return config{}, errors.New(lmsg(lg, "--compact cannot be combined with --bars/--blocks or --hybrid", "--compact не сочетается с --bars/--blocks или --hybrid"))
 	}
 
 	var iters int
@@ -688,7 +699,7 @@ func parseConfig(args []string) (config, error) {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
-		blocks: blocks, hybrid: hybrid, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
+		blocks: blocks, hybrid: hybrid, compact: compact, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
 		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans,
@@ -1067,8 +1078,12 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	defer termRestore()
 
 	tty := stdoutIsTTY()
-	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid, symbols: true, lang: cfg.lang}
-	u.head, u.sep = headerOf(cols)
+	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, symbols: true, lang: cfg.lang}
+	if cfg.compact {
+		u.head, u.sep = headerOfCompact(cols)
+	} else {
+		u.head, u.sep = headerOf(cols)
+	}
 
 	defer u.restore()
 	u.setup()
@@ -1132,6 +1147,7 @@ func newOnceUI(w io.Writer, cfg config, tty bool) *ui {
 		color:   tty && os.Getenv("NO_COLOR") == "",
 		blocks:  cfg.blocks,
 		hybrid:  cfg.hybrid,
+		compact: cfg.compact,
 		symbols: cfg.symbols,
 		lang:    cfg.lang,
 	}
@@ -1629,6 +1645,13 @@ func measure(ctx context.Context, cfg config) []reading {
 
 // dataRow — строка значений (цифры или квадраты) без служебных символов.
 func (u *ui) dataRow(rs []reading) string {
+	if u.compact {
+		cells := make([]string, len(rs))
+		for j, r := range rs {
+			cells[j] = u.compactCell(r)
+		}
+		return strings.Join(cells, "")
+	}
 	cells := make([]string, len(rs))
 	for j, r := range rs {
 		switch {
@@ -1673,6 +1696,7 @@ type ui struct {
 	color   bool
 	blocks  bool
 	hybrid  bool
+	compact bool
 	symbols bool // показывать «...» вместо 999 (нет ответа)
 	lang    string
 	rows    int
@@ -1684,7 +1708,11 @@ type ui struct {
 func (u *ui) setup() {
 	if !u.tty {
 		// вне терминала заголовок обычный, сверху
-		fmt.Fprintf(u.w, "%s\n%s\n", u.head, u.sep)
+		if u.sep == "" {
+			fmt.Fprintf(u.w, "%s\n", u.head)
+		} else {
+			fmt.Fprintf(u.w, "%s\n%s\n", u.head, u.sep)
+		}
 		return
 	}
 	fmt.Fprint(u.w, "\x1b[?25l") // спрятать курсор — не мелькает
@@ -1755,6 +1783,28 @@ func headerOf(rs []reading) (head, sep string) {
 	return strings.Join(hs, " "), strings.Join(ss, " ")
 }
 
+// headerOfCompact — по одной букве на колонку, без пробелов.
+func headerOfCompact(rs []reading) (head, sep string) {
+	hs := make([]string, len(rs))
+	for i, r := range rs {
+		hs[i] = compactLabel(r)
+	}
+	return strings.Join(hs, ""), ""
+}
+
+// compactLabel — один символ для колонки: буква из id (для пингов/GPU — первая).
+func compactLabel(r reading) string {
+	id := r.id
+	if id == "" {
+		id = r.head
+	}
+	rs := []rune(id)
+	if len(rs) == 0 {
+		return "?"
+	}
+	return string(rs[0])
+}
+
 // emit выводит строку значений и обновляет цвет нижнего заголовка.
 func (u *ui) emit(rs []reading) {
 	u.lastRS = rs
@@ -1773,6 +1823,22 @@ func (u *ui) emit(rs []reading) {
 func (u *ui) headerRow(rs []reading) string {
 	if len(rs) == 0 {
 		return u.head // до первого измерения — просто подписи
+	}
+	if u.compact {
+		cells := make([]string, len(rs))
+		for i, r := range rs {
+			label := compactLabel(r)
+			if !u.color {
+				cells[i] = label
+				continue
+			}
+			if r.v < 0 {
+				cells[i] = dim + label + reset
+				continue
+			}
+			cells[i] = "\x1b[38;5;16;48;5;" + gradient256(r.severity()) + "m" + label + reset
+		}
+		return strings.Join(cells, "")
 	}
 	cells := make([]string, len(rs))
 	for i, r := range rs {
@@ -1859,6 +1925,36 @@ func (u *ui) blockCell(r reading) string {
 		return red + "..." + reset
 	}
 	return "\x1b[38;5;" + gradient256(r.severity()) + "m███" + reset
+}
+
+// compactCell — один символ на параметр, без пробелов.
+// Форма ▁..█ кодирует уровень, цвет — ту же шкалу; «·» — нет датчика.
+func (u *ui) compactCell(r reading) string {
+	if r.v < 0 {
+		if u.color {
+			return dim + "·" + reset
+		}
+		return "·"
+	}
+	if u.symbols && r.v == 999 {
+		if u.color {
+			return red + "!" + reset
+		}
+		return "!"
+	}
+	glyphs := []rune("▁▂▃▄▅▆▇█")
+	idx := int(math.Round(r.severity() * 7))
+	if idx < 0 {
+		idx = 0
+	}
+	if idx > 7 {
+		idx = 7
+	}
+	g := string(glyphs[idx])
+	if !u.color {
+		return g
+	}
+	return "\x1b[38;5;" + gradient256(r.severity()) + "m" + g + reset
 }
 
 // hybridCell — смешанный режим: точные цифры на подложке цвета состояния

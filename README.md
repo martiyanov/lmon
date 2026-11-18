@@ -9,7 +9,7 @@
   &nbsp;
   <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-hybrid.png" width="340" alt="lmon --hybrid: digits on state-colored backgrounds"></a>
 </p>
-<p align="center"><sub>Three display modes — plain digits, color blocks (<code>--bars</code>) and hybrid (<code>--hybrid</code>) — real values captured on macOS. The window can shrink to the width of the indicators:</sub></p>
+<p align="center"><sub>Four display modes — plain digits, color blocks (<code>--bars</code>), hybrid (<code>--hybrid</code>) and compact (<code>--compact</code>) — real values captured on macOS. The window can shrink to the width of the indicators:</sub></p>
 <p align="center">
   <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-corner.png" width="330" alt="compact lmon window sized to the indicators, tucked into a screen corner"></a>
 </p>
@@ -255,6 +255,13 @@ GPU, I/O, pings from `--ping`) and silently drops what the OS does not expose.
 It cannot be combined with `--cols`; with `--gpu-index 0,1` you get one GPU
 block per card (`G0`, `G1`, `T0`, `T1`).
 
+### Compact mode
+
+`lmon --compact` is the most minimal view: one letter per parameter in the
+header and one block glyph (`▁…█`) per value, with no spaces between columns.
+It uses the same letters as `--cols`; multi-letter columns (pings, `PW`, `WR`)
+show their first letter. Color carries the state, shape carries the level.
+
 ### Bars mode
 
 `lmon --hybrid` combines both: exact digits printed on the state-colored
@@ -287,6 +294,7 @@ machine; `...` (TUI) or `999` (`--once`) means the host is unreachable.
 | `--gw` | `LMON_GW` | auto-detect | your gateway |
 | `--interval` | `LMON_INTERVAL` | `1` | seconds between lines (fractional ok) |
 | `--bars` | — | off | colored bars instead of digits (`--blocks` is a legacy alias) |
+| `--compact` | `LMON_COMPACT` | off | one letter/symbol per parameter, no gaps |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`) and `--ping` names (`NG,VPN,M`); flags add more |
 | `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |

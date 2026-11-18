@@ -789,3 +789,36 @@ func TestRootMetricsFlags(t *testing.T) {
 		t.Errorf("--cols PW,WR: %v %v", cfg2.cols, err)
 	}
 }
+
+func TestCompactMode(t *testing.T) {
+	for _, k := range []string{"LMON_COMPACT"} {
+		t.Setenv(k, "")
+	}
+	cfg, err := parseConfig([]string{"--compact"})
+	if err != nil || !cfg.compact {
+		t.Fatalf("--compact: cfg=%+v err=%v", cfg.compact, err)
+	}
+	if _, err := parseConfig([]string{"--compact", "--bars"}); err == nil {
+		t.Error("--compact + --bars: ожидалась ошибка")
+	}
+	rs := []reading{
+		{id: "N", head: "NET", v: 10},
+		{id: "M", head: "MEM", v: 50},
+		{id: "VPN", head: "VPN", v: 1},
+	}
+	head, sep := headerOfCompact(rs)
+	if head != "NMV" || sep != "" {
+		t.Errorf("headerOfCompact = %q/%q, want NMV/empty", head, sep)
+	}
+	u := &ui{compact: true, symbols: true}
+	row := u.dataRow(rs)
+	if got := len([]rune(row)); got != len(rs) {
+		t.Errorf("compact row = %q (%d runes), want %d", row, got, len(rs))
+	}
+	if strings.ContainsRune(row, ' ') {
+		t.Errorf("compact row contains space: %q", row)
+	}
+	if got := u.headerRow(rs); got != "NMV" {
+		t.Errorf("compact headerRow = %q, want NMV", got)
+	}
+}
