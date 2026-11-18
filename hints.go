@@ -203,20 +203,40 @@ func startupHints(cfg config, cols []reading, goos string, dropped []droppedColu
 		}
 	}
 	if r, ok := byID["P"]; ok && r.v < 0 {
+		detail := lmsg(lang,
+			"Windows: NVIDIA driver (NVML/nvidia-smi) or Windows 10 1709+ for PDH GPU Engine counters; otherwise drop column P.",
+			"Windows: драйвер NVIDIA (NVML/nvidia-smi) или Windows 10 1709+ для счётчиков PDH GPU Engine; иначе уберите колонку P.")
+		switch goos {
+		case "linux":
+			detail = lmsg(lang,
+				"NVIDIA: install the proprietary driver and check `nvidia-smi`; AMD: check /sys/class/drm/card*/device/gpu_busy_percent; Intel: not supported.",
+				"NVIDIA: поставьте проприетарный драйвер и проверьте `nvidia-smi`; AMD: проверьте /sys/class/drm/card*/device/gpu_busy_percent; Intel: не поддерживается.")
+		case "darwin":
+			detail = lmsg(lang,
+				"macOS: reads ioreg IOAccelerator; if there is no GPU, drop column P.",
+				"macOS: читает ioreg IOAccelerator; если GPU нет — уберите колонку P.")
+		}
 		add(lmsg(lang,
 			"GPU: no GPU utilization source.",
-			"GPU: нет источника загрузки GPU."),
-			lmsg(lang,
-				"Windows: NVIDIA driver (NVML/nvidia-smi) or Windows 10 1709+ for PDH GPU Engine counters; otherwise drop column P.",
-				"Windows: драйвер NVIDIA (NVML/nvidia-smi) или Windows 10 1709+ для счётчиков PDH GPU Engine; иначе уберите колонку P."))
+			"GPU: нет источника загрузки GPU."), detail)
 	}
 	if r, ok := byID["H"]; ok && r.v < 0 {
+		detail := lmsg(lang,
+			"Windows: NVIDIA via NVML/nvidia-smi; AMD/Intel need an external monitor (not supported yet); otherwise drop column H.",
+			"Windows: NVIDIA через NVML/nvidia-smi; AMD/Intel — только внешний монитор (пока не поддержано); иначе уберите колонку H.")
+		switch goos {
+		case "linux":
+			detail = lmsg(lang,
+				"NVIDIA: nvidia-smi (proprietary driver); AMD: amdgpu hwmon temp1_input; Intel: no public sensor.",
+				"NVIDIA: nvidia-smi (проприетарный драйвер); AMD: hwmon amdgpu, temp1_input; Intel: публичного датчика нет.")
+		case "darwin":
+			detail = lmsg(lang,
+				"macOS does not expose GPU temperature through public APIs; drop column H.",
+				"macOS не отдаёт температуру GPU через публичные API; уберите колонку H.")
+		}
 		add(lmsg(lang,
 			"G°: no GPU temperature source.",
-			"G°: нет источника температуры GPU."),
-			lmsg(lang,
-				"Windows: NVIDIA via NVML/nvidia-smi; AMD/Intel need an external monitor (not supported yet); otherwise drop column H.",
-				"Windows: NVIDIA через NVML/nvidia-smi; AMD/Intel — только внешний монитор (пока не поддержано); иначе уберите колонку H."))
+			"G°: нет источника температуры GPU."), detail)
 	}
 	if r, ok := byID["K"]; ok && r.v < 0 {
 		detail := lmsg(lang,

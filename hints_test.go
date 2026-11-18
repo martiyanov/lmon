@@ -226,3 +226,18 @@ func TestStartupHintsTempCmdFailure(t *testing.T) {
 		t.Errorf("нет подсказки про --temp-cmd:\n%s", txt)
 	}
 }
+
+func TestStartupHintsLinuxGPU(t *testing.T) {
+	cfg := config{lang: "en", gpu: true, gputemp: true}
+	cols, dropped := layoutWithDropped(cfg, "linux")
+	setValues(cols, map[string]int{"N": 24, "G": 2, "L": 1, "M": 48, "T": 55, "P": -1, "H": -1})
+	txt := hintsText(startupHints(cfg, cols, "linux", dropped))
+	for _, want := range []string{"nvidia-smi", "amdgpu", "gpu_busy_percent"} {
+		if !strings.Contains(txt, want) {
+			t.Errorf("linux GPU hint: нет %q:\n%s", want, txt)
+		}
+	}
+	if strings.Contains(txt, "Windows:") {
+		t.Errorf("linux GPU hint содержит Windows-текст:\n%s", txt)
+	}
+}

@@ -9,9 +9,24 @@ import (
 	"strings"
 )
 
+// nvidiaSMI запускает nvidia-smi, пробуя обычные места установки драйвера:
+// на серверах PATH иногда не содержит /usr/bin, а на некоторых сборках
+// утилита лежит в /usr/local/bin.
+func nvidiaSMI(args ...string) ([]byte, error) {
+	var lastErr error
+	for _, bin := range []string{"nvidia-smi", "/usr/bin/nvidia-smi", "/usr/local/bin/nvidia-smi"} {
+		out, err := runCmd(bin, args...)
+		if err == nil {
+			return out, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
 // GPUPercent: nvidia-smi, затем sysfs gpu_busy_percent (amdgpu/i915).
 func GPUPercent() int {
-	if out, err := runCmd("nvidia-smi", "--query-gpu=utilization.gpu",
+	if out, err := nvidiaSMI("--query-gpu=utilization.gpu",
 		"--format=csv,noheader,nounits"); err == nil {
 		if v, ok := firstInt(string(out)); ok {
 			return v
@@ -25,7 +40,7 @@ func GPUPercent() int {
 
 // GPUTempC: nvidia-smi, затем hwmon GPU-драйверов (amdgpu/i915/nouveau/radeon).
 func GPUTempC() int {
-	if out, err := runCmd("nvidia-smi", "--query-gpu=temperature.gpu",
+	if out, err := nvidiaSMI("--query-gpu=temperature.gpu",
 		"--format=csv,noheader,nounits"); err == nil {
 		if v, ok := firstInt(string(out)); ok {
 			return v
