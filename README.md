@@ -259,8 +259,9 @@ block per card (`G0`, `G1`, `T0`, `T1`).
 
 `lmon --compact` is the most minimal view: one letter per parameter in the
 header and one colored block `█` per value, with no spaces between columns.
-The color gradient is the same as in `--bars`/`--blocks`; it uses the same
-letters as `--cols`; multi-letter columns (pings, `PW`, `WR`) show their first letter.
+The color gradient is the same as in `--bars`/`--blocks`; purple means
+no sensor, bright red means no reply. It uses the same letters as `--cols`;
+multi-letter columns (pings, `PW`, `WR`) show their first letter.
 
 ### Bars mode
 
@@ -270,8 +271,10 @@ background (the bottom ribbon look, but in the data stream).
 `lmon --bars` (`--blocks`) replaces digits with colored squares `███` —
 one per column, with a continuous green → yellow → red gradient along
 each column's scale. You read the status with peripheral vision instead
-of parsing numbers. A dim square (or `·`) means no sensor on this
-machine; `...` (TUI) or `999` (`--once`) means the host is unreachable.
+of parsing numbers. In `--bars`/`--compact` a **purple** block means
+no sensor on this machine and a **bright red** block means the host is
+unreachable — no `·`/`...` characters are printed in color mode.
+Without color (`NO_COLOR`, pipe) the text fallbacks stay.
 
 ### Reading bad numbers
 

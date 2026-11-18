@@ -576,10 +576,10 @@ func TestUnreachableSymbols(t *testing.T) {
 	if !strings.Contains(got, "...") || strings.Contains(got, "999") {
 		t.Errorf("hybrid: %q, want ... на цветной подложке", got)
 	}
-	// блоки в режиме символов тоже дают понять «ответа нет»
+	// в блочном режиме «ответа нет» — красный блок, без текстовых символов
 	blk := &ui{symbols: true, color: true, blocks: true}
-	if got := blk.dataRow([]reading{r}); !strings.Contains(got, "...") {
-		t.Errorf("blocks: %q, want ...", got)
+	if got := blk.dataRow([]reading{r}); !strings.Contains(got, "███") || !strings.Contains(got, "38;5;196") {
+		t.Errorf("blocks: %q, want red block", got)
 	}
 }
 
@@ -820,5 +820,28 @@ func TestCompactMode(t *testing.T) {
 	}
 	if got := u.headerRow(rs); got != "NMV" {
 		t.Errorf("compact headerRow = %q, want NMV", got)
+	}
+}
+
+func TestBlockSpecialColors(t *testing.T) {
+	u := &ui{color: true, blocks: true, symbols: true}
+	if s := u.blockCell(reading{v: -1}); !strings.Contains(s, "38;5;135") || !strings.Contains(s, "███") || strings.Contains(s, "·") {
+		t.Errorf("block no-sensor = %q", s)
+	}
+	if s := u.blockCell(reading{v: 999}); !strings.Contains(s, "38;5;196") || !strings.Contains(s, "███") || strings.Contains(s, "...") {
+		t.Errorf("block no-reply = %q", s)
+	}
+	c := &ui{color: true, compact: true, symbols: true}
+	if s := c.compactCell(reading{v: -1}); !strings.Contains(s, "38;5;135") || !strings.Contains(s, "█") || strings.Contains(s, "·") {
+		t.Errorf("compact no-sensor = %q", s)
+	}
+	if s := c.compactCell(reading{v: 999}); !strings.Contains(s, "38;5;196") || !strings.Contains(s, "█") || strings.Contains(s, "!") {
+		t.Errorf("compact no-reply = %q", s)
+	}
+	if h := u.headerRow([]reading{{id: "N", head: "NET", v: -1}}); !strings.Contains(h, "48;5;135") {
+		t.Errorf("header no-sensor = %q", h)
+	}
+	if h := u.headerRow([]reading{{id: "N", head: "NET", v: 999}}); !strings.Contains(h, "48;5;196") {
+		t.Errorf("header no-reply = %q", h)
 	}
 }

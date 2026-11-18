@@ -269,13 +269,12 @@ Columns (letter in parentheses is for --cols):
              macOS/Windows — «·», no sensor without admin rights).
 
 Display modes:
-  --bars        — colored blocks ███ instead of digits; color grades from
-                  (--blocks is kept as a legacy alias)
-                  green through yellow to red along each column's scale.
-                  Status is visible with peripheral vision. A dim block
-                  means no sensor.
+  --bars        — colored blocks ███ instead of digits; green → yellow → red
+                  along each column's scale. A purple block means no sensor,
+                  a red block means no reply. --blocks is a legacy alias.
   --hybrid      — mixed mode: exact digits on the state-colored background
   --compact     — one letter and one colored block per parameter, no gaps
+                  (purple = no sensor, red = no reply)
                   (like the bottom ribbon, but in the data stream).
 
 Column set:
@@ -296,7 +295,8 @@ Column set:
   Examples: network and memory only — lmon --cols NM
             swap before memory    — lmon --cols N,SG,M
 
-Colors: green — normal, yellow — attention, red — bad.
+Colors: green — normal, yellow — attention, red — bad;
+purple — no sensor (block/compact), bright red block — no reply.
 Thresholds (green ≤ / yellow ≤ / then red):
   NET: 50/150 ms   GTW: 10/50 ms   RUN: per cores* MEM: 60/85
   TMP: 60/75       CPU: 50/80      IOW: 5/20    SWP: 30/70
@@ -423,11 +423,15 @@ func helpTextFor(lang string) string {
 }
 
 const (
-	reset = "\x1b[0m"
-	grn   = "\x1b[1;32m"
-	yel   = "\x1b[1;33m"
-	red   = "\x1b[1;31m"
-	dim   = "\x1b[2m"
+	reset     = "\x1b[0m"
+	grn       = "\x1b[1;32m"
+	yel       = "\x1b[1;33m"
+	red       = "\x1b[1;31m"
+	dim       = "\x1b[2m"
+	purple    = "\x1b[38;5;135m" // датчика нет
+	purpleBg  = "\x1b[38;5;16;48;5;135m"
+	redBright = "\x1b[38;5;196m" // нет ответа
+	redBg     = "\x1b[38;5;16;48;5;196m"
 )
 
 type config struct {
@@ -1833,7 +1837,11 @@ func (u *ui) headerRow(rs []reading) string {
 				continue
 			}
 			if r.v < 0 {
-				cells[i] = dim + label + reset
+				cells[i] = purpleBg + label + reset
+				continue
+			}
+			if r.v == 999 {
+				cells[i] = redBg + label + reset
 				continue
 			}
 			cells[i] = "\x1b[38;5;16;48;5;" + gradient256(r.severity()) + "m" + label + reset
@@ -1843,8 +1851,12 @@ func (u *ui) headerRow(rs []reading) string {
 	cells := make([]string, len(rs))
 	for i, r := range rs {
 		label := r.head
-		if r.v < 0 { // датчика нет — нейтральная тусклая подпись
-			cells[i] = dim + label + reset
+		if r.v < 0 { // датчика нет — фиолетовая подпись
+			cells[i] = purpleBg + label + reset
+			continue
+		}
+		if r.v == 999 { // нет ответа — красная подпись
+			cells[i] = redBg + label + reset
 			continue
 		}
 		cells[i] = "\x1b[38;5;16;48;5;" + gradient256(r.severity()) + "m" + label + reset
@@ -1919,10 +1931,16 @@ func (u *ui) digitCell(r reading) string {
 // В блочном режиме градусы не приписываются: цвет несёт весь смысл.
 func (u *ui) blockCell(r reading) string {
 	if r.v < 0 { // датчика нет
-		return dim + "███" + reset
+		if !u.color {
+			return dim + "·" + reset
+		}
+		return purple + "███" + reset
 	}
-	if u.symbols && r.v == 999 {
-		return red + "..." + reset
+	if r.v == 999 { // нет ответа
+		if !u.color {
+			return red + "..." + reset
+		}
+		return redBright + "███" + reset
 	}
 	return "\x1b[38;5;" + gradient256(r.severity()) + "m███" + reset
 }
@@ -1932,13 +1950,13 @@ func (u *ui) blockCell(r reading) string {
 func (u *ui) compactCell(r reading) string {
 	if r.v < 0 {
 		if u.color {
-			return dim + "·" + reset
+			return purple + "█" + reset
 		}
 		return "·"
 	}
-	if u.symbols && r.v == 999 {
+	if r.v == 999 {
 		if u.color {
-			return red + "!" + reset
+			return redBright + "█" + reset
 		}
 		return "!"
 	}
