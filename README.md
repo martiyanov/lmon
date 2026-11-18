@@ -299,7 +299,7 @@ Without color (`NO_COLOR`, pipe) the text fallbacks stay.
 | `--bars` | — | off | colored bars instead of digits (`--blocks` is a legacy alias) |
 | `--compact` | `LMON_COMPACT` | off | one letter and one colored block per parameter, no gaps |
 | `--hybrid` | — | off | digits on the state-colored background |
-| `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`) and `--ping` names (`NG,VPN,M`); flags add more |
+| `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`), `--ping` names (`NG,VPN,M`), and an empty column for two commas (`NG,,M`); flags add more |
 | `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |
 | `--temp-cmd` | `LMON_TEMP_CMD` | — | external command printing CPU temp in °C (e.g. LibreHardwareMonitor via PowerShell on Windows) |
 | `--disk-busy` | `LMON_DISK_BUSY` | off | disk busy time %: Windows PDH `PhysicalDisk`, macOS IOKit |
@@ -323,6 +323,7 @@ Without color (`NO_COLOR`, pipe) the text fallbacks stay.
 ```sh
 lmon --target 1.1.1.1 --interval 2 10
 lmon --bars --cols TNGC --cpu          # own set and order, flags add more
+lmon --cols NG,,M                      # empty spacer between G and M
 lmon --ping VPN=10.8.0.1 --cols NG,VPN,M  # place a ping column anywhere
 lmon --gpu-list                    # 0: RTX 3060, 1: Intel UHD
 lmon --gpu --gputemp --gpu-index 0 # show a specific GPU

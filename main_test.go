@@ -845,3 +845,48 @@ func TestBlockSpecialColors(t *testing.T) {
 		t.Errorf("header no-reply = %q", h)
 	}
 }
+
+func TestColsBlankColumn(t *testing.T) {
+	for _, k := range []string{"LMON_COLS", "LMON_PING"} {
+		t.Setenv(k, "")
+	}
+	cfg, err := parseConfig([]string{"--cols", "NG,,M"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(cfg.cols, ","); got != "N,G,_,M" {
+		t.Fatalf("--cols NG,,M = %q", got)
+	}
+	rs := layout(cfg)
+	if len(rs) != 4 || !rs[2].blank {
+		t.Fatalf("layout NG,,M = %+v", ids(rs))
+	}
+	if rs[2].head != "   " {
+		t.Errorf("blank head = %q", rs[2].head)
+	}
+	if got := len([]rune(rs[2].head)); got != 3 {
+		t.Errorf("blank width = %d", got)
+	}
+	// два подряд пустых
+	cfg2, err := parseConfig([]string{"--cols", "NG,,,M"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(cfg2.cols, ","); got != "N,G,_,_,M" {
+		t.Errorf("--cols NG,,,M = %q", got)
+	}
+	// по краям пустые не добавляются
+	cfg3, err := parseConfig([]string{"--cols", ",NG,"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(cfg3.cols, ","); got != "N,G" {
+		t.Errorf("--cols ,NG, = %q", got)
+	}
+	// в compact пустой столбик — один пробел
+	u := &ui{compact: true, symbols: true}
+	row := u.dataRow([]reading{{id: "N", v: 10}, {id: "_", blank: true}, {id: "M", v: 20}})
+	if got := len([]rune(row)); got != 3 {
+		t.Errorf("compact blank row = %q (%d runes)", row, got)
+	}
+}

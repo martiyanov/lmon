@@ -80,13 +80,14 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   колонки. Статус видно боковым зрением. Тусклый
                   квадрат — датчика нет.
   --hybrid      — смешанный режим: точные цифры на подложке цвета
-  --compact     — по одной букве/символу на параметр, без пробелов
-                  состояния (как нижняя лента, но в потоке данных).
+  --compact     — по одной букве и одному цветному блоку на параметр,
+                  без пробелов (фиолетовый — нет датчика, красный — нет ответа).
 
 Набор колонок:
   --cols NG,CSB  — свой набор и порядок (каждая буква — колонка,
                    разделители запятая/пробел/плюс, регистр не важен;
-                   LMON_COLS). Флаги --cpu и др. добавляют колонки справа.
+                   LMON_COLS). Две запятые подряд — пустой столбик: NG,,M.
+                   Флаги --cpu и др. добавляют колонки справа.
 
   Буквы колонок (все двенадцать):
     N — сеть      G — шлюз       L — очередь CPU  M — память
@@ -100,6 +101,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
 
   Примеры: только сеть и память — lmon --cols NM
            swap перед памятью  — lmon --cols N,SG,M
+           пустой столбик      — lmon --cols NG,,M
   --once         — одна строка значений без заголовка; цвет только на
                    терминале, в пайпе — чистый текст (tmux/скрипты):
                    set -g status-right '#(lmon --once --cols=NGMC)'
@@ -274,13 +276,13 @@ Display modes:
                   a red block means no reply. --blocks is a legacy alias.
   --hybrid      — mixed mode: exact digits on the state-colored background
   --compact     — one letter and one colored block per parameter, no gaps
-                  (purple = no sensor, red = no reply)
-                  (like the bottom ribbon, but in the data stream).
+                  (purple = no sensor, red = no reply).
 
 Column set:
   --cols NG,CSB  — your own set and order (each letter is a column;
                    separators comma/space/plus, case-insensitive;
-                   LMON_COLS). Flags like --cpu add columns on the right.
+                   LMON_COLS). Two commas in a row add an empty column: NG,,M.
+                   Flags like --cpu add columns on the right.
 
   Column letters (all twelve):
     N — network   G — gateway    L — CPU queue  M — memory
@@ -294,6 +296,7 @@ Column set:
 
   Examples: network and memory only — lmon --cols NM
             swap before memory    — lmon --cols N,SG,M
+            empty spacer          — lmon --cols NG,,M
 
 Colors: green — normal, yellow — attention, red — bad;
 purple — no sensor (block/compact), bright red block — no reply.
@@ -787,6 +790,10 @@ func parseCols(spec string, pings []pingTarget, lang string) ([]string, error) {
 	seen := map[string]bool{}
 	var cols []string
 	add := func(id string) error {
+		if id == "_" { // пустые столбики могут повторяться
+			cols = append(cols, id)
+			return nil
+		}
 		if seen[id] {
 			return fmt.Errorf(lmsg(lang, "--cols: column %q listed twice", "--cols: колонка %q указана дважды"), id)
 		}
@@ -794,9 +801,13 @@ func parseCols(spec string, pings []pingTarget, lang string) ([]string, error) {
 		cols = append(cols, id)
 		return nil
 	}
-	for _, tok := range strings.FieldsFunc(spec, func(r rune) bool {
-		return r == ',' || r == ' ' || r == '+' || r == '\t'
-	}) {
+	for _, tok := range splitColsSpec(spec) {
+		if tok == "_" {
+			if err := add("_"); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		up := strings.ToUpper(tok)
 		if name, ok := pingByName[up]; ok {
 			if err := add(name); err != nil {
@@ -1235,6 +1246,7 @@ type reading struct {
 	v                  int
 	green, yellow, red int
 	invert             bool // больше — лучше (батарея)
+	blank              bool // пустой столбик-разделитель из --cols (NG,,M)
 }
 
 // colRegistry — все известные колонки; ключ — однобуквенный id из --cols.
@@ -1277,6 +1289,10 @@ func requestedLayout(cfg config) []reading {
 	}
 	rs := make([]reading, 0, len(base)+5)
 	for _, id := range base {
+		if id == "_" {
+			rs = append(rs, reading{id: "_", head: "   ", blank: true})
+			continue
+		}
 		r, ok := columnByID(id, cfg.pings)
 		if !ok {
 			continue // не должно случаться: --cols проверен парсером
@@ -1652,12 +1668,20 @@ func (u *ui) dataRow(rs []reading) string {
 	if u.compact {
 		cells := make([]string, len(rs))
 		for j, r := range rs {
+			if r.blank {
+				cells[j] = " "
+				continue
+			}
 			cells[j] = u.compactCell(r)
 		}
 		return strings.Join(cells, "")
 	}
 	cells := make([]string, len(rs))
 	for j, r := range rs {
+		if r.blank {
+			cells[j] = "   "
+			continue
+		}
 		switch {
 		case u.hybrid && u.color: // цифры на подложке цвета состояния
 			cells[j] = u.hybridCell(r)
@@ -1781,6 +1805,11 @@ func headerOf(rs []reading) (head, sep string) {
 	hs := make([]string, len(rs))
 	ss := make([]string, len(rs))
 	for i, r := range rs {
+		if r.blank {
+			hs[i] = "   "
+			ss[i] = "   "
+			continue
+		}
 		hs[i] = r.head // головы в реестре уже выровнены до 3 символов
 		ss[i] = "---"
 	}
@@ -1791,6 +1820,10 @@ func headerOf(rs []reading) (head, sep string) {
 func headerOfCompact(rs []reading) (head, sep string) {
 	hs := make([]string, len(rs))
 	for i, r := range rs {
+		if r.blank {
+			hs[i] = " "
+			continue
+		}
 		hs[i] = compactLabel(r)
 	}
 	return strings.Join(hs, ""), ""
@@ -1831,6 +1864,10 @@ func (u *ui) headerRow(rs []reading) string {
 	if u.compact {
 		cells := make([]string, len(rs))
 		for i, r := range rs {
+			if r.blank {
+				cells[i] = " "
+				continue
+			}
 			label := compactLabel(r)
 			if !u.color {
 				cells[i] = label
@@ -1850,6 +1887,10 @@ func (u *ui) headerRow(rs []reading) string {
 	}
 	cells := make([]string, len(rs))
 	for i, r := range rs {
+		if r.blank {
+			cells[i] = "   "
+			continue
+		}
 		label := r.head
 		if r.v < 0 { // датчика нет — фиолетовая подпись
 			cells[i] = purpleBg + label + reset
@@ -1978,6 +2019,35 @@ func (u *ui) hybridCell(r reading) string {
 func stdoutIsTTY() bool {
 	fi, err := os.Stdout.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
+// splitColsSpec режет --cols по запятым, сохраняя пустые сегменты как "_".
+// Пустые сегменты по краям отбрасываются: "пусто" имеет смысл только между
+// индикаторами (NG,,M — один пустой столбик).
+func splitColsSpec(spec string) []string {
+	var out []string
+	raw := strings.Split(spec, ",")
+	for i, seg := range raw {
+		if strings.TrimSpace(seg) == "" {
+			if i > 0 && i < len(raw)-1 {
+				out = append(out, "_")
+			}
+			continue
+		}
+		for _, tok := range strings.FieldsFunc(seg, func(r rune) bool {
+			return r == ' ' || r == '+' || r == '\t'
+		}) {
+			out = append(out, tok)
+		}
+	}
+	// NG,,,M → два пустых; NG,, → хвостовые пустые не нужны
+	for len(out) > 0 && out[0] == "_" {
+		out = out[1:]
+	}
+	for len(out) > 0 && out[len(out)-1] == "_" {
+		out = out[:len(out)-1]
+	}
+	return out
 }
 
 // parseGPUIdx разбирает --gpu-index: «1» или «0,1». Пустой список → [0].
