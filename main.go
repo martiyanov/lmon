@@ -2104,8 +2104,12 @@ func (u *ui) dataRow(rs []reading) string {
 			if width >= 3 {
 				// цифра 0–9 + два разных символа, без повтора тройки
 				digit := '0' + rune(int(sev*9+0.5))
-				g1 := runeForRow(sev, used)
-				g2 := runeForRow(sev, used)
+				symbolSev := sev
+				if symbolSev <= 0 {
+					symbolSev = 0.01 // для 0 берём самые лёгкие символы, но не пробелы
+				}
+				g1 := runeForRow(symbolSev, used)
+				g2 := runeForRow(symbolSev, used)
 				s = string([]rune{digit, g1, g2})
 			} else {
 				s = string(runeForRow(sev, used))

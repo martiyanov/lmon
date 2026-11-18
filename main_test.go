@@ -1101,3 +1101,19 @@ func TestMatrixNoRepeatsInValue(t *testing.T) {
 		}
 	}
 }
+
+func TestMatrixZeroHasThreeSymbols(t *testing.T) {
+	u := &ui{matrix: true, color: false}
+	row := u.dataRow([]reading{{id: "N", head: "NET", v: 0, green: 50, yellow: 150, red: 300}})
+	group := strings.TrimSpace(row)
+	if len([]rune(group)) != 3 {
+		t.Fatalf("zero matrix group = %q, want 3 runes", group)
+	}
+	seen := map[rune]bool{}
+	for _, r := range group {
+		if seen[r] {
+			t.Errorf("повтор в нулевом значении: %q", group)
+		}
+		seen[r] = true
+	}
+}
