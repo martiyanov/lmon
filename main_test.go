@@ -1132,3 +1132,18 @@ func TestCompactMatrixAlignment(t *testing.T) {
 		t.Errorf("compact matrix row contains space: %q", row)
 	}
 }
+
+func TestRainLinesAreFrozen(t *testing.T) {
+	var b bytes.Buffer
+	u := &ui{w: &b, tty: true, rain: true, matrix: true, rows: 6}
+	u.emit([]reading{{id: "N", head: "NET", v: 120, green: 50, yellow: 150, red: 300}})
+	u.emit([]reading{{id: "N", head: "NET", v: 120, green: 50, yellow: 150, red: 300}})
+	if len(u.rainLines) != 1 {
+		t.Fatalf("rainLines = %d, want 1", len(u.rainLines))
+	}
+	frozen := u.rainLines[0]
+	u.emit([]reading{{id: "N", head: "NET", v: 120, green: 50, yellow: 150, red: 300}})
+	if len(u.rainLines) < 2 || u.rainLines[1] != frozen {
+		t.Errorf("строка изменилась при падении: было %q, стало %q", frozen, u.rainLines[1])
+	}
+}

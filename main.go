@@ -2201,7 +2201,7 @@ type ui struct {
 	compact    bool
 	matrix     bool
 	rain       bool
-	rainRows   [][]reading
+	rainLines  []string
 	glyphCount map[string]int
 	symbols    bool // показывать «...» вместо 999 (нет ответа)
 	lang       string
@@ -2278,13 +2278,13 @@ func (u *ui) redrawRain(rows int) {
 	u.rows = rows
 	fmt.Fprint(u.w, "\x1b[2J\x1b[H")
 	fmt.Fprintf(u.w, "\x1b[1;1H\x1b[2K%s", u.headerRow(u.lastRS))
-	for i, rs := range u.rainRows {
+	for i, line := range u.rainLines {
 		if i >= rows-1 {
 			break
 		}
-		fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[2K%s", i+2, u.dataRow(rs))
+		fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[2K%s", i+2, line)
 	}
-	fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[0J", min(rows, len(u.rainRows)+2))
+	fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[0J", min(rows, len(u.rainLines)+2))
 }
 
 func (u *ui) redraw(rows int) {
@@ -2362,9 +2362,10 @@ func (u *ui) emit(rs []reading) {
 			u.redrawRain(u.rows)
 			return
 		}
-		u.rainRows = append([][]reading{u.pending}, u.rainRows...)
-		if len(u.rainRows) > u.rows-1 {
-			u.rainRows = u.rainRows[:u.rows-1]
+		line := u.dataRow(u.pending)
+		u.rainLines = append([]string{line}, u.rainLines...)
+		if len(u.rainLines) > u.rows-1 {
+			u.rainLines = u.rainLines[:u.rows-1]
 		}
 		u.pending = rs
 		u.redrawRain(u.rows)
