@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/martiyanov/lmon/internal/meter"
@@ -16,18 +18,19 @@ import (
 // визуальному весу: от точки до плотного греческого знака. Внутри группы несколько вариантов,
 // поэтому одно и то же значение каждый раз выглядит немного иначе.
 var runeLevels = [][]rune{
-	{'.', ','},
-	{':', ';', '!', '?'},
-	{'-', '=', '_', '~'},
-	{'+', '*', '^'},
-	{'#', '%', '&'},
-	{'@', '$', '?'},
-	{'λ', 'π', 'Σ'},
-	{'Ψ', 'Ω', 'Ξ'},
+	{'.', ',', '·', '\'', '`'},
+	{':', ';', '!', '?', 'i', 'l', 'I', '|'},
+	{'-', '=', '_', '~', '+', '×', '÷'},
+	{'+', '*', '^', 'x', 'X', 'v', '±'},
+	{'#', '%', '&', '$', '@', '§', '¤'},
+	{'λ', 'π', 'Σ', 'µ', 'σ', 'φ', 'γ', 'δ'},
+	{'Ψ', 'Ω', 'Ξ', 'Φ', 'Θ', 'Δ', 'Λ', 'Π'},
+	{'W', 'M', '@', '%', '&', '∞', '∑', '√'},
 }
 
-// runeGlyph выбирает руну по уровню 0..1; cycle перебирает варианты
-// внутри одного уровня, чтобы повторяющееся значение не застывало.
+// runeGlyph выбирает символ нужного уровня. Внутри уровня варианты
+// перемешиваются и расходуются без повторов; когда мешок исчерпан,
+// он перемешивается заново (первый символ не совпадает с предыдущим).
 func runeGlyph(sev float64, cycle int) rune {
 	if sev <= 0 {
 		return ' '
@@ -39,8 +42,79 @@ func runeGlyph(sev float64, cycle int) rune {
 	if idx >= len(runeLevels) {
 		idx = len(runeLevels) - 1
 	}
-	g := runeLevels[idx]
-	return g[cycle%len(g)]
+	return nextRune(idx)
+}
+
+// runeForRow выбирает символ, которого ещё нет в текущей строке.
+// Сначала берёт целевой уровень, затем соседние — чтобы даже при
+// одинаковых значениях символы в одной строке не повторялись.
+func runeForRow(sev float64, used map[rune]bool) rune {
+	if sev <= 0 {
+		return ' '
+	}
+	level := int(sev*float64(len(runeLevels)-1) + 0.5)
+	if level < 0 {
+		level = 0
+	}
+	if level >= len(runeLevels) {
+		level = len(runeLevels) - 1
+	}
+	try := func(lv int) (rune, bool) {
+		if lv < 0 || lv >= len(runeLevels) {
+			return 0, false
+		}
+		g := runeLevels[lv]
+		start := rand.Intn(len(g))
+		for i := 0; i < len(g); i++ {
+			c := g[(start+i)%len(g)]
+			if !used[c] {
+				used[c] = true
+				return c, true
+			}
+		}
+		return 0, false
+	}
+	for d := 0; d < len(runeLevels); d++ {
+		if c, ok := try(level - d); ok {
+			return c
+		}
+		if d > 0 {
+			if c, ok := try(level + d); ok {
+				return c
+			}
+		}
+	}
+	// Строка больше всего набора — повторяем, иначе нечего выводить.
+	c := runeGlyph(sev, 0)
+	used[c] = true
+	return c
+}
+
+var (
+	runeMu   sync.Mutex
+	runeBags = map[int][]rune{}
+	runePos  = map[int]int{}
+	runeLast = map[int]rune{}
+)
+
+func nextRune(level int) rune {
+	runeMu.Lock()
+	defer runeMu.Unlock()
+	bag := runeBags[level]
+	pos := runePos[level]
+	if len(bag) == 0 || pos >= len(bag) {
+		bag = append([]rune(nil), runeLevels[level]...)
+		rand.Shuffle(len(bag), func(i, j int) { bag[i], bag[j] = bag[j], bag[i] })
+		if len(bag) > 1 && bag[0] == runeLast[level] {
+			bag = append(bag[1:], bag[0])
+		}
+		runeBags[level] = bag
+		pos = 0
+	}
+	g := bag[pos]
+	runePos[level] = pos + 1
+	runeLast[level] = g
+	return g
 }
 
 type gcell struct {
@@ -119,6 +193,7 @@ func (v *gview) add(rs []reading) {
 	if h < 1 {
 		h = 1
 	}
+	used := map[rune]bool{}
 	for _, r := range v.visible(rs) {
 		var c gcell
 		switch {
@@ -126,11 +201,11 @@ func (v *gview) add(rs []reading) {
 			c.blank = true
 		case r.v == 999:
 			c.sev = 1
-			c.glyph = runeGlyph(1, v.counters[r.id])
+			c.glyph = runeForRow(1, used)
 		default:
 			c.sev = r.severity()
 			if c.sev > 0 {
-				c.glyph = runeGlyph(c.sev, v.counters[r.id])
+				c.glyph = runeForRow(c.sev, used)
 			} else {
 				c.blank = true
 			}

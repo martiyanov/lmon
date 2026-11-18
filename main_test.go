@@ -1067,13 +1067,37 @@ func TestMatrixStyleReplacesDigits(t *testing.T) {
 	rs := []reading{{id: "N", head: "NET", v: 120, green: 50, yellow: 150, red: 300}}
 	out := u.dataRow(rs)
 	plain := strings.NewReplacer("\x1b[38;5;46m", "", "\x1b[0m", "").Replace(out)
-	if strings.ContainsAny(plain, "0123456789") {
-		t.Errorf("matrix row contains digits: %q", out)
+	if !strings.ContainsAny(plain, "0123456789") {
+		t.Errorf("matrix row has no 0-9 digit: %q", out)
 	}
 	if !strings.Contains(out, "38;5;46") {
 		t.Errorf("matrix row is not green: %q", out)
 	}
 	if got := len([]rune(strings.ReplaceAll(out, "\x1b[0m", ""))); got < 3 {
 		t.Errorf("matrix row too short: %q", out)
+	}
+}
+
+func TestMatrixNoRepeatsInValue(t *testing.T) {
+	u := &ui{matrix: true, color: false}
+	rs := []reading{
+		{id: "N", head: "NET", v: 120, green: 50, yellow: 150, red: 300},
+		{id: "M", head: "MEM", v: 120, green: 50, yellow: 150, red: 300},
+	}
+	row := u.dataRow(rs)
+	for _, group := range strings.Fields(row) {
+		seen := map[rune]bool{}
+		for _, r := range group {
+			if r == 0 || r == ' ' {
+				continue
+			}
+			if seen[r] {
+				t.Errorf("в значении %q повторяется символ %q", group, r)
+			}
+			seen[r] = true
+		}
+		if len(seen) < 3 {
+			t.Errorf("в значении %q меньше трёх разных символов", group)
+		}
 	}
 }

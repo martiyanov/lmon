@@ -272,30 +272,30 @@ lmon --rain --matrix # green palette
 - new values appear under it and move down;
 - `--rain` works with digits, `--bars`, `--hybrid`, `--compact`;
 - it cannot be combined with `--horizontal` or `--once`;
-- `--matrix` is the green fill-glyph style, independent of direction.
+- `--matrix` is the green cipher style, independent of direction.
 
-`--rain --matrix` uses single-cell cipher glyphs instead of digits/colors:
+`--rain --matrix` uses single-cell cipher glyphs:
 
 ```sh
 lmon --rain --matrix
 ```
 
 Cells use a mixed set of keyboard symbols and Greek letters, ordered by
-visual weight: `. , : ; - = + * # % & @ λ π Σ Ψ Ω`. Higher values use
+visual weight: `. , : ; - = + * # % & @ i l I x X v $ λ π Σ µ σ φ Ψ Ω Ξ Φ Θ W M`. Higher values use
 heavier glyphs; all glyphs are the same bright green (no brightness
 gradient). Repeated values cycle through equivalent glyphs so the rain
 keeps changing. All glyphs are single-width.
 
 `--matrix` is a full style and works with any mode: colors become green and
-digits/blocks become single-cell cipher glyphs.
+the value cells become cipher glyphs.
 
 ```sh
-lmon --matrix              # normal grid: cipher glyphs instead of digits
+lmon --matrix              # digit 0-9 + two different glyphs per value
 lmon --bars --matrix
 lmon --hybrid --matrix
 lmon --compact --matrix    # one glyph per parameter
 lmon --horizontal --matrix
-lmon --rain --matrix       # falling cipher glyphs
+lmon --rain --matrix       # one falling glyph per parameter
 
 ### Horizontal timeline
 

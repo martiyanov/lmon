@@ -88,7 +88,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   появляются под ним и падают вниз; символы/цвета как обычно.
   --rain --matrix — падающие символы (. , : - = + * # % & @ λ π Σ Ψ Ω),
                   все одним зелёным цветом.
-  --matrix      — матричный стиль: зелёный + символы по визуальному весу
+  --matrix      — матричный стиль: зелёный; в обычной сетке цифра 0–9
+                  + два разных символа, в compact/horizontal/rain — один
                   вместо цифр (работает с любым режимом).
 
 Набор колонок:
@@ -302,7 +303,8 @@ Display modes:
                   under it and fall down; symbols/colors unchanged.
   --rain --matrix — falling glyphs (. , : - = + * # % & @ λ π Σ Ψ Ω),
                   all in the same green color.
-  --matrix      — matrix style: green + weight-ordered glyphs instead of digits
+  --matrix      — matrix style: green; normal grid uses digit 0–9
+                  + two different glyphs, compact/horizontal/rain use one
                   (works with any mode).
 
 Column set:
@@ -1871,6 +1873,7 @@ func (v *hview) add(rs []reading) {
 		visible = append(visible, r)
 	}
 	v.order = v.order[:0]
+	used := map[rune]bool{}
 	for _, r := range visible {
 		v.order = append(v.order, r.id)
 		cell := hcell{state: 0}
@@ -1887,8 +1890,7 @@ func (v *hview) add(rs []reading) {
 			if cell.state == 999 {
 				sev = 1
 			}
-			cell.glyph = runeGlyph(sev, v.glyphs[r.id])
-			v.glyphs[r.id]++
+			cell.glyph = runeForRow(sev, used)
 		}
 		h := append([]hcell{cell}, v.history[r.id]...)
 		if len(h) > v.cols {
@@ -2087,16 +2089,10 @@ func (u *ui) dataRow(rs []reading) string {
 		if u.compact {
 			width = 1
 		}
-		if u.glyphCount == nil {
-			u.glyphCount = map[string]int{}
-		}
 		cells := make([]string, len(rs))
+		used := map[rune]bool{}
 		for j, r := range rs {
-			if r.blank {
-				cells[j] = strings.Repeat(" ", width)
-				continue
-			}
-			if r.v < 0 {
+			if r.blank || r.v < 0 {
 				cells[j] = strings.Repeat(" ", width)
 				continue
 			}
@@ -2104,9 +2100,16 @@ func (u *ui) dataRow(rs []reading) string {
 			if r.v == 999 {
 				sev = 1
 			}
-			g := runeGlyph(sev, u.glyphCount[r.id])
-			u.glyphCount[r.id]++
-			s := strings.Repeat(string(g), width)
+			var s string
+			if width >= 3 {
+				// цифра 0–9 + два разных символа, без повтора тройки
+				digit := '0' + rune(int(sev*9+0.5))
+				g1 := runeForRow(sev, used)
+				g2 := runeForRow(sev, used)
+				s = string([]rune{digit, g1, g2})
+			} else {
+				s = string(runeForRow(sev, used))
+			}
 			if u.color {
 				s = "\x1b[38;5;46m" + s + reset
 			}
