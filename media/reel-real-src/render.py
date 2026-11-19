@@ -117,8 +117,8 @@ def terminal_window(mode, t, lang):
     d.text((x0+22,y0+h+37),(cap_ru if lang=='ru' else cap_en),font=h2,fill=(180,255,200))
     # top label
     d.text((60,90),'lmon',font=logo,fill=GREEN)
-    d.text((64,245),('монитор компьютера' if lang=='ru' else 'a system monitor'),font=h1,fill=(170,255,195))
-    d.text((64,305),('в терминале' if lang=='ru' else 'for your terminal'),font=h1,fill=(170,255,195))
+    d.text((64,245),('пульс компьютера' if lang=='ru' else 'the pulse of your computer'),font=h1,fill=(170,255,195))
+    d.text((64,305),('в одной строке' if lang=='ru' else 'in one line'),font=h1,fill=(170,255,195))
     return img
 
 def intro(t, lang):

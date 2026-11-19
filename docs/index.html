@@ -81,6 +81,23 @@
   .foot { color: var(--dim); font-size: 14px; border-top: 1px solid #21262d; padding-top: 22px; margin-top: 56px; }
   .foot a { color: var(--link); text-decoration: none; }
   a { color: var(--link); }
+
+  nav.toc { display:flex; gap:6px; flex-wrap:wrap; margin:22px 0 6px; padding:10px 0;
+            border-top:1px solid #21262d; border-bottom:1px solid #21262d; }
+  nav.toc a { color:#9aa4af; text-decoration:none; font:600 13px var(--mono); padding:4px 9px;
+              border:1px solid #262d36; border-radius:999px; }
+  nav.toc a:hover { color:var(--ink); border-color:#3d4652; }
+  .modes { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px; margin:18px 0 22px; }
+  .mode { display:block; text-decoration:none; background:var(--panel); border:1px solid #21262d;
+          border-radius:9px; padding:12px 14px; }
+  .mode:hover { border-color:#3d4652; }
+  .mode b { display:block; color:#7ee787; font:700 13px var(--mono); margin-bottom:4px; }
+  .mode span { color:#9aa4af; font-size:14px; }
+  .quick { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin:16px 0; }
+  .quick div { background:var(--panel); border:1px solid #21262d; border-radius:9px; padding:12px 14px; }
+  .quick b { color:#7ee787; font:700 12px var(--mono); }
+  .quick span { display:block; color:#9aa4af; font-size:14px; margin-top:5px; }
+  @media (max-width:560px) { .modes { grid-template-columns:1fr; } h1 { font-size:32px; } }
 </style>
 </head>
 <body>
@@ -89,6 +106,12 @@
   <p class="tag">Пульс компьютера — в одной строке. Цвет вместо цифр, ответ вместо графиков: один взгляд — и понятно, всё ли в порядке.</p>
   <p style="margin:0 0 10px">По-русски · <a href="https://martiyanov.github.io/lmon/en/" style="font-size:14px">English</a></p>
   <div class="os"><span>macOS</span><span>Linux</span><span>Windows 10+</span><span>один бинарник ~1 МБ</span><span>MIT</span></div>
+
+  <nav class="toc" aria-label="Разделы">
+    <a href="#modes">Режимы</a><a href="#matrix">Матрица</a><a href="#compact">Compact</a>
+    <a href="#columns">Что показывает</a><a href="#install">Установка</a>
+    <a href="#reels">Рилсы</a><a href="#community">Сообщество</a>
+  </nav>
 
   <div class="term" id="term">
     <div class="bar"><i></i><i></i><i></i><span>lmon --hybrid --cpu</span></div>
@@ -103,10 +126,19 @@
   </div>
 
   <section>
-    <h2>Как это выглядит</h2>
+    <h2 id="modes">Режимы</h2>
     <p class="lead">Шесть режимов отображения — цифры, цветные блоки, гибрид,
     компактный виджет, горизонтальная лента и матричный дождь.
     Значения настоящие, снятые <code class="inl">lmon</code> на macOS.</p>
+    <div class="modes">
+      <a class="mode" href="#modes"><b>lmon</b><span>цифры и цвет состояния</span></a>
+      <a class="mode" href="#modes"><b>--bars</b><span>только цвет, без цифр</span></a>
+      <a class="mode" href="#modes"><b>--hybrid</b><span>цифры на цветной подложке</span></a>
+      <a class="mode" href="#compact"><b>--compact</b><span>одна буква и один блок</span></a>
+      <a class="mode" href="#columns"><b>--horizontal</b><span>лента времени вправо</span></a>
+      <a class="mode" href="#matrix"><b>--matrix --rain</b><span>зелёный дождь символов</span></a>
+    </div>
+
     <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
       <figure style="margin:0;text-align:center">
         <img src="img/screenshot-digits.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon: цифры цветом состояния">
@@ -128,7 +160,7 @@
   </section>
 
   <section>
-    <h2>Матрица и дождь</h2>
+    <h2 id="matrix">Матрица и дождь</h2>
     <p class="lead"><code class="inl">--matrix</code> — зелёный стиль без цифр:
     случайный безопасный набор символов, нулевой уровень — маленькая точка
     по центру, остальные — три разных символа. <code class="inl">--rain</code>
@@ -153,7 +185,7 @@
   </section>
 
   <section>
-    <h2>Одноколоночный режим</h2>
+    <h2 id="compact">Одноколоночный режим</h2>
     <p class="lead"><code class="inl">--compact</code> — самый узкий вид:
     по одной букве на параметр в заголовке и по одному блоку на значение,
     без промежутков между колонками. Заголовок — буквы из
@@ -175,24 +207,9 @@
     </div>
   </section>
 
-  <section>
-    <h2>Реальные рилсы</h2>
-    <p class="lead">Снято из настоящего TUI lmon — не синтетические картинки:
-    цифры, блоки, компактный режим, матрица и горизонтальная лента.</p>
-    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin-top:14px">
-      <div style="flex:1;min-width:260px;max-width:360px">
-        <video src="media/reel-real-ru.mp4" controls playsinline poster="img/screenshot-rain.png" style="width:100%;border-radius:12px;border:1px solid #30363d"></video>
-        <p class="note">Русская версия · 20 секунд</p>
-      </div>
-      <div style="flex:1;min-width:260px;max-width:360px">
-        <video src="media/reel-real-en.mp4" controls playsinline poster="img/screenshot-rain.png" style="width:100%;border-radius:12px;border:1px solid #30363d"></video>
-        <p class="note">English version · 20 seconds</p>
-      </div>
-    </div>
-  </section>
 
   <section>
-    <h2>Что показывает</h2>
+    <h2 id="columns">Что показывает</h2>
     <div class="cols" id="cols"></div>
     <p class="lead" style="margin-top:14px">Точка <code class="inl">·</code> — такого датчика в системе нет (честно, без выдуманных чисел),
     <code class="inl">999</code> — хост не отвечает. Набор и порядок колонок — любые: <code class="inl">lmon --cols NRMC</code>.
@@ -200,7 +217,7 @@
   </section>
 
   <section>
-    <h2>Установка</h2>
+    <h2 id="install">Установка</h2>
     <div class="install">
       <div class="tabs" id="tabs">
         <button data-t="mac" class="on">macOS</button>
@@ -234,7 +251,27 @@
   </section>
 
   <section>
-    <h2>Сообщество</h2>
+    <h2 id="reels">Реальные рилсы</h2>
+    <p class="lead">Снято из настоящего TUI lmon — не синтетические картинки:
+    цифры, блоки, компактный режим, матрица и горизонтальная лента.</p>
+    <figure style="margin:18px 0 0;text-align:center">
+      <img src="img/real-terminal.png" width="640" style="max-width:100%;border-radius:10px;border:1px solid #30363d" alt="real lmon terminal output">
+      <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px">настоящий вывод терминала</figcaption>
+    </figure>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin-top:14px">
+      <div style="flex:1;min-width:260px;max-width:360px">
+        <video src="media/reel-real-ru.mp4" controls playsinline poster="img/screenshot-rain.png" style="width:100%;border-radius:12px;border:1px solid #30363d"></video>
+        <p class="note">Русская версия · 20 секунд</p>
+      </div>
+      <div style="flex:1;min-width:260px;max-width:360px">
+        <video src="media/reel-real-en.mp4" controls playsinline poster="img/screenshot-rain.png" style="width:100%;border-radius:12px;border:1px solid #30363d"></video>
+        <p class="note">English version · 20 seconds</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="community">Сообщество</h2>
     <p class="lead">Идеи, вопросы и настройки — в <b>GitHub Discussions</b> (русский и английский).
     Правила и путь идеи до релиза — в <a href="https://github.com/martiyanov/lmon/blob/main/COMMUNITY.md">COMMUNITY.md</a>.</p>
     <p><a href="https://github.com/martiyanov/lmon/discussions">GitHub Discussions</a> ·

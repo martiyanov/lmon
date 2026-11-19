@@ -1,5 +1,6 @@
 import json, os, subprocess, time
 SESSION = "lmon-reel"
+SOCKET = "lmonreel"
 SIZE = ("90", "28")
 MODES = [
     ("digits", ["lmon", "--interval", "0.45"]),
@@ -11,11 +12,11 @@ MODES = [
 def sh(args):
     return subprocess.run(args, check=False, capture_output=True, text=True)
 def kill():
-    sh(["tmux", "kill-session", "-t", SESSION])
+    sh(["tmux", "-L", SOCKET, "kill-session", "-t", SESSION])
 def capture(mode, cmd, seconds=3.2):
     kill()
-    shell = " ".join(cmd)
-    r = sh(["tmux", "new-session", "-d", "-s", SESSION, "-x", SIZE[0], "-y", SIZE[1], shell])
+    shell = "env -u NO_COLOR TERM=xterm-256color COLORTERM=truecolor " + " ".join(cmd)
+    r = sh(["tmux", "-L", SOCKET, "new-session", "-d", "-s", SESSION, "-x", SIZE[0], "-y", SIZE[1], shell])
     if r.returncode != 0:
         print("tmux start failed", mode, r.stderr)
         return []
@@ -23,7 +24,7 @@ def capture(mode, cmd, seconds=3.2):
     frames = []
     end = time.time() + seconds
     while time.time() < end:
-        r = sh(["tmux", "capture-pane", "-p", "-e", "-t", SESSION, "-S", "-100"])
+        r = sh(["tmux", "-L", SOCKET, "capture-pane", "-p", "-e", "-t", SESSION, "-S", "-100"])
         lines = r.stdout.splitlines()[-28:]
         frames.append({"t": len(frames) * 0.12, "lines": lines})
         time.sleep(0.12)
