@@ -1,5 +1,7 @@
 # lmon
 
+**Minimal, concise computer monitoring for the terminal.**
+
 **English** · [По-русски / Russian](README.ru.md) · [Website](https://martiyanov.github.io/lmon/)
 
 <p align="center">
@@ -283,7 +285,7 @@ characters. The exact font still decides whether a glyph is drawn or shown as
 a box.
 
 Digit-free, same bright green for every glyph; repeats inside one value are
-avoided. A short reel: [`media/reel-matrix.mp4`](media/reel-matrix.mp4).
+avoided. Reels: [Russian `media/reel-real-ru.mp4`](media/reel-real-ru.mp4) · [English `media/reel-real-en.mp4`](media/reel-real-en.mp4) · [matrix teaser](media/reel-matrix.mp4).
 
 ### Rain direction
 

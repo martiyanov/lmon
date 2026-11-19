@@ -4,8 +4,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>lmon — монитор компьютера в терминале</title>
-<meta name="description" content="Монитор компьютера в терминале: цифры, цветные блоки, компактный вид, горизонтальная лента и матричный дождь. macOS, Linux, Windows.">
+<title>lmon — минималистичный мониторинг компьютера</title>
+<meta name="description" content="Минималистичный, лаконичный мониторинг компьютера в терминале: цифры, блоки, компактный вид, горизонтальная лента и матричный дождь. macOS, Linux, Windows.">
 <link rel="canonical" href="https://martiyanov.github.io/lmon/">
 <link rel="alternate" hreflang="ru" href="https://martiyanov.github.io/lmon/">
 <link rel="alternate" hreflang="en" href="https://martiyanov.github.io/lmon/en/">
@@ -86,7 +86,7 @@
 <body>
 <main>
   <h1>l<span class="u">mon</span></h1>
-  <p class="tag">Одна строка в секунду — и видно, всё ли с компьютером в порядке. Цвет вместо цифр: зелёный — спокойно, красный — посмотри.</p>
+  <p class="tag">Минималистичный, лаконичный мониторинг компьютера. Одна строка в секунду — и видно, всё ли в порядке. Цвет вместо цифр: зелёный — спокойно, красный — посмотри.</p>
   <p style="margin:0 0 10px">По-русски · <a href="https://martiyanov.github.io/lmon/en/" style="font-size:14px">English</a></p>
   <div class="os"><span>macOS</span><span>Linux</span><span>Windows 10+</span><span>один бинарник ~1 МБ</span><span>MIT</span></div>
 
@@ -171,6 +171,22 @@
         <p class="note">Фиолетовый — датчика нет, ярко-красный — нет ответа.
         С <code class="inl">--matrix</code> вместо блоков — шифрованные символы;
         с <code class="inl">--rain</code> значения падают вниз.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Реальные рилсы</h2>
+    <p class="lead">Снято из настоящего TUI lmon — не синтетические картинки:
+    цифры, блоки, компактный режим, матрица и горизонтальная лента.</p>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin-top:14px">
+      <div style="flex:1;min-width:260px;max-width:360px">
+        <video src="media/reel-real-ru.mp4" controls playsinline poster="img/screenshot-rain.png" style="width:100%;border-radius:12px;border:1px solid #30363d"></video>
+        <p class="note">Русская версия · 20 секунд</p>
+      </div>
+      <div style="flex:1;min-width:260px;max-width:360px">
+        <video src="media/reel-real-en.mp4" controls playsinline poster="img/screenshot-rain.png" style="width:100%;border-radius:12px;border:1px solid #30363d"></video>
+        <p class="note">English version · 20 seconds</p>
       </div>
     </div>
   </section>
