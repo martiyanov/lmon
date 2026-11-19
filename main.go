@@ -86,10 +86,11 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   время идёт вправо; --labels full|short — подписи.
   --rain        — направление: заголовок сверху, новые значения
                   появляются под ним и падают вниз; символы/цвета как обычно.
-  --rain --matrix — падающие значения в формате matrix: нулевой уровень —
-                  « · », иначе три разных символа; всё зелёное.
-  --matrix      — матричный стиль: зелёный, без цифр. Нулевой уровень — «·»,
-                  иначе три разных символа; в compact/horizontal/rain — один.
+  --rain --matrix — падающие значения в формате matrix. При старте набор
+                  символов выбирается случайно из безопасных; нулевой
+                  уровень — ·/./,/… по центру, иначе три разных символа.
+  --matrix      — матричный стиль: зелёный, без цифр; случайный безопасный
+                  набор при старте. Ноль — ·/./,/… иначе три разных символа.
 
 Набор колонок:
   --cols NG,CSB  — свой набор и порядок (каждая буква — колонка,
@@ -300,10 +301,11 @@ Display modes:
                   time flows right; --labels full|short selects labels.
   --rain        — direction: header stays on top, new values appear
                   under it and fall down; symbols/colors unchanged.
-  --rain --matrix — falling matrix values: level zero is « · », otherwise
-                  three different glyphs; all green.
-  --matrix      — matrix style: green, no digits. Level zero is «·»,
-                  otherwise three different glyphs; compact/horizontal/rain use one.
+  --rain --matrix — falling matrix values. A random safe glyph set is chosen
+                  at startup; level zero is ·/./ centered, otherwise three
+                  different glyphs.
+  --matrix      — matrix style: green, no digits; random safe glyph set at
+                  startup. Zero is ·/./,/… otherwise three different glyphs.
 
 Column set:
   --cols NG,CSB  — your own set and order (each letter is a column;
@@ -1117,6 +1119,9 @@ func envFloat(name string, def float64) float64 {
 }
 
 func monitor(ctx context.Context, cfg config, w io.Writer) int {
+	if cfg.matrixPalette {
+		initMatrixSet()
+	}
 	if len(cfg.gpuIdx) > 0 {
 		meter.SetGPUIndex(cfg.gpuIdx[0])
 	}
@@ -2093,10 +2098,11 @@ func (u *ui) dataRow(rs []reading) string {
 			}
 			var s string
 			if severityLevel(sev) == 0 {
+				z := zeroGlyph()
 				if width >= 3 {
-					s = " · "
+					s = " " + string(z) + " "
 				} else {
-					s = "·"
+					s = string(z)
 				}
 			} else if width >= 3 {
 				// три разных символа уровня, без цифр

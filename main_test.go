@@ -1105,8 +1105,12 @@ func TestMatrixNoRepeatsInValue(t *testing.T) {
 func TestMatrixZeroDot(t *testing.T) {
 	u := &ui{matrix: true, color: false}
 	row := u.dataRow([]reading{{id: "N", head: "NET", v: 0, green: 50, yellow: 150, red: 300}})
-	if got := strings.TrimSpace(row); got != "·" {
-		t.Fatalf("zero matrix = %q, want centered dot", row)
+	got := strings.TrimSpace(row)
+	if len([]rune(got)) != 1 || !strings.ContainsRune("·.,'`:;˙∙", []rune(got)[0]) {
+		t.Fatalf("zero matrix = %q, want centered small symbol", row)
+	}
+	if len([]rune(row)) != 3 {
+		t.Errorf("zero cell = %q, want 3 runes with centered symbol", row)
 	}
 	if strings.ContainsAny(row, "0123456789") {
 		t.Errorf("zero matrix contains digit: %q", row)

@@ -19,13 +19,51 @@ import (
 // поэтому одно и то же значение каждый раз выглядит немного иначе.
 var runeLevels = [][]rune{
 	{'.', ',', '·', '\'', '`'},
-	{':', ';', '!', '?', 'i', 'l', 'I', '|'},
+	{':', ';', '!', 'i', 'l', 'I', '|'},
 	{'-', '=', '_', '~', '+', '×', '÷'},
 	{'+', '*', '^', 'x', 'X', 'v', '±'},
 	{'#', '%', '&', '$', '@', '§', '¤'},
 	{'λ', 'π', 'Σ', 'µ', 'σ', 'φ', 'γ', 'δ'},
 	{'Ψ', 'Ω', 'Ξ', 'Φ', 'Θ', 'Δ', 'Λ', 'Π'},
 	{'W', 'M', '@', '%', '&', '∞', '∑', '√'},
+}
+
+var zeroGlyphs = []rune{'·', '.', ',', '\'', '`', ':', ';', '˙', '∙'}
+
+func zeroGlyph() rune {
+	return zeroGlyphs[rand.Intn(len(zeroGlyphs))]
+}
+
+var matrixSetOnce sync.Once
+
+// initMatrixSet выбирает при старте случайный «безопасный» срез из
+// проверенного набора символов и раскладывает его по уровням.
+func initMatrixSet() {
+	matrixSetOnce.Do(func() {
+		base := make([]rune, 0, 64)
+		seen := map[rune]bool{}
+		for _, level := range runeLevels {
+			for _, r := range level {
+				if !seen[r] {
+					seen[r] = true
+					base = append(base, r)
+				}
+			}
+		}
+		n := 32
+		if len(base) < n {
+			return
+		}
+		start := rand.Intn(len(base) - n + 1)
+		part := base[start : start+n]
+		groups := make([][]rune, 8)
+		for i := range groups {
+			lo := i * len(part) / len(groups)
+			hi := (i + 1) * len(part) / len(groups)
+			groups[i] = append([]rune(nil), part[lo:hi]...)
+		}
+		runeLevels = groups
+	})
 }
 
 // runeGlyph выбирает символ нужного уровня. Внутри уровня варианты
@@ -63,7 +101,7 @@ func severityLevel(sev float64) int {
 // matrixGlyphFor — один символ для compact/horizontal/rain.
 func matrixGlyphFor(sev float64, used map[rune]bool) rune {
 	if severityLevel(sev) == 0 {
-		return '·'
+		return zeroGlyph()
 	}
 	return runeForRow(sev, used)
 }
@@ -228,7 +266,7 @@ func (v *gview) add(rs []reading) {
 		default:
 			c.sev = r.severity()
 			if severityLevel(c.sev) == 0 {
-				c.glyph = '·'
+				c.glyph = zeroGlyph()
 			} else {
 				c.glyph = matrixGlyphFor(c.sev, used)
 			}
