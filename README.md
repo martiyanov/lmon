@@ -281,21 +281,21 @@ but the stream goes down:
 lmon --rain --matrix
 ```
 
-Each value is a digit `0–9` plus two different cipher glyphs (keyboard
-symbols and Greek letters). The digit may appear in any of the three
-positions, so the first character is not always the same. All glyphs are
-the same bright green; repeats inside one value are avoided.
+Each value is three different cipher glyphs (keyboard symbols and Greek
+letters). Level zero is a single centered dot ` · `; higher levels use three
+different glyphs. All glyphs are the same bright green; repeats inside one
+value are avoided.
 
 `--matrix` is a full style and works with any mode: colors become green and
 the value cells become cipher glyphs.
 
 ```sh
-lmon --matrix              # digit 0-9 + two different glyphs per value
+lmon --matrix              # three different glyphs per value (zero = ·)
 lmon --bars --matrix
 lmon --hybrid --matrix
 lmon --compact --matrix    # one glyph per parameter
 lmon --horizontal --matrix
-lmon --rain --matrix       # one falling glyph per parameter
+lmon --rain --matrix       # falling matrix cells, no digits
 
 ### Horizontal timeline
 

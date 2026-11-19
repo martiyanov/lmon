@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/rand"
 	"net/netip"
 	"os"
 	"os/signal"
@@ -87,11 +86,10 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   время идёт вправо; --labels full|short — подписи.
   --rain        — направление: заголовок сверху, новые значения
                   появляются под ним и падают вниз; символы/цвета как обычно.
-  --rain --matrix — падающие символы (. , : - = + * # % & @ λ π Σ Ψ Ω),
-                  все одним зелёным цветом.
-  --matrix      — матричный стиль: зелёный; в обычной сетке цифра 0–9
-                  + два разных символа, в compact/horizontal/rain — один
-                  вместо цифр (работает с любым режимом).
+  --rain --matrix — падающие значения в формате matrix: нулевой уровень —
+                  « · », иначе три разных символа; всё зелёное.
+  --matrix      — матричный стиль: зелёный, без цифр. Нулевой уровень — «·»,
+                  иначе три разных символа; в compact/horizontal/rain — один.
 
 Набор колонок:
   --cols NG,CSB  — свой набор и порядок (каждая буква — колонка,
@@ -302,11 +300,10 @@ Display modes:
                   time flows right; --labels full|short selects labels.
   --rain        — direction: header stays on top, new values appear
                   under it and fall down; symbols/colors unchanged.
-  --rain --matrix — falling glyphs (. , : - = + * # % & @ λ π Σ Ψ Ω),
-                  all in the same green color.
-  --matrix      — matrix style: green; normal grid uses digit 0–9
-                  + two different glyphs, compact/horizontal/rain use one
-                  (works with any mode).
+  --rain --matrix — falling matrix values: level zero is « · », otherwise
+                  three different glyphs; all green.
+  --matrix      — matrix style: green, no digits. Level zero is «·»,
+                  otherwise three different glyphs; compact/horizontal/rain use one.
 
 Column set:
   --cols NG,CSB  — your own set and order (each letter is a column;
@@ -1884,7 +1881,7 @@ func (v *hview) add(rs []reading) {
 			if cell.state == 999 {
 				sev = 1
 			}
-			cell.glyph = runeForRow(sev, used)
+			cell.glyph = matrixGlyphFor(sev, used)
 		}
 		h := append([]hcell{cell}, v.history[r.id]...)
 		if len(h) > v.cols {
@@ -2095,23 +2092,21 @@ func (u *ui) dataRow(rs []reading) string {
 				sev = 1
 			}
 			var s string
-			if width >= 3 {
-				// цифра 0–9 + два разных символа, без повтора тройки
-				digit := '0' + rune(int(sev*9+0.5))
-				symbolSev := sev
-				if symbolSev <= 0 {
-					symbolSev = 0.01 // для 0 берём самые лёгкие символы, но не пробелы
+			if severityLevel(sev) == 0 {
+				if width >= 3 {
+					s = " · "
+				} else {
+					s = "·"
 				}
-				g1 := runeForRow(symbolSev, used)
-				g2 := runeForRow(symbolSev, used)
-				cell := []rune{digit, g1, g2}
-				// цифра уровня — в случайной позиции, чтобы первая цифра
-				// не была всегда одной и той же
-				rot := rand.Intn(len(cell))
-				cell = append(cell[rot:], cell[:rot]...)
-				s = string(cell)
+			} else if width >= 3 {
+				// три разных символа уровня, без цифр
+				s = string([]rune{
+					runeForRow(sev, used),
+					runeForRow(sev, used),
+					runeForRow(sev, used),
+				})
 			} else {
-				s = string(runeForRow(sev, used))
+				s = string(matrixGlyphFor(sev, used))
 			}
 			if u.color {
 				s = "\x1b[38;5;46m" + s + reset

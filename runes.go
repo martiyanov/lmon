@@ -45,6 +45,29 @@ func runeGlyph(sev float64, cycle int) rune {
 	return nextRune(idx)
 }
 
+// severityLevel — уровень 0..len(runeLevels)-1 по «плохости».
+func severityLevel(sev float64) int {
+	if sev <= 0 {
+		return 0
+	}
+	l := int(sev*float64(len(runeLevels)-1) + 0.5)
+	if l < 0 {
+		return 0
+	}
+	if l >= len(runeLevels) {
+		return len(runeLevels) - 1
+	}
+	return l
+}
+
+// matrixGlyphFor — один символ для compact/horizontal/rain.
+func matrixGlyphFor(sev float64, used map[rune]bool) rune {
+	if severityLevel(sev) == 0 {
+		return '·'
+	}
+	return runeForRow(sev, used)
+}
+
 // runeForRow выбирает символ, которого ещё нет в текущей строке.
 // Сначала берёт целевой уровень, затем соседние — чтобы даже при
 // одинаковых значениях символы в одной строке не повторялись.
@@ -201,13 +224,13 @@ func (v *gview) add(rs []reading) {
 			c.blank = true
 		case r.v == 999:
 			c.sev = 1
-			c.glyph = runeForRow(1, used)
+			c.glyph = matrixGlyphFor(1, used)
 		default:
 			c.sev = r.severity()
-			if c.sev > 0 {
-				c.glyph = runeForRow(c.sev, used)
+			if severityLevel(c.sev) == 0 {
+				c.glyph = '·'
 			} else {
-				c.blank = true
+				c.glyph = matrixGlyphFor(c.sev, used)
 			}
 		}
 		v.counters[r.id]++
