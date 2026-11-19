@@ -13,7 +13,7 @@ def sh(args):
     return subprocess.run(args, check=False, capture_output=True, text=True)
 def kill():
     sh(["tmux", "-L", SOCKET, "kill-session", "-t", SESSION])
-def capture(mode, cmd, seconds=3.2):
+def capture(mode, cmd, seconds=14.0):
     kill()
     shell = "env -u NO_COLOR TERM=xterm-256color COLORTERM=truecolor " + " ".join(cmd)
     r = sh(["tmux", "-L", SOCKET, "new-session", "-d", "-s", SESSION, "-x", SIZE[0], "-y", SIZE[1], shell])

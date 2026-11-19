@@ -21,12 +21,12 @@ INK = (200, 255, 215)
 BLACK = (3, 7, 5)
 
 SCENES = [
-    ('digits', 3.2, 'lmon', 'Сервер тормозит? Сначала — общая картина.', 'Server feels slow? Start with the whole picture.'),
-    ('bars', 3.2, 'lmon --bars', 'Цвет вместо цифр: проблема видна боковым зрением.', 'Color instead of numbers: spot trouble at a glance.'),
-    ('compact', 3.2, 'lmon --compact', 'Узкое окно или tmux — минимум места.', 'Narrow window or tmux: minimum space.'),
-    ('matrix', 3.6, 'lmon --matrix --rain', 'Тот же мониторинг, только красивее.', 'Same monitoring, nicer to look at.'),
-    ('horizontal', 3.4, 'lmon --horizontal --labels full', 'История вправо: видно, когда началось.', 'History to the right: see when it started.'),
-    ('once', 2.8, 'lmon --once --cols NGCMT', 'В статусбар или скрипт — одна строка.', 'Status bar or script: one line.'),
+    ('digits', 6.5, 'lmon', 'Сервер тормозит? Сначала — общая картина.', 'Server feels slow? Start with the whole picture.'),
+    ('bars', 6.5, 'lmon --bars', 'Цвет вместо цифр: проблема видна боковым зрением.', 'Color instead of numbers: spot trouble at a glance.'),
+    ('compact', 6.0, 'lmon --compact', 'Узкое окно или tmux — минимум места.', 'Narrow window or tmux: minimum space.'),
+    ('matrix', 8.0, 'lmon --matrix --rain', 'Тот же мониторинг, только красивее.', 'Same monitoring, nicer to look at.'),
+    ('horizontal', 7.5, 'lmon --horizontal --labels full', 'История вправо: видно, когда началось.', 'History to the right: see when it started.'),
+    ('once', 4.0, 'lmon --once --cols NGCMT', 'В статусбар или скрипт — одна строка.', 'Status bar or script: one line.'),
 ]
 KEYS = ['lmon', '--bars', '--compact', '--matrix', '--rain', '--horizontal', '--labels full', '--cols', '--once', '--all', '--disk-io', '--gpu', '--fans']
 
@@ -80,7 +80,7 @@ def terminal(mode, local, lang):
         d.ellipse([x0+20+i*26,y0+17,x0+34+i*26,y0+31], fill=c)
     d.text((x0+108,y0+13), scene[2], font=mono, fill=(120,170,135))
     cap = CAP.get(mode, [])
-    idx = min(len(cap)-1, int(local/0.12)) if cap else 0
+    idx = min(len(cap)-1, int(local*2.0/0.12)) if cap else 0
     lines = cap[idx]['lines'] if cap else []
     cw, rh = 18.0, 36
     # real terminal content, 90x28
