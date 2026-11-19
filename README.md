@@ -8,8 +8,10 @@
   <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-blocks.png" width="340" alt="lmon --bars: colored blocks, no digits"></a>
   &nbsp;
   <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-hybrid.png" width="340" alt="lmon --hybrid: digits on state-colored backgrounds"></a>
+  &nbsp;
+  <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-matrix.png" width="340" alt="lmon --matrix: green cipher symbols without digits"></a>
 </p>
-<p align="center"><sub>Four display modes — plain digits, color blocks (<code>--bars</code>), hybrid (<code>--hybrid</code>) and compact (<code>--compact</code>) — real values captured on macOS. The window can shrink to the width of the indicators:</sub></p>
+<p align="center"><sub>Six display modes — plain digits, color blocks (<code>--bars</code>), hybrid (<code>--hybrid</code>), compact (<code>--compact</code>), horizontal (<code>--horizontal</code>) and matrix/rain (<code>--matrix</code>, <code>--rain</code>) — real values captured on macOS. The window can shrink to the width of the indicators:</sub></p>
 <p align="center">
   <a href="https://martiyanov.github.io/lmon/"><img src="docs/img/screenshot-corner.png" width="330" alt="compact lmon window sized to the indicators, tucked into a screen corner"></a>
 </p>
@@ -153,6 +155,8 @@ sysfs (`hwmon` / `thermal_zone`), no extra tools required.
 lmon                    # run forever, one line per second
 lmon 20                 # print 20 lines and exit
 lmon --bars                 # color blocks instead of digits
+lmon --matrix               # green cipher matrix, no digits
+lmon --rain --matrix        # same, values fall down
 lmon --cpu --swap       # add extra columns
 lmon --no-hints         # start without hints about hidden columns
 lmon help               # built-in reference (English; Russian via --lang ru
@@ -255,54 +259,53 @@ GPU, I/O, pings from `--ping`) and silently drops what the OS does not expose.
 It cannot be combined with `--cols`; with `--gpu-index 0,1` you get one GPU
 block per card (`G0`, `G1`, `T0`, `T1`).
 
-### Rain direction
+### Matrix style
 
-`--rain` is not a separate display mode: it only changes the direction.
-Symbols and colors stay exactly as in the selected mode.
-
-```sh
-lmon --rain          # digits, new values on top, falling down
-lmon --rain --bars
-lmon --rain --hybrid
-lmon --rain --compact
-lmon --rain --matrix # green palette
-```
-
-- header stays pinned on top;
-- new values appear under it and move down;
-- `--rain` works with digits, `--bars`, `--hybrid`, `--compact`;
-- it cannot be combined with `--horizontal` or `--once`;
-- `--matrix` is the green cipher style, independent of direction.
-
-`--rain --matrix` uses the same cell format as the normal matrix mode,
-but the stream goes down:
+`--matrix` works with any display mode: colors become green and values become
+cipher glyphs instead of digits.
 
 ```sh
-lmon --rain --matrix
-```
-
-Each value is three different cipher glyphs (keyboard symbols and Greek
-letters). At startup lmon picks a random slice of a safe, single-cell glyph
-set. Level zero is a random small symbol `·`, `.`, `,`, `'`, `` ` ``, `˙`, `∙` centered in the cell;
-higher levels use three different glyphs. All glyphs are the same bright
-green; repeats inside one value are avoided. No font can guarantee a glyph
-is present, but the safe set avoids wide/combining characters.
-
-`--matrix` is a full style and works with any mode: colors become green and
-the value cells become cipher glyphs.
-
-```sh
-lmon --matrix              # random safe set; zero = ·/./,/…
+lmon --matrix              # normal grid, no digits
 lmon --bars --matrix
 lmon --hybrid --matrix
 lmon --compact --matrix    # one glyph per parameter
 lmon --horizontal --matrix
-lmon --rain --matrix       # falling matrix cells, no digits
+lmon --rain --matrix       # falling matrix values
+```
+
+In the normal grid each value is **three different glyphs**; the zero level
+is a small random symbol centered in the cell: `·`, `.`, `,`, `'`, `` ` ``,
+`˙`, `∙`. `--compact` and `--horizontal` use one glyph; `--rain` keeps
+the width of the selected mode (three glyphs in the normal grid). At startup
+lmon chooses a random slice of a safe single-cell glyph set (ASCII, Greek,
+common math/geometric symbols); the set avoids wide, combining and control
+characters. The exact font still decides whether a glyph is drawn or shown as
+a box.
+
+Digit-free, same bright green for every glyph; repeats inside one value are
+avoided. A short reel: [`media/reel-matrix.mp4`](media/reel-matrix.mp4).
+
+### Rain direction
+
+`--rain` is not a separate display mode: it only flips the direction. Header
+stays on top, new values appear under it and fall down; symbols and colors
+are exactly those of the selected mode.
+
+```sh
+lmon --rain          # digits fall down
+lmon --rain --bars
+lmon --rain --hybrid
+lmon --rain --compact
+lmon --rain --matrix # falling matrix glyphs
+```
+
+`--rain` cannot be combined with `--horizontal` or `--once`. Rendered rows are
+frozen once created — they do not change while falling.
 
 ### Horizontal timeline
 
-`lmon --horizontal` turns the view 90°: one row per parameter, time flows
-to the right, and each cell is a colored block. No digits.
+`--horizontal` turns the view 90°: one row per parameter, time flows to the
+right, each cell is a colored block. No digits.
 
 ```sh
 lmon --horizontal
@@ -312,38 +315,36 @@ lmon --horizontal --labels full
 - newest sample is on the left, older samples move right;
 - short labels are the `--cols` letters, `--labels full` gives names like
   `Network`, `Memory`, `CPU temp`;
-- only rows that fit the terminal height are shown; the rest are skipped;
+- only rows that fit the terminal height are shown;
 - purple = no sensor, bright red = no reply;
-- TUI only; `--once` keeps its normal one-line output and cannot be combined
-  with `--horizontal`.
-
-### TUI: header leads by one sample
-
-In the TUI the pinned header always shows the **current** sample, while the
-data row directly above it is one sample older. So a color change appears
-first in the header and moves upward on the next tick instead of lighting
-the header and the cell above it at the same time. `--once` is unchanged.
+- TUI only; `--once` cannot be combined with `--horizontal`.
 
 ### Compact mode
 
 `lmon --compact` is the most minimal view: one letter per parameter in the
 header and one colored block `█` per value, with no spaces between columns.
-The color gradient is the same as in `--bars`/`--blocks`; purple means
-no sensor, bright red means no reply. It uses the same letters as `--cols`;
-multi-letter columns (pings, `PW`, `WR`) show their first letter.
+The color gradient is the same as in `--bars`; purple means no sensor and
+bright red means no reply. It uses the same letters as `--cols`; multi-letter
+columns (pings, `PW`, `WR`) show their first letter.
 
-### Bars mode
+### Bars and hybrid
+
+`lmon --bars` (`--blocks` is a legacy alias) replaces digits with colored
+squares `███`: one per column, with a continuous green → yellow → red gradient
+along each column's scale. In color mode a purple block means no sensor on
+this machine and a bright red block means the host is unreachable — no `·` or
+`...` characters are printed. Without color (`NO_COLOR`, pipe) the text
+fallbacks stay.
 
 `lmon --hybrid` combines both: exact digits printed on the state-colored
-background (the bottom ribbon look, but in the data stream).
+background.
 
-`lmon --bars` (`--blocks`) replaces digits with colored squares `███` —
-one per column, with a continuous green → yellow → red gradient along
-each column's scale. You read the status with peripheral vision instead
-of parsing numbers. In `--bars`/`--compact` a **purple** block means
-no sensor on this machine and a **bright red** block means the host is
-unreachable — no `·`/`...` characters are printed in color mode.
-Without color (`NO_COLOR`, pipe) the text fallbacks stay.
+### TUI: header leads by one sample
+
+In the TUI the pinned header always shows the **current** sample, while the
+data row directly above it is one sample older. A color change appears first
+in the header and moves upward on the next tick instead of lighting the
+header and the cell above it at the same time. `--once` is unchanged.
 
 ### Reading bad numbers
 
@@ -368,8 +369,8 @@ Without color (`NO_COLOR`, pipe) the text fallbacks stay.
 | `--bars` | — | off | colored bars instead of digits (`--blocks` is a legacy alias) |
 | `--compact` | `LMON_COMPACT` | off | one letter and one colored block per parameter, no gaps |
 | `--horizontal` | `LMON_HORIZONTAL` | off | horizontal color timeline (TUI) |
-| `--rain` | `LMON_RAIN` | off | falling values, Braille fill, TUI only |
-| `--matrix` | `LMON_MATRIX` | off | matrix style: green + cipher glyphs (any mode) |
+| `--rain` | `LMON_RAIN` | off | direction: new values on top, falling down (works with the selected mode) |
+| `--matrix` | `LMON_MATRIX` | off | matrix style: green, no digits, random safe cipher glyphs, zero = small centered symbol (any mode) |
 | `--labels` | `LMON_LABELS` | `short` | horizontal labels: `full` or `short` |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`), `--ping` names (`NG,VPN,M`), and an empty column for two commas (`NG,,M`); flags add more |

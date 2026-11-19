@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>lmon — a one-line system monitor for your terminal</title>
-<meta name="description" content="One line per second: ping, memory, CPU and GPU temperatures — as color. macOS, Linux, Windows.">
+<meta name="description" content="A system monitor for the terminal: digits, color blocks, compact view, horizontal timeline and matrix rain. macOS, Linux, Windows.">
 <link rel="canonical" href="https://martiyanov.github.io/lmon/en/">
 <link rel="alternate" hreflang="ru" href="https://martiyanov.github.io/lmon/">
 <link rel="alternate" hreflang="en" href="https://martiyanov.github.io/lmon/en/">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://martiyanov.github.io/lmon/">
 <meta property="og:title" content="lmon — a one-line system monitor for your terminal">
-<meta property="og:description" content="One line per second: ping, memory, CPU and GPU temperatures — as color. macOS, Linux, Windows.">
+<meta property="og:description" content="A system monitor for the terminal: digits, color blocks, compact view, horizontal timeline and matrix rain. macOS, Linux, Windows.">
 <meta property="og:image" content="https://martiyanov.github.io/lmon/img/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
@@ -104,7 +104,8 @@
 
   <section>
     <h2>How it looks</h2>
-    <p class="lead">Three display modes — plus a compact corner widget.
+    <p class="lead">Six display modes — digits, color blocks, hybrid,
+    compact corner widget, horizontal timeline and matrix rain.
     Values are real, captured by <code class="inl">lmon</code> on macOS.</p>
     <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
       <figure style="margin:0;text-align:center">
@@ -127,11 +128,35 @@
   </section>
 
   <section>
+    <h2>Matrix and rain</h2>
+    <p class="lead"><code class="inl">--matrix</code> is a green, digit-free
+    style: a random safe glyph set, a small centered symbol for level zero,
+    three different glyphs for other values. <code class="inl">--rain</code>
+    flips the direction: header on top, new values fall down.</p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin-top:16px">
+      <figure style="margin:0;text-align:center">
+        <img src="../img/screenshot-matrix.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --matrix: green cipher glyphs without digits">
+        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --matrix</b> — no digits</figcaption>
+      </figure>
+      <figure style="margin:0;text-align:center">
+        <img src="../img/screenshot-rain.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --matrix --rain: values fall down">
+        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --matrix --rain</b> — falling down</figcaption>
+      </figure>
+    </div>
+    <video src="../media/reel-matrix.mp4" controls playsinline poster="../img/screenshot-rain.png"
+           style="width:100%;max-width:360px;border-radius:12px;border:1px solid #30363d;margin-top:18px;display:block"></video>
+    <p class="note">An 18-second matrix-mode reel, no sound.</p>
+    <div class="cmd" style="margin-top:16px"><span class="c">lmon --matrix --all --rain</span><button>copy</button></div>
+    <p class="note">All glyphs are the same green. The safe single-cell set avoids
+    wide/combining characters; the exact glyph still depends on the terminal font.</p>
+  </section>
+
+  <section>
     <h2>What it shows</h2>
     <div class="cols" id="cols"></div>
     <p class="lead" style="margin-top:14px">A dot <code class="inl">·</code> means the machine has no such sensor (honest, no made-up numbers),
     <code class="inl">999</code> — the host is not answering. Any column set and order: <code class="inl">lmon --cols NRMC</code>.
-    There are also colored bars <code class="inl">--bars</code>, digits on a colored background <code class="inl">--hybrid</code>, and the most minimal <code class="inl">--compact</code> — one letter and one colored block per parameter, no gaps.</p>
+    There are also colored bars <code class="inl">--bars</code>, digits on a colored background <code class="inl">--hybrid</code>, the most minimal <code class="inl">--compact</code> — one letter and one block per parameter, a horizontal timeline <code class="inl">--horizontal</code>, and matrix <code class="inl">--matrix</code> with falling values <code class="inl">--rain</code>.</p>
   </section>
 
   <section>

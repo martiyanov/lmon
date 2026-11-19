@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>lmon — монитор компьютера в терминале</title>
-<meta name="description" content="Одна строка в секунду: пинг, память, температуры CPU и GPU — цветом. macOS, Linux, Windows.">
+<meta name="description" content="Монитор компьютера в терминале: цифры, цветные блоки, компактный вид, горизонтальная лента и матричный дождь. macOS, Linux, Windows.">
 <link rel="canonical" href="https://martiyanov.github.io/lmon/">
 <link rel="alternate" hreflang="ru" href="https://martiyanov.github.io/lmon/">
 <link rel="alternate" hreflang="en" href="https://martiyanov.github.io/lmon/en/">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://martiyanov.github.io/lmon/">
 <meta property="og:title" content="lmon — монитор компьютера в терминале">
-<meta property="og:description" content="Одна строка в секунду: пинг, память, температуры CPU и GPU — цветом. macOS, Linux, Windows.">
+<meta property="og:description" content="Монитор компьютера в терминале: цифры, цветные блоки, компактный вид, горизонтальная лента и матричный дождь. macOS, Linux, Windows.">
 <meta property="og:image" content="https://martiyanov.github.io/lmon/img/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
@@ -104,7 +104,8 @@
 
   <section>
     <h2>Как это выглядит</h2>
-    <p class="lead">Три режима отображения — и компактный виджет в углу экрана.
+    <p class="lead">Шесть режимов отображения — цифры, цветные блоки, гибрид,
+    компактный виджет, горизонтальная лента и матричный дождь.
     Значения настоящие, снятые <code class="inl">lmon</code> на macOS.</p>
     <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
       <figure style="margin:0;text-align:center">
@@ -127,11 +128,36 @@
   </section>
 
   <section>
+    <h2>Матрица и дождь</h2>
+    <p class="lead"><code class="inl">--matrix</code> — зелёный стиль без цифр:
+    случайный безопасный набор символов, нулевой уровень — маленькая точка
+    по центру, остальные — три разных символа. <code class="inl">--rain</code>
+    переворачивает поток: заголовок сверху, новые значения падают вниз.</p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin-top:16px">
+      <figure style="margin:0;text-align:center">
+        <img src="img/screenshot-matrix.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --matrix: зелёные шифрованные символы без цифр">
+        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --matrix</b> — без цифр</figcaption>
+      </figure>
+      <figure style="margin:0;text-align:center">
+        <img src="img/screenshot-rain.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --matrix --rain: значения падают вниз">
+        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --matrix --rain</b> — падает вниз</figcaption>
+      </figure>
+    </div>
+    <video src="media/reel-matrix.mp4" controls playsinline poster="img/screenshot-rain.png"
+           style="width:100%;max-width:360px;border-radius:12px;border:1px solid #30363d;margin-top:18px;display:block"></video>
+    <p class="note">Рилс про матричный режим — 18 секунд, без звука.</p>
+    <div class="cmd" style="margin-top:16px"><span class="c">lmon --matrix --all --rain</span><button>копировать</button></div>
+    <p class="note">Цвет — один зелёный; ширина терминала не ломается:
+    символы выбираются из безопасного одноклеточного набора. Конкретный
+    глиф всё равно зависит от шрифта терминала.</p>
+  </section>
+
+  <section>
     <h2>Что показывает</h2>
     <div class="cols" id="cols"></div>
     <p class="lead" style="margin-top:14px">Точка <code class="inl">·</code> — такого датчика в системе нет (честно, без выдуманных чисел),
     <code class="inl">999</code> — хост не отвечает. Набор и порядок колонок — любые: <code class="inl">lmon --cols NRMC</code>.
-    Ещё есть цветные квадраты <code class="inl">--bars</code>, цифры на цветном фоне <code class="inl">--hybrid</code> и самый минималистичный <code class="inl">--compact</code> — по одной букве и одному цветному блоку на параметр, без пробелов.</p>
+    Ещё есть цветные квадраты <code class="inl">--bars</code>, цифры на цветном фоне <code class="inl">--hybrid</code>, самый минималистичный <code class="inl">--compact</code> — по одной букве и одному блоку на параметр, горизонтальная лента <code class="inl">--horizontal</code> и матрица <code class="inl">--matrix</code> с падающими значениями <code class="inl">--rain</code>.</p>
   </section>
 
   <section>
