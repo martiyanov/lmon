@@ -283,7 +283,7 @@ lmon --rain --matrix
 
 Each value is three different cipher glyphs (keyboard symbols and Greek
 letters). At startup lmon picks a random slice of a safe, single-cell glyph
-set. Level zero is a random small symbol `·`, `.`, `,`, `'`, `` ` ``, `:`, `;`, `˙`, `∙` centered in the cell;
+set. Level zero is a random small symbol `·`, `.`, `,`, `'`, `` ` ``, `˙`, `∙` centered in the cell;
 higher levels use three different glyphs. All glyphs are the same bright
 green; repeats inside one value are avoided. No font can guarantee a glyph
 is present, but the safe set avoids wide/combining characters.

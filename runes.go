@@ -28,7 +28,7 @@ var runeLevels = [][]rune{
 	{'W', 'M', '@', '%', '&', '∞', '∑', '√'},
 }
 
-var zeroGlyphs = []rune{'·', '.', ',', '\'', '`', ':', ';', '˙', '∙'}
+var zeroGlyphs = []rune{'·', '.', ',', '\'', '`', '˙', '∙'}
 
 func zeroGlyph() rune {
 	return zeroGlyphs[rand.Intn(len(zeroGlyphs))]
