@@ -125,9 +125,9 @@ def intro(t, lang):
     img=rain_bg(t); d=ImageDraw.Draw(img)
     d.text((70,560),'lmon',font=logo,fill=GREEN)
     if lang=='ru':
-        lines=['минималистичный, лаконичный','мониторинг компьютера','в терминале']
+        lines=['пульс компьютера','в одной строке','реальный TUI · без графики']
     else:
-        lines=['minimal, concise','computer monitoring','in your terminal']
+        lines=['the pulse of your computer','in one line','real TUI · no graphs']
     for i,s in enumerate(lines):
         d.text((76,735+i*72),s,font=h1 if i<2 else h2,fill=(180,255,205))
     d.text((80,1010),'lmon --matrix --rain',font=small,fill=(0,210,100))
@@ -137,9 +137,9 @@ def end(t, lang):
     img=rain_bg(t); d=ImageDraw.Draw(img)
     d.text((70,480),'lmon',font=logo,fill=GREEN)
     if lang=='ru':
-        lines=['минималистичный мониторинг','компьютера — одной командой','github.com/martiyanov/lmon']
+        lines=['пульс компьютера','в одной строке','github.com/martiyanov/lmon']
     else:
-        lines=['minimal computer monitoring','one command, one binary','github.com/martiyanov/lmon']
+        lines=['the pulse of your computer','in one line','github.com/martiyanov/lmon']
     for i,s in enumerate(lines):
         d.text((76,660+i*72),s,font=h2 if i<2 else small,fill=(180,255,205) if i<2 else (0,190,100))
     d.text((76,930),'lmon --matrix --rain',font=small,fill=(0,255,120))

@@ -1,6 +1,6 @@
 # lmon
 
-**Minimal, concise computer monitoring for the terminal.**
+**The pulse of your computer, in one line.**
 
 **English** · [По-русски / Russian](README.ru.md) · [Website](https://martiyanov.github.io/lmon/)
 
