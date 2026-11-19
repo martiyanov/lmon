@@ -321,11 +321,23 @@ lmon --horizontal --labels full
 
 ### Compact mode
 
-`lmon --compact` is the most minimal view: one letter per parameter in the
+<p align="center"><img src="docs/img/screenshot-compact.png" width="252" alt="lmon --compact: one letter per parameter, one block per value"></p>
+
+`lmon --compact` is the narrowest view: one letter per parameter in the
 header and one colored block `█` per value, with no spaces between columns.
-The color gradient is the same as in `--bars`; purple means no sensor and
-bright red means no reply. It uses the same letters as `--cols`; multi-letter
-columns (pings, `PW`, `WR`) show their first letter.
+The header uses the same letters as `--cols`; pings and multi-letter columns
+(`PW`, `WR`) show their first character. Purple means no sensor, bright red
+means no reply. It fits tmux/status bars and can be combined with the other
+styles:
+
+```sh
+lmon --compact --cols NGM
+lmon --compact --matrix     # cipher glyphs instead of blocks
+lmon --rain --compact       # values fall down
+```
+
+With `--matrix` the single cell shows a cipher glyph; the zero level is a
+small centered symbol. With `--rain` the same compact cells fall down.
 
 ### Bars and hybrid
 

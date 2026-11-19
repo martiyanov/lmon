@@ -153,6 +153,29 @@
   </section>
 
   <section>
+    <h2>Одноколоночный режим</h2>
+    <p class="lead"><code class="inl">--compact</code> — самый узкий вид:
+    по одной букве на параметр в заголовке и по одному блоку на значение,
+    без промежутков между колонками. Заголовок — буквы из
+    <code class="inl">--cols</code>; у имён пингов и многобуквенных колонок
+    берётся первый символ.</p>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-top:14px">
+      <figure style="margin:0;text-align:center">
+        <img src="img/screenshot-compact.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --compact: одна буква на параметр и один блок на значение">
+        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --compact</b> — минимальная ширина</figcaption>
+      </figure>
+      <div style="flex:1;min-width:260px">
+        <div class="cmd"><span class="c">lmon --compact --cols NGM</span><button>копировать</button></div>
+        <div class="cmd"><span class="c">lmon --compact --matrix</span><button>копировать</button></div>
+        <div class="cmd"><span class="c">lmon --rain --compact</span><button>копировать</button></div>
+        <p class="note">Фиолетовый — датчика нет, ярко-красный — нет ответа.
+        С <code class="inl">--matrix</code> вместо блоков — шифрованные символы;
+        с <code class="inl">--rain</code> значения падают вниз.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <h2>Что показывает</h2>
     <div class="cols" id="cols"></div>
     <p class="lead" style="margin-top:14px">Точка <code class="inl">·</code> — такого датчика в системе нет (честно, без выдуманных чисел),

@@ -152,6 +152,28 @@
   </section>
 
   <section>
+    <h2>Single-column mode</h2>
+    <p class="lead"><code class="inl">--compact</code> is the narrowest view:
+    one letter per parameter in the header and one block per value, with no
+    gaps between columns. Labels are the <code class="inl">--cols</code>
+    letters; pings and multi-letter columns use their first character.</p>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-top:14px">
+      <figure style="margin:0;text-align:center">
+        <img src="../img/screenshot-compact.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --compact: one letter per parameter and one block per value">
+        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --compact</b> — minimum width</figcaption>
+      </figure>
+      <div style="flex:1;min-width:260px">
+        <div class="cmd"><span class="c">lmon --compact --cols NGM</span><button>copy</button></div>
+        <div class="cmd"><span class="c">lmon --compact --matrix</span><button>copy</button></div>
+        <div class="cmd"><span class="c">lmon --rain --compact</span><button>copy</button></div>
+        <p class="note">Purple — no sensor, bright red — no reply.
+        With <code class="inl">--matrix</code> blocks become cipher glyphs;
+        with <code class="inl">--rain</code> values fall down.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <h2>What it shows</h2>
     <div class="cols" id="cols"></div>
     <p class="lead" style="margin-top:14px">A dot <code class="inl">·</code> means the machine has no such sensor (honest, no made-up numbers),
