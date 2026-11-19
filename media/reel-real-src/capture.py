@@ -1,13 +1,13 @@
 import json, os, subprocess, time
 SESSION = "lmon-reel"
 SOCKET = "lmonreel"
-SIZE = ("90", "28")
+SIZE = ("55", "14")
 MODES = [
-    ("digits", ["lmon", "--interval", "0.45"]),
-    ("bars", ["lmon", "--bars", "--interval", "0.45"]),
-    ("compact", ["lmon", "--compact", "--interval", "0.45"]),
-    ("matrix", ["lmon", "--matrix", "--rain", "--interval", "0.45"]),
-    ("horizontal", ["lmon", "--horizontal", "--interval", "0.45"]),
+    ("digits", ["lmon", "--interval", "0.20"]),
+    ("bars", ["lmon", "--bars", "--interval", "0.20"]),
+    ("compact", ["lmon", "--compact", "--interval", "0.20"]),
+    ("matrix", ["lmon", "--matrix", "--rain", "--interval", "0.20"]),
+    ("horizontal", ["lmon", "--horizontal", "--interval", "0.20"]),
 ]
 def sh(args):
     return subprocess.run(args, check=False, capture_output=True, text=True)
@@ -34,6 +34,14 @@ all_frames = {}
 for name, cmd in MODES:
     print("capture", name)
     all_frames[name] = capture(name, cmd)
+# --once: status-bar mode, one line, keep the tmux session alive briefly
+kill()
+sh(["tmux", "-L", SOCKET, "new-session", "-d", "-s", SESSION, "-x", SIZE[0], "-y", SIZE[1],
+    "env -u NO_COLOR TERM=xterm-256color COLORTERM=truecolor sh -c 'lmon --once --cols NGCMT; sleep 3'"])
+time.sleep(1.0)
+r = sh(["tmux", "-L", SOCKET, "capture-pane", "-p", "-e", "-t", SESSION, "-S", "-100"])
+all_frames["once"] = [{"t": 0.0, "lines": r.stdout.splitlines()[-28:]}]
+kill()
 with open(os.path.join(os.path.dirname(__file__), "captures.json"), "w") as f:
     json.dump(all_frames, f, ensure_ascii=False)
 print({k: len(v) for k, v in all_frames.items()})

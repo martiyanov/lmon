@@ -285,7 +285,7 @@ characters. The exact font still decides whether a glyph is drawn or shown as
 a box.
 
 Digit-free, same bright green for every glyph; repeats inside one value are
-avoided. Reels: [Russian `media/reel-real-ru.mp4`](media/reel-real-ru.mp4) · [English `media/reel-real-en.mp4`](media/reel-real-en.mp4) · [matrix teaser](media/reel-matrix.mp4).
+avoided. Reels: [Russian `media/reel-benefit-ru.mp4`](media/reel-benefit-ru.mp4) · [English `media/reel-benefit-en.mp4`](media/reel-benefit-en.mp4) · [matrix teaser](media/reel-matrix.mp4).
 
 ### Rain direction
 
