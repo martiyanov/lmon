@@ -1044,10 +1044,14 @@ func TestMatrixFillGlyphs(t *testing.T) {
 	v := &gview{rows: 4, cols: 3, color: true, history: map[string][]gcell{}, counters: map[string]int{}}
 	r := []reading{{id: "N", head: "NET", v: 200, green: 50, yellow: 150, red: 300}}
 	v.add(r)
-	v.add(r)
+	// в одной строке два одинаковых значения должны получить разные символы
+	v.add([]reading{
+		{id: "N", head: "NET", v: 200, green: 50, yellow: 150, red: 300},
+		{id: "M", head: "MEM", v: 200, green: 50, yellow: 150, red: 300},
+	})
 	h := v.history["N"]
 	if len(h) < 2 || h[0].glyph == h[1].glyph {
-		t.Errorf("повтор значения не перебирает символы: %+v", h)
+		t.Errorf("в строке повторяется символ: %+v", h)
 	}
 	if !strings.Contains(v.cell(h[0]), "38;5;46") {
 		t.Errorf("символ не одним зелёным цветом: %q", v.cell(h[0]))
