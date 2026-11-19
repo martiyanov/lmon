@@ -1049,12 +1049,13 @@ func TestMatrixFillGlyphs(t *testing.T) {
 		{id: "N", head: "NET", v: 200, green: 50, yellow: 150, red: 300},
 		{id: "M", head: "MEM", v: 200, green: 50, yellow: 150, red: 300},
 	})
-	h := v.history["N"]
-	if len(h) < 2 || h[0].glyph == h[1].glyph {
-		t.Errorf("в строке повторяется символ: %+v", h)
+	hN := v.history["N"]
+	hM := v.history["M"]
+	if len(hN) == 0 || len(hM) == 0 || hN[0].glyph == hM[0].glyph {
+		t.Errorf("в строке повторяется символ: N=%+v M=%+v", hN, hM)
 	}
-	if !strings.Contains(v.cell(h[0]), "38;5;46") {
-		t.Errorf("символ не одним зелёным цветом: %q", v.cell(h[0]))
+	if !strings.Contains(v.cell(hN[0]), "38;5;46") {
+		t.Errorf("символ не одним зелёным цветом: %q", v.cell(hN[0]))
 	}
 
 	cfg, err := parseConfig([]string{"--rain", "--matrix"})
