@@ -798,8 +798,8 @@ func TestCompactMode(t *testing.T) {
 	if err != nil || !cfg.compact {
 		t.Fatalf("--compact: cfg=%+v err=%v", cfg.compact, err)
 	}
-	if _, err := parseConfig([]string{"--compact", "--bars"}); err == nil {
-		t.Error("--compact + --bars: ожидалась ошибка")
+	if cfg, err := parseConfig([]string{"--compact", "--blocks"}); err != nil || !cfg.compact || cfg.blocks {
+		t.Errorf("--compact + --blocks should mean compact: cfg=%+v err=%v", cfg, err)
 	}
 	rs := []reading{
 		{id: "N", head: "NET", v: 10},

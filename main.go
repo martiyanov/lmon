@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.48.0"
+const version = "1.49.0"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -152,6 +152,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --rain --bars   — блоки падают вниз
   lmon --rain --matrix — падающие символы по визуальному весу
   lmon --matrix        — обычный режим без цифр, только заполнение
+  lmon --mono --bars   — ч/б заполнение без цвета
   lmon --compact --matrix — по одному символу заполнения
   lmon --horizontal --labels full   # полные подписи
   lmon --once --json — машиночитаемая строка для скриптов
@@ -210,6 +211,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --labels      LMON_LABELS     подписи в горизонтальном режиме: full или short
   --rain        LMON_RAIN       направление вниз: новые значения сверху
   --matrix      LMON_MATRIX     матричный стиль (любой режим)
+  --mono        LMON_MONO       ч/б заполнение: · ░ ▒ ▓ █ (авто при NO_COLOR)
   --gpu-index   LMON_GPU_INDEX  индекс или список GPU для --gpu/--gputemp: 0 или 0,1
   --gpu-list    LMON_GPU_LIST   показать список GPU и выйти
   --all         LMON_ALL        все доступные колонки (с --ping — ещё и они)
@@ -382,6 +384,7 @@ Usage:
   lmon --rain --bars   — blocks falling down
   lmon --rain --matrix — falling weight-ordered glyphs
   lmon --matrix        — normal mode without digits, fill only
+  lmon --mono --bars   — monochrome fill, no color
   lmon --compact --matrix — one glyph per parameter
   lmon --horizontal --labels full   # full labels
   lmon --cpu --swap  — restore CPU/swap if removed from --cols
@@ -440,6 +443,7 @@ Settings (flags and environment variables):
   --labels      LMON_LABELS     horizontal mode labels: full or short
   --rain        LMON_RAIN       down direction: new values on top
   --matrix      LMON_MATRIX     matrix style (any mode)
+  --mono        LMON_MONO       mono fill: · ░ ▒ ▓ █ (auto with NO_COLOR)
   --gpu-index   LMON_GPU_INDEX  GPU index or list for --gpu/--gputemp: 0 or 0,1
   --gpu-list    LMON_GPU_LIST   list GPUs and exit
   --all         LMON_ALL        every available column (pings too, if --ping)
@@ -523,6 +527,7 @@ type config struct {
 	blocks        bool
 	hybrid        bool
 	compact       bool
+	mono          bool // --mono: monochrome fill, works without color
 	horizontal    bool
 	labelsFull    bool
 	rain          bool
@@ -667,6 +672,7 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&blocks, "blocks", false, "alias for --bars (legacy name)")
 	fs.BoolVar(&hybrid, "hybrid", false, "digits on the state-colored background")
 	fs.BoolVar(&compact, "compact", envFlag("LMON_COMPACT"), "one character per column, no gaps")
+	mono := fs.Bool("mono", envFlag("LMON_MONO"), "monochrome fill: · ░ ▒ ▓ █ (also auto without color)")
 	fs.BoolVar(&rain, "rain", envFlag("LMON_RAIN"), "falling values: headers on top, values fall down")
 	matrixPalette := fs.Bool("matrix", envFlag("LMON_MATRIX"), "green matrix palette (works with any mode)")
 	horizontal := fs.Bool("horizontal", envFlag("LMON_HORIZONTAL"), "horizontal color timeline (TUI)")
@@ -726,8 +732,11 @@ func parseConfig(args []string) (config, error) {
 	if blocks && hybrid {
 		return config{}, errors.New(lmsg(lg, "--bars/--blocks and --hybrid are mutually exclusive", "--bars/--blocks и --hybrid взаимоисключающи"))
 	}
-	if compact && (blocks || hybrid) {
-		return config{}, errors.New(lmsg(lg, "--compact cannot be combined with --bars/--blocks or --hybrid", "--compact не сочетается с --bars/--blocks или --hybrid"))
+	if compact && hybrid {
+		return config{}, errors.New(lmsg(lg, "--compact cannot be combined with --hybrid", "--compact не сочетается с --hybrid"))
+	}
+	if compact {
+		blocks = false // compact already uses one block/glyph per value
 	}
 	labelsMode := strings.ToLower(strings.TrimSpace(*labels))
 	if labelsMode != "full" && labelsMode != "short" {
@@ -862,7 +871,7 @@ func parseConfig(args []string) (config, error) {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once, jsonOut: *jsonOut, exitCode: *exitCode, profile: prof, topN: *topN,
-		blocks: blocks, hybrid: hybrid, compact: compact, horizontal: *horizontal, labelsFull: labelsMode == "full", rain: rain, matrixPalette: *matrixPalette, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
+		blocks: blocks, hybrid: hybrid, compact: compact, mono: *mono, horizontal: *horizontal, labelsFull: labelsMode == "full", rain: rain, matrixPalette: *matrixPalette, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
 		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans,
@@ -1270,7 +1279,8 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	defer termRestore()
 
 	tty := stdoutIsTTY()
-	u := &ui{w: w, tty: tty, color: tty && os.Getenv("NO_COLOR") == "", blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, matrix: cfg.matrixPalette, rain: cfg.rain, symbols: true, lang: cfg.lang}
+	color := colorAllowed(tty) && !cfg.mono
+	u := &ui{w: w, tty: tty, color: color, mono: monoWanted(cfg, color), blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, matrix: cfg.matrixPalette, rain: cfg.rain, symbols: true, lang: cfg.lang}
 	if cfg.compact {
 		u.head, u.sep = headerOfCompact(cols)
 	} else {
@@ -1377,13 +1387,23 @@ func monitorHorizontal(ctx context.Context, cfg config, w io.Writer, dropped []d
 	}
 }
 
+func colorAllowed(tty bool) bool {
+	return tty && os.Getenv("NO_COLOR") == ""
+}
+
+func monoWanted(cfg config, color bool) bool {
+	return cfg.mono || (!color && (cfg.blocks || cfg.compact))
+}
+
 // newOnceUI собирает ui для --once: tty передаётся явно, чтобы цвет
 // включался ровно на терминале и не зависел от os.Stdout в тестах.
 func newOnceUI(w io.Writer, cfg config, tty bool) *ui {
+	color := colorAllowed(tty) && !cfg.mono
 	return &ui{
 		w:       w,
 		tty:     tty,
-		color:   tty && os.Getenv("NO_COLOR") == "",
+		color:   color,
+		mono:    monoWanted(cfg, color),
 		blocks:  cfg.blocks,
 		hybrid:  cfg.hybrid,
 		compact: cfg.compact,
@@ -2246,7 +2266,7 @@ func (u *ui) dataRow(rs []reading) string {
 		switch {
 		case u.hybrid && u.color: // цифры на подложке цвета состояния
 			cells[j] = u.hybridCell(r)
-		case u.blocks && u.color:
+		case u.blocks && (u.color || u.mono):
 			cells[j] = u.blockCell(r)
 		default:
 			cells[j] = u.digitCell(r)
@@ -2298,6 +2318,7 @@ type ui struct {
 	w          io.Writer
 	tty        bool
 	color      bool
+	mono       bool
 	blocks     bool
 	hybrid     bool
 	compact    bool
@@ -2643,6 +2664,9 @@ func (u *ui) digitCell(r reading) string {
 // blockCell — квадрат-индикатор с непррерывной градацией цвета.
 // В блочном режиме градусы не приписываются: цвет несёт весь смысл.
 func (u *ui) blockCell(r reading) string {
+	if u.mono {
+		return monoBar(r)
+	}
 	if r.v < 0 { // датчика нет
 		if !u.color {
 			return dim + "·" + reset
@@ -2667,6 +2691,9 @@ func (u *ui) blockCell(r reading) string {
 // compactCell — один блок на параметр, без пробелов.
 // Цвет — та же градация, что в --bars/--blocks; «·» — нет датчика.
 func (u *ui) compactCell(r reading) string {
+	if u.mono {
+		return monoCompact(r)
+	}
 	if r.v < 0 {
 		if u.color {
 			if u.matrix {
@@ -2689,6 +2716,45 @@ func (u *ui) compactCell(r reading) string {
 		return "█"
 	}
 	return fgSev(r.severity(), u.matrix) + "█" + reset
+}
+
+// monoBar — монохромная шкала заполнения для --bars/--blocks.
+func monoBar(r reading) string {
+	if r.blank {
+		return "   "
+	}
+	if r.v < 0 {
+		return "???"
+	}
+	if r.v == 999 {
+		return "!!!"
+	}
+	n := int(r.severity()*6 + 0.5)
+	if n < 0 {
+		n = 0
+	}
+	if n > 6 {
+		n = 6
+	}
+	return []string{" . ", "░  ", "░▒ ", "░▒▓", "▒▓█", "▓██", "███"}[n]
+}
+
+// monoCompact — один монохромный символ на параметр.
+func monoCompact(r reading) string {
+	if r.v < 0 {
+		return "?"
+	}
+	if r.v == 999 {
+		return "!"
+	}
+	n := int(r.severity()*4 + 0.5)
+	if n < 0 {
+		n = 0
+	}
+	if n > 4 {
+		n = 4
+	}
+	return string([]rune{'·', '░', '▒', '▓', '█'}[n])
 }
 
 // hybridCell — смешанный режим: точные цифры на подложке цвета состояния

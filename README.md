@@ -401,9 +401,15 @@ ping=VPN=10.8.0.1
 
 ## No color
 
-Color is disabled with the standard `NO_COLOR=1 lmon`. There is no separate
-`--no-color` flag yet; `--bars`/`--hybrid` fall back to readable text when
-color is off. A true monochrome fill (`--mono`) is still in the backlog.
+Color is disabled with the standard `NO_COLOR=1 lmon` or `--mono`. In
+`--compact`/`--bars` lmon automatically switches to a monochrome fill ramp:
+
+```
+· → ░ → ▒ → ▓ → █
+```
+
+No sensor is `?`/`???`, no reply is `!`/`!!!`. There is no separate
+`--no-color` flag yet; use `NO_COLOR=1` or `--mono`.
 
 ### TUI: header leads by one sample
 
@@ -437,6 +443,7 @@ header and the cell above it at the same time. `--once` is unchanged.
 | `--horizontal` | `LMON_HORIZONTAL` | off | horizontal color timeline (TUI) |
 | `--rain` | `LMON_RAIN` | off | direction: new values on top, falling down (works with the selected mode) |
 | `--matrix` | `LMON_MATRIX` | off | matrix style: green, no digits, random safe cipher glyphs, zero = small centered symbol (any mode) |
+| `--mono` | `LMON_MONO` | off | monochrome fill (`· ░ ▒ ▓ █`); also automatic with `NO_COLOR` |
 | `--labels` | `LMON_LABELS` | `short` | horizontal labels: `full` or `short` |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`), `--ping` names (`NG,VPN,M`), and an empty column for two commas (`NG,,M`); flags add more |
