@@ -268,8 +268,8 @@ func TestLayoutAdditiveCols(t *testing.T) {
 	for _, r := range layout(cfg3) {
 		got3 += r.id
 	}
-	if got3 != "NGLMT" {
-		t.Errorf("layout(дефолт) = %q, want NGLMT", got3)
+	if got3 != "NGCLMTUS" {
+		t.Errorf("layout(дефолт) = %q, want NGCLMTUS", got3)
 	}
 }
 
@@ -536,8 +536,8 @@ func TestColsWithPingNames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := ids(layout(cfg2)); got != "NGLMTVPN" {
-		t.Errorf("layout без cols = %q, want NGLMTVPN", got)
+	if got := ids(layout(cfg2)); got != "NGCLMTUSVPN" {
+		t.Errorf("layout без cols = %q, want NGCLMTUSVPN", got)
 	}
 }
 

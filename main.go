@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.46.0"
+const version = "1.47.0"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -108,6 +108,9 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
     PW/WR — CPU power и износ NVMe (нужен root)
     P — загрузка GPU (%)         H — t°GPU
 
+  По умолчанию: NET GTW CPU RUN MEM C° DSK SWP — сеть, процессор,
+  память, температура и диск. Остальное добавляется флагами.
+
   Примеры: только сеть и память — lmon --cols NM
            swap перед памятью  — lmon --cols N,SG,M
            пустой столбик      — lmon --cols NG,,M
@@ -151,7 +154,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --matrix        — обычный режим без цифр, только заполнение
   lmon --compact --matrix — по одному символу заполнения
   lmon --horizontal --labels full   # полные подписи
-  lmon --cpu --swap  — добавить колонки CPU и swap
+  lmon --cpu --swap  — вернуть CPU/swap, если их убрали из --cols
   lmon --gpu         — добавить колонку загрузки GPU
   lmon --gpu-list    — список видеокарт (индекс: имя)
   lmon --gpu-index 1 — какую карту показывать (по умолчанию 0)
@@ -213,6 +216,11 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --system      LMON_SYSTEM     упавшие юниты и reboot-required (Linux)
   --cpu-power   LMON_CPU_POWER  потребление CPU, Вт (Linux, нужен root)
   --nvme-smart  LMON_NVME_SMART износ NVMe, % (Linux, нужен root)
+  --config PATH LMON_CONFIG   файл настроек (по умолчанию
+                              XDG_CONFIG_HOME/lmon/config или
+                              ~/.config/lmon/config; Windows: AppData)
+  --save-config                сохранить текущие настройки в файл и выйти
+  --no-config                  не читать файл настроек
   --temp-cmd    LMON_TEMP_CMD  внешняя команда, печатающая температуру CPU
                               в °C (берётся первое число). Нужна на Windows,
                               где нет штатного API: например, LHM через
@@ -323,6 +331,9 @@ Column set:
     PW/WR — CPU power and NVMe wear (root required)
     P — GPU usage (%)            H — GPU °C
 
+  Default: NET GTW CPU RUN MEM C° DSK SWP — network, CPU, memory,
+  temperature and disk. Everything else is opt-in.
+
   Examples: network and memory only — lmon --cols NM
             swap before memory    — lmon --cols N,SG,M
             empty spacer          — lmon --cols NG,,M
@@ -365,7 +376,7 @@ Usage:
   lmon --matrix        — normal mode without digits, fill only
   lmon --compact --matrix — one glyph per parameter
   lmon --horizontal --labels full   # full labels
-  lmon --cpu --swap  — add CPU and swap columns
+  lmon --cpu --swap  — restore CPU/swap if removed from --cols
   lmon --gpu         — add the GPU utilization column
   lmon --gpu-list    — list GPUs (index: name)
   lmon --gpu-index 1 — which GPU to show (default 0)
@@ -427,7 +438,11 @@ Settings (flags and environment variables):
   --system      LMON_SYSTEM     failed units and reboot-required (Linux)
   --cpu-power   LMON_CPU_POWER  CPU package power, W (Linux, root)
   --nvme-smart  LMON_NVME_SMART NVMe wear, % (Linux, root)
-  --temp-cmd    LMON_TEMP_CMD  external command that prints CPU temperature
+  --config PATH LMON_CONFIG   config file (default: XDG_CONFIG_HOME/lmon/config
+                              or ~/.config/lmon/config; Windows: AppData)
+  --save-config                save current settings to the config file and exit
+  --no-config                  do not read the config file
+  --temp-cmd    LMON_TEMP_CMD external command that prints CPU temperature
                               in °C (the first number is used). Needed on
                               Windows where no native API exists; e.g. LHM
                               via PowerShell.
@@ -550,11 +565,34 @@ func run(args []string, w io.Writer) int {
 		}
 	}
 
+	rest, cf, err := splitConfigFlags(args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "lmon: %v\n", err)
+		return 2
+	}
+	if !cf.noConfig {
+		cfgArgs, err := loadConfigArgs(cf.path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "lmon: %v\n", err)
+			return 2
+		}
+		args = append(cfgArgs, rest...)
+	} else {
+		args = rest
+	}
 	cfg, err := parseConfig(args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "lmon: %v %s\n", err,
 			lmsg(langFromArgs(args), "(see lmon help)", "(см. lmon help)"))
 		return 2
+	}
+	if cf.save {
+		if err := writeConfigFile(cfg, cf.path); err != nil {
+			fmt.Fprintf(os.Stderr, "lmon: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(w, "lmon: config saved to %s\n", cf.path)
+		return 0
 	}
 
 	if cfg.fansList {
@@ -1407,7 +1445,7 @@ var colRegistry = map[string]reading{
 // --cols задаёт набор и порядок целиком; без него — базовые колонки
 // плюс включённые флагами.
 func requestedLayout(cfg config) []reading {
-	base := []string{"N", "G", "L", "M", "T"}
+	base := []string{"N", "G", "C", "L", "M", "T", "U", "S"}
 	if len(cfg.cols) > 0 {
 		base = cfg.cols
 	}
@@ -2277,13 +2315,17 @@ func (u *ui) redrawRain(rows int) {
 		rows = 2
 	}
 	u.rows = rows
+	cols := termCols()
+	if cols < 1 {
+		cols = 1 << 20
+	}
 	fmt.Fprint(u.w, "\x1b[2J\x1b[H")
-	fmt.Fprintf(u.w, "\x1b[1;1H\x1b[2K%s", u.headerRow(u.lastRS))
+	fmt.Fprintf(u.w, "\x1b[1;1H\x1b[2K%s", clipANSI(u.headerRow(u.lastRS), cols))
 	for i, line := range u.rainLines {
 		if i >= rows-1 {
 			break
 		}
-		fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[2K%s", i+2, line)
+		fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[2K%s", i+2, clipANSI(line, cols))
 	}
 	fmt.Fprintf(u.w, "\x1b[%d;1H\x1b[0J", min(rows, len(u.rainLines)+2))
 }

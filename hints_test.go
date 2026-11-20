@@ -43,8 +43,8 @@ func droppedHeads(ds []droppedColumn) string {
 
 func TestLayoutDropsWindowsUnsupported(t *testing.T) {
 	cols, dropped := layoutWithDropped(config{lang: "ru"}, "windows")
-	if got := ids(cols); got != "NGM" {
-		t.Fatalf("windows layout = %q, want NGM (без RUN и C°)", got)
+	if got := ids(cols); got != "NGCMUS" {
+		t.Fatalf("windows layout = %q, want NGCMUS (без RUN и C°)", got)
 	}
 	if got := droppedHeads(dropped); got != "RUN,C°" {
 		t.Fatalf("dropped = %q, want RUN,C°", got)
@@ -67,8 +67,8 @@ func TestLayoutDarwinDropsOnlyIowaitAndGpuTemp(t *testing.T) {
 	if strings.Contains(got, "I") || strings.Contains(got, "H") {
 		t.Fatalf("darwin layout содержит I/H: %q", got)
 	}
-	if got != "NGLMT" {
-		t.Fatalf("darwin layout = %q, want NGLMT", got)
+	if got != "NGCLMTUS" {
+		t.Fatalf("darwin layout = %q, want NGCLMTUS", got)
 	}
 	if droppedHeads(dropped) != "IOW,G°" {
 		t.Fatalf("dropped = %q, want IOW,G°", droppedHeads(dropped))

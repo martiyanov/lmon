@@ -202,6 +202,7 @@
 
   <section>
     <h2 id="columns">What it shows</h2>
+    <p class="lead">Default set — <b>NET GTW CPU RUN MEM C° DSK SWP</b>: network, CPU, memory, temperature and disk. GPU, fans, battery and I/O are opt-in.</p>
     <div class="cols" id="cols"></div>
     <p class="lead" style="margin-top:14px">A dot <code class="inl">·</code> means the machine has no such sensor (honest, no made-up numbers),
     <code class="inl">999</code> — the host is not answering. Any column set and order: <code class="inl">lmon --cols NRMC</code>.
@@ -240,6 +241,18 @@
       </div>
     </div>
     <p class="note">Check it: <code class="inl">lmon 5</code> prints five lines and exits. Built-in reference: <code class="inl">lmon help</code> (English by default, <code class="inl">lmon help ru</code> for Russian).</p>
+  </section>
+
+  <section>
+    <h2 id="config">Config</h2>
+    <p class="lead">Settings live in a small <code class="inl">key=value</code> file.
+    Default path: <code class="inl">~/.config/lmon/config</code>
+    (<code class="inl">$XDG_CONFIG_HOME/lmon/config</code>; Windows — AppData).</p>
+    <div class="cmd"><span class="c">lmon --save-config</span><button>copy</button></div>
+    <div class="cmd"><span class="c">lmon --config ./lmon.conf --once</span><button>copy</button></div>
+    <div class="cmd"><span class="c">lmon --no-config</span><button>copy</button></div>
+    <p class="note">CLI overrides config; config overrides environment variables.
+    The file is written with 0600 permissions and contains no secrets.</p>
   </section>
 
   <section>

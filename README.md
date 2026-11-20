@@ -26,18 +26,18 @@ enough, which is why the header ribbon is pinned to the bottom and
 painted with each column's current state.
 
 A stream of measurements — ping to the internet, ping to your gateway,
-load average, memory pressure and CPU temperature — colored green / yellow /
-red so you can spot trouble at a glance.
+CPU load and usage, memory, swap, CPU temperature and disk usage — colored
+green / yellow / red so you can spot trouble at a glance.
 
 The header is pinned to the bottom; each label sits on a background
 colored by that column's current state, so the status line stays
 readable even in a 2-line window:
 
 ```
- 12   2   1  62  55       ← values stream upward
- 11   2   1  63  55
-118   3   1  63  56       ← Wi-Fi hiccup, gateway is fine → it's the uplink
-NET  GTW RUN MEM  C°       ← pinned header, label background = state color
+ 12   2  18   1  62  55  47  12   ← values stream upward
+ 11   2  19   1  63  55  47  12
+118   3  21   1  63  56  47  12   ← Wi-Fi hiccup, gateway is fine → uplink
+NET GTW CPU RUN MEM  C° DSK SWP   ← pinned header, background = state
 ```
 
 Single static binary for **macOS**, **Linux** and **Windows 10+**
@@ -159,7 +159,8 @@ lmon 20                 # print 20 lines and exit
 lmon --bars                 # color blocks instead of digits
 lmon --matrix               # green cipher matrix, no digits
 lmon --rain --matrix        # same, values fall down
-lmon --cpu --swap       # add extra columns
+lmon --config ~/.config/lmon/config  # explicit config
+lmon --save-config      # save current settings and exit
 lmon --no-hints         # start without hints about hidden columns
 lmon help               # built-in reference (English; Russian via --lang ru
                         # or automatically on a Russian locale)
@@ -168,7 +169,7 @@ lmon --version          # version
 
 ### Columns
 
-The base set is always shown; extra columns are enabled with flags:
+Default set: **NET GTW CPU RUN MEM C° DSK SWP**. Extra columns are enabled with flags:
 
 Column letters are used in `--cols`; headers are three letters wide and
 align exactly with the values. In plain words:
@@ -182,10 +183,10 @@ align exactly with the values. In plain words:
 - **MEM** — used memory, %. Red MEM with a growing SWP — memory is short,
   things start to slow down.
 - **C°** — CPU temperature. Above 80–90 °C it is overheating.
-- **CPU** — how busy the processor is right now, % (`--cpu`).
+- **CPU** — how busy the processor is right now, %.
 - **IOW** — how much the CPU idles waiting for the disk (`--iowait`,
   Linux only; high — the disk is the bottleneck; hidden on macOS/Windows).
-- **SWP** — swap/pagefile in use (`--swap`; grows when memory runs out). On Windows it reads the page file through PDH, no admin needed.
+- **SWP** — swap/pagefile in use; grows when memory runs out. On Windows it reads the page file through PDH, no admin needed.
 - **FAN** — fan speed, % (`--fans`; Linux: hwmon PWM outputs + NVIDIA GPU fan; other OS need external tools).
 - **GPW** — GPU power, W (`--gpu-power`; Linux/NVIDIA).
 - **NVM** — NVMe temperature, °C (`--nvme`; Linux).
@@ -197,7 +198,7 @@ align exactly with the values. In plain words:
 - **I/O** — how busy the disk is, % (`--disk-busy`; Windows reads
   `\PhysicalDisk(_Total)\% Disk Time` via PDH, macOS derives it from IOKit
   `Total Time (Read/Write)`; no admin). The closest thing to Linux iowait.
-- **DSK** — how full the system disk is (`--disk`; above 90% — time to clean).
+- **DSK** — how full the system disk is; above 90% — time to clean.
 - **BAT** — battery charge (`--batt`; red below 20%).
 - **GPU** — how busy the video card is, % (`--gpu`). Windows: NVML/nvidia-smi (NVIDIA) or PDH GPU Engine counters (other vendors). Several cards: `--gpu-list` shows indexes; `--gpu-index N` picks one for `GPU`/`G°`, while `--gpu-index 0,1 --gpu --gputemp` adds a column per card (`G0/G1`, `T0/T1`).
 - **G°** — GPU temperature (`--gputemp`; hidden on macOS/Windows — no
@@ -388,6 +389,9 @@ header and the cell above it at the same time. `--once` is unchanged.
 | `--labels` | `LMON_LABELS` | `short` | horizontal labels: `full` or `short` |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`), `--ping` names (`NG,VPN,M`), and an empty column for two commas (`NG,,M`); flags add more |
+| `--config` | `LMON_CONFIG` | XDG path | read settings from `key=value` file |
+| `--save-config` | — | off | save current settings to the config file and exit |
+| `--no-config` | — | off | do not read the config file |
 | `--once` | — | off | print one line of values and exit; colored only on a terminal (tmux/scripts get plain text) |
 | `--temp-cmd` | `LMON_TEMP_CMD` | — | external command printing CPU temp in °C (e.g. LibreHardwareMonitor via PowerShell on Windows) |
 | `--disk-busy` | `LMON_DISK_BUSY` | off | disk busy time %: Windows PDH `PhysicalDisk`, macOS IOKit |
