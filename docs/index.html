@@ -1,383 +1,99 @@
 <!DOCTYPE html>
-<!-- lmon site: деплой через .github/workflows/pages.yml -->
 <html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>lmon — пульс компьютера в одной строке</title>
-<meta name="description" content="Пульс компьютера в одной строке: цвет вместо цифр, реальный терминальный мониторинг. Цифры, блоки, компактный вид, горизонтальная лента и матрица. macOS, Linux, Windows.">
+<meta name="description" content="Минималистичный мониторинг компьютера в терминале: сеть, CPU, память, температура и диск. Один бинарник для macOS, Linux и Windows.">
 <link rel="canonical" href="https://martiyanov.github.io/lmon/">
 <link rel="alternate" hreflang="ru" href="https://martiyanov.github.io/lmon/">
 <link rel="alternate" hreflang="en" href="https://martiyanov.github.io/lmon/en/">
 <link rel="alternate" hreflang="x-default" href="https://martiyanov.github.io/lmon/en/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://martiyanov.github.io/lmon/">
-<meta property="og:title" content="lmon — монитор компьютера в терминале">
-<meta property="og:description" content="Монитор компьютера в терминале: цифры, цветные блоки, компактный вид, горизонтальная лента и матричный дождь. macOS, Linux, Windows.">
+<meta property="og:title" content="lmon — пульс компьютера в одной строке">
+<meta property="og:description" content="Сеть, CPU, память, температура и диск — цветом в терминале. macOS, Linux, Windows.">
 <meta property="og:image" content="https://martiyanov.github.io/lmon/img/og.png">
 <meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"lmon",
- "operatingSystem":"macOS, Linux, Windows","applicationCategory":"Utilities",
- "offers":{"@type":"Offer","price":"0"},"license":"https://opensource.org/licenses/MIT",
- "description":"Минимальный монитор системы для терминала: одна строка в секунду, статус цветом.",
- "inLanguage":["ru","en"]}
-</script>
 <style>
-  :root {
-    --bg: #0d1117; --panel: #12181f; --ink: #d6deе6; --ink: #d6dee6;
-    --dim: #7d8590; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    --link: #58a6ff;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--ink); font: 16px/1.65 -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 880px; margin: 0 auto; padding: 48px 20px 80px; }
-  h1 { font-size: 40px; letter-spacing: -0.5px; }
-  h1 .u { color: #2ea043; }
-  .tag { color: var(--dim); margin: 14px 0 8px; font-size: 18px; }
-  .os { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 34px; }
-  .os span { border: 1px solid #30363d; border-radius: 999px; padding: 3px 12px; font-size: 13px; color: var(--dim); }
-  section { margin: 44px 0; }
-  h2 { font-size: 22px; margin-bottom: 14px; }
-  p.lead { color: #b6bec8; max-width: 640px; }
-
-  /* — терминал — */
-  .term { background: #0a0e14; border: 1px solid #30363d; border-radius: 10px; overflow: hidden;
-          box-shadow: 0 12px 40px rgba(0,0,0,.45); }
-  .bar { display: flex; gap: 7px; padding: 10px 12px; background: #161b22; border-bottom: 1px solid #21262d; }
-  .bar i { width: 11px; height: 11px; border-radius: 50%; background: #30363d; }
-  .bar i:nth-child(1){background:#ff5f57}.bar i:nth-child(2){background:#febc2e}.bar i:nth-child(3){background:#28c840}
-  .bar span { margin-left: 10px; font: 12px var(--mono); color: var(--dim); align-self: center; }
-  .screen { font: 15px/1.55 var(--mono); padding: 14px 16px 16px; height: 262px;
-            display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
-  .row { white-space: pre; height: 1.55em; }
-  .cell { display: inline-block; width: 3ch; text-align: center; color: #04120a; font-weight: 700; }
-  .gap { display: inline-block; width: 1ch; }
-  .ribbon { white-space: pre; margin-top: 6px; }
-  .lbl { display: inline-block; width: 3ch; text-align: center; color: #04120a; font-weight: 800; }
-  .hint { font: 13px var(--mono); color: var(--dim); margin-top: 10px; }
-  .hint b { color: #9ea79f; font-weight: 600; }
-  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin: 0 2px 0 6px; }
-
-  /* — фичи — */
-  .cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
-  .col { background: var(--panel); border: 1px solid #21262d; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
-  .col b { font: 700 13px var(--mono); padding: 1px 7px; border-radius: 4px; color: #04120a; }
-  .col span { color: #9aa4af; display: block; margin-top: 6px; }
-  code.inl { font: 0.92em var(--mono); background: #1b2129; border: 1px solid #262d36; border-radius: 5px; padding: 1px 6px; }
-
-  /* — установка — */
-  .install { border: 1px solid #21262d; border-radius: 10px; overflow: hidden; }
-  .tabs { display: flex; background: #12181f; border-bottom: 1px solid #21262d; }
-  .tabs button { background: none; border: 0; color: var(--dim); padding: 10px 16px; font: 600 13px sans-serif; cursor: pointer; border-bottom: 2px solid transparent; }
-  .tabs button.on { color: var(--ink); border-bottom-color: #2ea043; }
-  .cmds { padding: 14px 16px; display: none; }
-  .cmds.on { display: block; }
-  .cmd { display: flex; gap: 10px; align-items: center; background: #0a0e14; border: 1px solid #262d36; border-radius: 7px; padding: 9px 12px; margin: 8px 0; font: 13.5px var(--mono); }
-  .cmd .c { white-space: pre-wrap; word-break: break-all; }
-  .cmd button { margin-left: auto; background: #21262d; color: var(--ink); border: 0; border-radius: 5px; padding: 4px 9px; font: 600 11px sans-serif; cursor: pointer; flex-shrink: 0; }
-  .note { color: var(--dim); font-size: 13px; margin-top: 8px; }
-
-  .foot { color: var(--dim); font-size: 14px; border-top: 1px solid #21262d; padding-top: 22px; margin-top: 56px; }
-  .foot a { color: var(--link); text-decoration: none; }
-  a { color: var(--link); }
-
-  nav.toc { display:flex; gap:6px; flex-wrap:wrap; margin:22px 0 6px; padding:10px 0;
-            border-top:1px solid #21262d; border-bottom:1px solid #21262d; }
-  nav.toc a { color:#9aa4af; text-decoration:none; font:600 13px var(--mono); padding:4px 9px;
-              border:1px solid #262d36; border-radius:999px; }
-  nav.toc a:hover { color:var(--ink); border-color:#3d4652; }
-  .modes { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px; margin:18px 0 22px; }
-  .mode { display:block; text-decoration:none; background:var(--panel); border:1px solid #21262d;
-          border-radius:9px; padding:12px 14px; }
-  .mode:hover { border-color:#3d4652; }
-  .mode b { display:block; color:#7ee787; font:700 13px var(--mono); margin-bottom:4px; }
-  .mode span { color:#9aa4af; font-size:14px; }
-  .quick { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin:16px 0; }
-  .quick div { background:var(--panel); border:1px solid #21262d; border-radius:9px; padding:12px 14px; }
-  .quick b { color:#7ee787; font:700 12px var(--mono); }
-  .quick span { display:block; color:#9aa4af; font-size:14px; margin-top:5px; }
-  @media (max-width:560px) { .modes { grid-template-columns:1fr; } h1 { font-size:32px; } }
+  :root { --bg:#0b0f0d; --panel:#111713; --line:#243027; --ink:#d9e6dc; --dim:#7f9185; --green:#7ee787; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--ink); font:16px/1.6 -apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:64px 22px 40px; }
+  .brand { color:var(--green); font:700 18px var(--mono); letter-spacing:.04em; }
+  h1 { font-size:clamp(38px,7vw,68px); line-height:1.03; letter-spacing:-.04em; margin:18px 0; }
+  h1 em { color:var(--green); font-style:normal; }
+  .lead { color:var(--dim); font-size:18px; max-width:620px; }
+  .install { display:flex; gap:8px; flex-wrap:wrap; margin:24px 0 6px; }
+  .install code { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font:14px var(--mono); color:var(--ink); }
+  .links { color:var(--dim); font-size:14px; margin-top:10px; }
+  a { color:var(--green); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  section { margin-top:56px; }
+  h2 { font-size:15px; text-transform:uppercase; letter-spacing:.12em; color:var(--dim); font-weight:600; margin-bottom:16px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
+  figure { background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  figure img { display:block; width:100%; height:auto; }
+  figcaption { padding:11px 12px; font:13px var(--mono); color:var(--dim); }
+  figcaption b { color:var(--ink); font-weight:600; display:block; margin-bottom:2px; }
+  pre { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; overflow:auto; font:14px/1.7 var(--mono); color:#b7d3bd; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .card p { color:var(--dim); font-size:14px; }
+  .card b { color:var(--green); font:600 13px var(--mono); }
+  footer { border-top:1px solid var(--line); margin-top:56px; padding-top:18px; color:var(--dim); font-size:13px; display:flex; gap:14px; flex-wrap:wrap; }
+  @media (max-width:640px) { main { padding-top:40px; } .two { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
 <main>
-  <h1>l<span class="u">mon</span></h1>
-  <p class="tag">Пульс компьютера — в одной строке. Цвет вместо цифр, ответ вместо графиков: один взгляд — и понятно, всё ли в порядке.</p>
-  <p style="margin:0 0 10px">По-русски · <a href="https://martiyanov.github.io/lmon/en/" style="font-size:14px">English</a></p>
-  <div class="os"><span>macOS</span><span>Linux</span><span>Windows 10+</span><span>один бинарник ~1 МБ</span><span>MIT</span></div>
-
-  <nav class="toc" aria-label="Разделы">
-    <a href="#modes">Режимы</a><a href="#matrix">Матрица</a><a href="#compact">Compact</a>
-    <a href="#columns">Что показывает</a><a href="#install">Установка</a><a href="#config">Конфиг</a>
-    <a href="#reels">Рилсы</a><a href="#community">Сообщество</a>
-  </nav>
-
-  <div class="term" id="term">
-    <div class="bar"><i></i><i></i><i></i><span>lmon --hybrid --cpu</span></div>
-    <div class="screen" id="screen">
-      <div class="ribbon" id="ribbon"></div>
-    </div>
+  <div class="brand">lmon</div>
+  <h1>Пульс компьютера.<br><em>В одной строке.</em></h1>
+  <p class="lead">Сеть, CPU, память, температура и диск — цветом в терминале. Без дашбордов и тяжёлых панелей.</p>
+  <div class="install">
+    <code>brew install martiyanov/tap/lmon</code>
+    <code>sudo dpkg -i lmon_amd64.deb</code>
   </div>
-  <div class="hint">
-    Это живая демонстрация настоящего вывода <b>lmon --hybrid</b>: цифры на подложке цвета состояния,
-    закреплённая лента заголовка внизу.<span class="swatch" style="background:#00c800"></span>зелёный — норма
-    <span class="swatch" style="background:#d8d800"></span>жёлтый — внимание<span class="swatch" style="background:#f03000"></span>красный — плохо
-  </div>
+  <p class="links"><a href="https://github.com/martiyanov/lmon">GitHub</a> · <a href="https://github.com/martiyanov/lmon/blob/main/README.ru.md">README</a> · <a href="#modes">режимы</a> · <a href="#quick">быстрый старт</a></p>
 
-  <section>
-    <h2 id="modes">Режимы</h2>
-    <p class="lead">Шесть режимов отображения — цифры, цветные блоки, гибрид,
-    компактный виджет, горизонтальная лента и матричный дождь.
-    Значения настоящие, снятые <code class="inl">lmon</code> на macOS.</p>
-    <div class="modes">
-      <a class="mode" href="#modes"><b>lmon</b><span>цифры и цвет состояния</span></a>
-      <a class="mode" href="#modes"><b>--bars</b><span>только цвет, без цифр</span></a>
-      <a class="mode" href="#modes"><b>--hybrid</b><span>цифры на цветной подложке</span></a>
-      <a class="mode" href="#compact"><b>--compact</b><span>одна буква и один блок</span></a>
-      <a class="mode" href="#columns"><b>--horizontal</b><span>лента времени вправо</span></a>
-      <a class="mode" href="#matrix"><b>--matrix --rain</b><span>зелёный дождь символов</span></a>
-    </div>
-
-    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
-      <figure style="margin:0;text-align:center">
-        <img src="img/screenshot-digits.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon: цифры цветом состояния">
-        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon</b> — цифры</figcaption>
-      </figure>
-      <figure style="margin:0;text-align:center">
-        <img src="img/screenshot-blocks.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --bars: цветные квадраты без цифр">
-        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --bars</b> — только цвет</figcaption>
-      </figure>
-      <figure style="margin:0;text-align:center">
-        <img src="img/screenshot-hybrid.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --hybrid: цифры на цветной подложке">
-        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --hybrid</b> — цифры на цвете</figcaption>
-      </figure>
-      <figure style="margin:0;text-align:center">
-        <img src="img/screenshot-corner.png" width="330" style="border-radius:8px;border:1px solid #30363d" alt="компактное окно lmon по ширине индикаторов">
-        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px">окно ужато до индикаторов — в угол экрана</figcaption>
-      </figure>
+  <section id="modes">
+    <h2>Режимы вывода</h2>
+    <div class="grid">
+      <figure><img src="img/screenshot-digits.png" alt="lmon: цифры и цвет"><figcaption><b>lmon</b>цифры и цвет состояния</figcaption></figure>
+      <figure><img src="img/screenshot-blocks.png" alt="lmon --bars"><figcaption><b>--bars</b>только цвет, без цифр</figcaption></figure>
+      <figure><img src="img/screenshot-hybrid.png" alt="lmon --hybrid"><figcaption><b>--hybrid</b>цифры на цветной подложке</figcaption></figure>
+      <figure><img src="img/screenshot-compact.png" alt="lmon --compact"><figcaption><b>--compact</b>минимум места</figcaption></figure>
+      <figure><img src="img/screenshot-matrix.png" alt="lmon --matrix"><figcaption><b>--matrix</b>матрица без цифр</figcaption></figure>
+      <figure><img src="img/screenshot-rain.png" alt="lmon --rain --matrix"><figcaption><b>--rain --matrix</b>падение вниз</figcaption></figure>
     </div>
   </section>
 
-  <section>
-    <h2 id="matrix">Матрица и дождь</h2>
-    <p class="lead"><code class="inl">--matrix</code> — зелёный стиль без цифр:
-    случайный безопасный набор символов, нулевой уровень — маленькая точка
-    по центру, остальные — три разных символа. <code class="inl">--rain</code>
-    переворачивает поток: заголовок сверху, новые значения падают вниз.</p>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin-top:16px">
-      <figure style="margin:0;text-align:center">
-        <img src="img/screenshot-matrix.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --matrix: зелёные шифрованные символы без цифр">
-        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --matrix</b> — без цифр</figcaption>
-      </figure>
-      <figure style="margin:0;text-align:center">
-        <img src="img/screenshot-rain.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --matrix --rain: значения падают вниз">
-        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --matrix --rain</b> — падает вниз</figcaption>
-      </figure>
-    </div>
-    <video src="media/reel-matrix.mp4" controls playsinline poster="img/screenshot-rain.png"
-           style="width:100%;max-width:360px;border-radius:12px;border:1px solid #30363d;margin-top:18px;display:block"></video>
-    <p class="note">Рилс про матричный режим — 18 секунд, без звука.</p>
-    <div class="cmd" style="margin-top:16px"><span class="c">lmon --matrix --all --rain</span><button>копировать</button></div>
-    <p class="note">Цвет — один зелёный; ширина терминала не ломается:
-    символы выбираются из безопасного одноклеточного набора. Конкретный
-    глиф всё равно зависит от шрифта терминала.</p>
-  </section>
-
-  <section>
-    <h2 id="compact">Одноколоночный режим</h2>
-    <p class="lead"><code class="inl">--compact</code> — самый узкий вид:
-    по одной букве на параметр в заголовке и по одному блоку на значение,
-    без промежутков между колонками. Заголовок — буквы из
-    <code class="inl">--cols</code>; у имён пингов и многобуквенных колонок
-    берётся первый символ.</p>
-    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-top:14px">
-      <figure style="margin:0;text-align:center">
-        <img src="img/screenshot-compact.png" width="252" style="border-radius:8px;border:1px solid #30363d" alt="lmon --compact: одна буква на параметр и один блок на значение">
-        <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px"><b style="color:#9ea79f">lmon --compact</b> — минимальная ширина</figcaption>
-      </figure>
-      <div style="flex:1;min-width:260px">
-        <div class="cmd"><span class="c">lmon --compact --cols NGM</span><button>копировать</button></div>
-        <div class="cmd"><span class="c">lmon --compact --matrix</span><button>копировать</button></div>
-        <div class="cmd"><span class="c">lmon --rain --compact</span><button>копировать</button></div>
-        <p class="note">Фиолетовый — датчика нет, ярко-красный — нет ответа.
-        С <code class="inl">--matrix</code> вместо блоков — шифрованные символы;
-        с <code class="inl">--rain</code> значения падают вниз.</p>
-      </div>
+  <section id="quick">
+    <h2>Быстрый старт</h2>
+    <div class="two">
+      <div class="card"><b>диагностика</b><pre>lmon
+lmon --profile server
+lmon --bars
+lmon --matrix --rain</pre></div>
+      <div class="card"><b>скрипты</b><pre>lmon --once
+lmon --once --json
+lmon --once --exit-code
+lmon --top 10</pre></div>
     </div>
   </section>
 
-
-  <section>
-    <h2 id="columns">Что показывает</h2>
-    <p class="lead">По умолчанию — <b>NET GTW CPU RUN MEM C° DSK SWP</b>: сеть, процессор, память, температура и диск. GPU, вентиляторы, батарея и I/O — по флагам.</p>
-    <div class="cols" id="cols"></div>
-    <p class="lead" style="margin-top:14px">Точка <code class="inl">·</code> — такого датчика в системе нет (честно, без выдуманных чисел),
-    <code class="inl">999</code> — хост не отвечает. Набор и порядок колонок — любые: <code class="inl">lmon --cols NRMC</code>.
-    Ещё есть цветные квадраты <code class="inl">--bars</code>, цифры на цветном фоне <code class="inl">--hybrid</code>, самый минималистичный <code class="inl">--compact</code> — по одной букве и одному блоку на параметр, горизонтальная лента <code class="inl">--horizontal</code> и матрица <code class="inl">--matrix</code> с падающими значениями <code class="inl">--rain</code>.</p>
+  <section id="config">
+    <h2>Настройки</h2>
+    <p class="lead">Одна строка в конфиге — и lmon запускается уже с нужными колонками:
+    <code>lmon --save-config</code>, затем правь <code>~/.config/lmon/config</code>.</p>
   </section>
 
-  <section>
-    <h2 id="install">Установка</h2>
-    <div class="install">
-      <div class="tabs" id="tabs">
-        <button data-t="mac" class="on">macOS</button>
-        <button data-t="lnx">Linux</button>
-        <button data-t="win">Windows</button>
-        <button data-t="brew">Homebrew</button>
-        <button data-t="go">go install</button>
-      </div>
-      <div class="cmds on" data-c="mac">
-        <div class="cmd"><span class="c">curl -fsSL https://github.com/martiyanov/lmon/releases/latest/download/lmon_darwin_arm64.tar.gz | tar -xz</span><button>копировать</button></div>
-        <div class="cmd"><span class="c">sudo mv lmon /usr/local/bin/</span><button>копировать</button></div>
-        <p class="note">Intel-мак: возьмите lmon_darwin_amd64.tar.gz. Пароль при sudo не виден — это нормально.</p>
-      </div>
-      <div class="cmds" data-c="lnx">
-        <div class="cmd"><span class="c">curl -fsSLO https://github.com/martiyanov/lmon/releases/latest/download/lmon_amd64.deb && sudo dpkg -i lmon_amd64.deb</span><button>копировать</button></div>
-        <p class="note">Fedora/RHEL — .rpm с страницы релизов; другие дистрибутивы — tar.gz как на macOS.</p>
-      </div>
-      <div class="cmds" data-c="win">
-        <div class="cmd"><span class="c">curl.exe -fsSL -o lmon.zip https://github.com/martiyanov/lmon/releases/latest/download/lmon_windows_amd64.zip</span><button>копировать</button></div>
-        <div class="cmd"><span class="c">Expand-Archive lmon.zip; Move-Item lmon\lmon.exe "$env:LOCALAPPDATA\Microsoft\WindowsApps" -Force</span><button>копировать</button></div>
-        <p class="note">SmartScreen предупредит о незнакомой программе: «Подробнее» → «Выполнить в любом случае».</p>
-      </div>
-      <div class="cmds" data-c="brew">
-        <div class="cmd"><span class="c">brew install martiyanov/tap/lmon</span><button>копировать</button></div>
-      </div>
-      <div class="cmds" data-c="go">
-        <div class="cmd"><span class="c">go install github.com/martiyanov/lmon@latest</span><button>копировать</button></div>
-      </div>
-    </div>
-    <p class="note">Проверка: <code class="inl">lmon 5</code> — пять строк и выход. Полная справка: <code class="inl">lmon help</code> — при русской локали по-русски, иначе <code class="inl">lmon help ru</code>.</p>
-  </section>
-
-  <section>
-    <h2 id="config">Конфиг</h2>
-    <p class="lead">Настройки сохраняются в простой <code class="inl">key=value</code> файл.
-    Путь по умолчанию: <code class="inl">~/.config/lmon/config</code>
-    (<code class="inl">$XDG_CONFIG_HOME/lmon/config</code>; Windows — AppData).</p>
-    <div class="cmd"><span class="c">lmon --save-config</span><button>копировать</button></div>
-    <div class="cmd"><span class="c">lmon --config ./lmon.conf --once</span><button>копировать</button></div>
-    <div class="cmd"><span class="c">lmon --no-config</span><button>копировать</button></div>
-    <p class="note">CLI перекрывает конфиг, конфиг — переменные окружения.
-    Файл создаётся с правами 0600; секретов в нём нет.</p>
-  </section>
-
-  <section>
-    <h2 id="reels">Реальные рилсы</h2>
-    <p class="lead">Снято из настоящего TUI lmon — не синтетические картинки:
-    цифры, блоки, компактный режим, матрица и горизонтальная лента.</p>
-    <figure style="margin:18px 0 0;text-align:center">
-      <img src="img/real-terminal.png" width="640" style="max-width:100%;border-radius:10px;border:1px solid #30363d" alt="real lmon terminal output">
-      <figcaption style="font:13px var(--mono);color:#8b949e;margin-top:6px">настоящий вывод терминала</figcaption>
-    </figure>
-    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin-top:14px">
-      <div style="flex:1;min-width:260px;max-width:360px">
-        <video src="media/reel-benefit-ru.mp4" controls playsinline poster="img/screenshot-rain.png" style="width:100%;border-radius:12px;border:1px solid #30363d"></video>
-        <p class="note">Русская версия · 38 секунд · реальный TUI, ×2</p>
-      </div>
-      <div style="flex:1;min-width:260px;max-width:360px">
-        <video src="media/reel-benefit-en.mp4" controls playsinline poster="img/screenshot-rain.png" style="width:100%;border-radius:12px;border:1px solid #30363d"></video>
-        <p class="note">English version · 38 seconds · real TUI, ×2</p>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <h2 id="community">Сообщество</h2>
-    <p class="lead">Идеи, вопросы и настройки — в <b>GitHub Discussions</b> (русский и английский).
-    Правила и путь идеи до релиза — в <a href="https://github.com/martiyanov/lmon/blob/main/COMMUNITY.md">COMMUNITY.md</a>.</p>
-    <p><a href="https://github.com/martiyanov/lmon/discussions">GitHub Discussions</a> ·
-       <a href="https://github.com/martiyanov/lmon/blob/main/COMMUNITY.md">Правила сообщества</a> ·
-       <a href="https://github.com/martiyanov/lmon/issues">Issues</a></p>
-    <p class="note">Ответы остаются в Discussions, чтобы их можно было найти поиском.
-    Ссылки на Matrix/Telegram чат появятся здесь после запуска комнаты и канала.</p>
-  </section>
-
-  <div class="foot">
-    Код и релизы: <a href="https://github.com/martiyanov/lmon">github.com/martiyanov/lmon</a> ·
-    принципы: <a href="https://github.com/martiyanov/lmon/blob/main/CONCEPT.md">легко, мало ресурсов, честно</a> ·
-    установка для новичков по-русски: <a href="https://github.com/martiyanov/lmon/blob/main/README.ru.md">README.ru</a>
-  </div>
+  <footer>
+    <span>macOS · Linux · Windows · MIT</span>
+    <a href="en/">English</a>
+    <a href="https://github.com/martiyanov/lmon/releases/latest">releases</a>
+    <a href="media/reel-benefit-ru.mp4">реальный TUI</a>
+  </footer>
 </main>
-
-<script>
-// цвета — та же градация, что в lmon: зелёный → жёлтый → красный
-function ramp(s) { // цвета квантуются в терминальную 256-палитру, как в lmon
-  s = Math.max(0, Math.min(1, s));
-  var t = s * 511 | 0;
-  var r = t < 256 ? t : 255, g = t < 256 ? 220 : 220 - (t - 256) * 180 / 255 | 0, b = t < 256 ? 0 : 40;
-  var q = function (v) { return Math.round(v * 5 / 255) * 51; };
-  return 'rgb(' + q(r) + ',' + q(g) + ',' + q(b) + ')';
-}
-function severity(v, g, y, r) {
-  if (v <= g) return 0;
-  if (v <= y) return 0.5 * (v - g) / (y - g);
-  if (v >= r) return 1;
-  return 0.5 + 0.5 * (v - y) / (r - y);
-}
-// колонки демо: подпись, пороги, реалистичный генератор значения
-var COLS = [
-  { h: 'NET', gen: function () { return Math.random() < .08 ? 110 + Math.random() * 200 | 0 : 42 + Math.random() * 14 | 0; }, g: 50, y: 150, r: 300 },
-  { h: 'GTW',  gen: function () { return 2 + Math.random() * 4 | 0; }, g: 10, y: 50, r: 100 },
-  { h: 'RUN', gen: function () { return 2 + Math.random() * 3 | 0; }, g: 8, y: 16, r: 32 },
-  { h: 'MEM', gen: function () { return 68 + Math.random() * 6 | 0; }, g: 60, y: 85, r: 97 },
-  { h: 'C\u00B0', gen: function () { return 54 + Math.random() * 10 | 0; }, g: 60, y: 75, r: 90, deg: true },
-  { h: 'CPU', gen: function () { return Math.random() < .06 ? 92 : 18 + Math.random() * 22 | 0; }, g: 50, y: 80, r: 100 }
-];
-var screen = document.getElementById('screen'), ribbon = document.getElementById('ribbon');
-
-function tick() {
-  var vals = COLS.map(function (c) { return c.gen(); });
-  var row = document.createElement('div'); row.className = 'row';
-  COLS.forEach(function (c, i) {
-    var sp = document.createElement('span'); sp.className = 'cell';
-    var v = vals[i];
-    sp.textContent = v > 999 ? '+++' : String(v).padStart(3, '\u00A0');
-    sp.style.background = ramp(severity(v, c.g, c.y, c.r));
-    row.appendChild(sp);
-    row.appendChild(document.createTextNode(' '));
-  });
-  screen.insertBefore(row, ribbon);
-  while (screen.children.length > 8) screen.removeChild(screen.firstChild);
-  ribbon.innerHTML = '';
-  COLS.forEach(function (c, i) {
-    var l = document.createElement('span'); l.className = 'lbl';
-    l.textContent = c.h === 'C\u00B0' ? '\u00A0C\u00B0' : c.h;
-    l.style.background = ramp(severity(vals[i], c.g, c.y, c.r));
-    ribbon.appendChild(l);
-    ribbon.appendChild(document.createTextNode(' '));
-  });
-}
-tick(); setInterval(tick, 1000);
-
-// вкладки установки + копирование
-document.getElementById('tabs').addEventListener('click', function (e) {
-  var b = e.target.closest('button'); if (!b) return;
-  document.querySelectorAll('.tabs button').forEach(function (x) { x.classList.toggle('on', x === b); });
-  document.querySelectorAll('.cmds').forEach(function (c) { c.classList.toggle('on', c.dataset.c === b.dataset.t); });
-});
-document.addEventListener('click', function (e) {
-  var b = e.target.closest('.cmd button'); if (!b) return;
-  navigator.clipboard.writeText(b.parentElement.querySelector('.c').textContent).then(function () {
-    b.textContent = 'готово'; setTimeout(function () { b.textContent = 'копировать'; }, 1200);
-  });
-});
-
-// карточки колонок
-var ABOUT = {
-  NET: 'как быстро отвечает интернет', GW: 'как быстро отвечает роутер',
-  RUN: 'сколько программ ждёт процессор', MEM: 'сколько занято памяти',
-  'C\u00B0': 'температура процессора', CPU: 'занятость процессора, %'
-};
-var cols = document.getElementById('cols');
-COLS.forEach(function (c) {
-  var d = document.createElement('div'); d.className = 'col';
-  var b = document.createElement('b'); b.textContent = c.h;
-  b.style.background = ramp(0.15); d.appendChild(b);
-  d.appendChild(Object.assign(document.createElement('span'), { textContent: ABOUT[c.h] }));
-  cols.appendChild(d);
-});
-</script>
 </body>
 </html>

@@ -354,6 +354,57 @@ fallbacks stay.
 `lmon --hybrid` combines both: exact digits printed on the state-colored
 background.
 
+## JSON, exit codes and processes
+
+For scripts and cron:
+
+```sh
+lmon --once --json          # machine-readable columns
+lmon --once --exit-code     # 0 = ok, 1 = warning, 2 = critical
+lmon --top 10               # top processes by CPU (Unix)
+```
+
+JSON is one object per sample; `state` is `ok`, `warning`, `critical`,
+`no_sensor` or `no_reply`, and `value` is `null` when there is no reading.
+`--exit-code` works only with `--once`; `--top` is Unix-only for now.
+
+Presets choose a sensible column set:
+
+```sh
+lmon --profile server
+lmon --profile desktop
+lmon --profile network
+```
+
+An explicit `--cols` or config `cols` wins over a profile.
+
+## Config
+
+lmon reads a small `key=value` file before CLI flags:
+
+```sh
+lmon --save-config
+lmon --config ./lmon.conf --once
+lmon --no-config
+```
+
+Default path: `$XDG_CONFIG_HOME/lmon/config` or `~/.config/lmon/config`
+(Windows: `%AppData%\lmon\config`). `LMON_CONFIG` overrides it.
+Precedence: CLI flags > config file > environment > defaults.
+
+```ini
+cols=NGCLMTUS
+interval=1
+no-hints=true
+ping=VPN=10.8.0.1
+```
+
+## No color
+
+Color is disabled with the standard `NO_COLOR=1 lmon`. There is no separate
+`--no-color` flag yet; `--bars`/`--hybrid` fall back to readable text when
+color is off. A true monochrome fill (`--mono`) is still in the backlog.
+
 ### TUI: header leads by one sample
 
 In the TUI the pinned header always shows the **current** sample, while the
@@ -389,6 +440,10 @@ header and the cell above it at the same time. `--once` is unchanged.
 | `--labels` | `LMON_LABELS` | `short` | horizontal labels: `full` or `short` |
 | `--hybrid` | — | off | digits on the state-colored background |
 | `--cols` | `LMON_COLS` | base set | column set and order: letters (`NG,CSB`), `--ping` names (`NG,VPN,M`), and an empty column for two commas (`NG,,M`); flags add more |
+| `--profile` | `LMON_PROFILE` | off | column preset: `server`, `desktop`, `network` |
+| `--json` | `LMON_JSON` | off | JSON output for `--once` and `--top` |
+| `--exit-code` | `LMON_EXIT_CODE` | off | with `--once`: exit 1 warning, 2 critical |
+| `--top` | `LMON_TOP` | off | show top N processes by CPU and exit (Unix) |
 | `--config` | `LMON_CONFIG` | XDG path | read settings from `key=value` file |
 | `--save-config` | — | off | save current settings to the config file and exit |
 | `--no-config` | — | off | do not read the config file |

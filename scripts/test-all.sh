@@ -38,10 +38,11 @@ if command -v node >/dev/null 2>&1; then
       const fs = require('fs');
       const html = fs.readFileSync(process.argv[1], 'utf8');
       const scripts = [...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
-      if (scripts.length === 0) { console.error('нет script-блоков: ' + process.argv[1]); process.exit(1); }
       for (const m of scripts) { try { new Function(m[1]); } catch (e) { console.error(process.argv[1] + ': ' + e.message); process.exit(1); } }
     " "$f" || fail=1
-    grep -q 'id="screen"' "$f" && grep -q 'function tick' "$f" || { echo "НЕТ ДЕМКИ: $f"; fail=1; }
+    if grep -q 'id="screen"' "$f"; then
+      grep -q 'function tick' "$f" || { echo "НЕТ ДЕМКИ: $f"; fail=1; }
+    fi
     echo "ok: $f"
   done
 else

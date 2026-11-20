@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.47.0"
+const version = "1.48.0"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -154,6 +154,10 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --matrix        — обычный режим без цифр, только заполнение
   lmon --compact --matrix — по одному символу заполнения
   lmon --horizontal --labels full   # полные подписи
+  lmon --once --json — машиночитаемая строка для скриптов
+  lmon --once --exit-code — 0/1/2 по порогам для cron
+  lmon --profile server   — пресет для сервера
+  lmon --top 10       — топ-10 процессов по CPU
   lmon --cpu --swap  — вернуть CPU/swap, если их убрали из --cols
   lmon --gpu         — добавить колонку загрузки GPU
   lmon --gpu-list    — список видеокарт (индекс: имя)
@@ -197,6 +201,10 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                               RUN=8/16/32; LMON_THRESHOLDS
   --disk-busy   LMON_DISK_BUSY  занятость диска, % (Windows PDH / macOS IOKit; колонка I/O)
   --symbols     LMON_SYMBOLS    в --once: «...» вместо 999 для «нет ответа»
+  --json        LMON_JSON       JSON для --once и --top (машиночитаемый вывод)
+  --exit-code   LMON_EXIT_CODE  с --once: код 1 при warning, 2 при critical
+  --profile     LMON_PROFILE    пресет колонок: server, desktop или network
+  --top N       LMON_TOP        топ-N процессов по CPU и выход (Unix)
   --compact     LMON_COMPACT    одна буква и один цветной блок на параметр, без пробелов
   --horizontal  LMON_HORIZONTAL горизонтальная цветная лента (TUI)
   --labels      LMON_LABELS     подписи в горизонтальном режиме: full или short
@@ -400,6 +408,10 @@ Usage:
                        name); VPN down — «...» in TUI, 999 in --once.
                        Position it with --cols (NG,VPN,M).
                        Repeatable; LMON_PING
+  lmon --once --json — machine-readable one-line output
+  lmon --once --exit-code — 0/1/2 thresholds for cron
+  lmon --profile server   — server column preset
+  lmon --top 10       — top-10 processes by CPU
   lmon --once        — one line; colored only on a terminal
   lmon --no-hints    — start without hints about unavailable columns
   lmon help          — this help
@@ -419,6 +431,10 @@ Settings (flags and environment variables):
                               LMON_THRESHOLDS
   --disk-busy   LMON_DISK_BUSY  disk busy time %, Windows PDH / macOS IOKit (column I/O)
   --symbols     LMON_SYMBOLS    in --once: «...» instead of 999 for “no reply”
+  --json        LMON_JSON       JSON for --once and --top (machine-readable)
+  --exit-code   LMON_EXIT_CODE  with --once: exit 1 on warning, 2 on critical
+  --profile     LMON_PROFILE    column preset: server, desktop or network
+  --top N       LMON_TOP        top-N processes by CPU and exit (Unix)
   --compact     LMON_COMPACT    one letter and one colored block per parameter, no gaps
   --horizontal  LMON_HORIZONTAL horizontal color timeline (TUI)
   --labels      LMON_LABELS     horizontal mode labels: full or short
@@ -500,6 +516,10 @@ type config struct {
 	interval      time.Duration
 	iters         int
 	once          bool
+	jsonOut       bool // --json: machine-readable output for --once/--top
+	exitCode      bool // --exit-code: exit 1/2 from thresholds (--once)
+	profile       string
+	topN          int
 	blocks        bool
 	hybrid        bool
 	compact       bool
@@ -626,6 +646,10 @@ func run(args []string, w io.Writer) int {
 		return 0
 	}
 
+	if cfg.topN > 0 {
+		return runTop(cfg, w)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -683,6 +707,10 @@ func parseConfig(args []string) (config, error) {
 	fs.Var(&pingsRaw, "ping", "named ping column NAME=host, repeatable (e.g. --ping VPN=10.8.0.1)")
 	var once bool
 	fs.BoolVar(&once, "once", false, "print one line of values and exit (for tmux/status bars)")
+	jsonOut := fs.Bool("json", envFlag("LMON_JSON"), "machine-readable JSON (works with --once and --top)")
+	exitCode := fs.Bool("exit-code", envFlag("LMON_EXIT_CODE"), "with --once: exit 1 on warning, 2 on critical")
+	profile := fs.String("profile", os.Getenv("LMON_PROFILE"), "preset: server, desktop or network")
+	topN := fs.Int("top", envInt("LMON_TOP", 0), "show top N processes by CPU and exit")
 	noHints := fs.Bool("no-hints", envFlag("LMON_NO_HINTS"), "do not print startup hints about unavailable columns")
 	tempCmd := fs.String("temp-cmd", envStr("LMON_TEMP_CMD", ""), "external command that prints CPU temperature (°C)")
 	symbols := fs.Bool("symbols", envFlag("LMON_SYMBOLS"), "in --once, show «...» instead of 999 when a host does not answer")
@@ -716,6 +744,26 @@ func parseConfig(args []string) (config, error) {
 	}
 	if rain && once {
 		return config{}, errors.New(lmsg(lg, "--rain cannot be combined with --once; use the normal --once output", "--rain не сочетается с --once; используйте обычный вывод --once"))
+	}
+
+	if *topN < 0 || *topN > 1000 {
+		return config{}, errors.New(lmsg(lg, "--top must be between 1 and 1000", "--top: число от 1 до 1000"))
+	}
+	if *topN > 0 && once {
+		return config{}, errors.New(lmsg(lg, "--top cannot be combined with --once", "--top не сочетается с --once"))
+	}
+	if *exitCode && !once {
+		return config{}, errors.New(lmsg(lg, "--exit-code requires --once", "--exit-code требует --once"))
+	}
+	if *exitCode && *topN > 0 {
+		return config{}, errors.New(lmsg(lg, "--exit-code cannot be combined with --top", "--exit-code не сочетается с --top"))
+	}
+	if *jsonOut && !once && *topN == 0 {
+		return config{}, errors.New(lmsg(lg, "--json requires --once or --top", "--json требует --once или --top"))
+	}
+	prof := strings.ToLower(strings.TrimSpace(*profile))
+	if prof != "" && prof != "server" && prof != "desktop" && prof != "network" {
+		return config{}, fmt.Errorf(lmsg(lg, "--profile=%q: expected server, desktop or network", "--profile=%q: ожидается server, desktop или network"), *profile)
 	}
 
 	var iters int
@@ -765,9 +813,14 @@ func parseConfig(args []string) (config, error) {
 		return config{}, err
 	}
 
+	// --profile: готовый набор колонок; явный --cols/LMON_COLS важнее.
+	colsArg := *colsFlag
+	if prof != "" && colsArg == "" && !*all {
+		colsArg = strings.Join(profileColumns(prof), ",")
+	}
 	// --cols / LMON_COLS: набор и порядок колонок; сюда же можно ставить
 	// именованные пинг-колонки из --ping (VPN, DNS…).
-	cols, err := parseCols(*colsFlag, pings, lg)
+	cols, err := parseCols(colsArg, pings, lg)
 	if err != nil {
 		return config{}, err
 	}
@@ -808,7 +861,7 @@ func parseConfig(args []string) (config, error) {
 	if d <= 0 {
 		d = time.Second
 	}
-	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once,
+	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once, jsonOut: *jsonOut, exitCode: *exitCode, profile: prof, topN: *topN,
 		blocks: blocks, hybrid: hybrid, compact: compact, horizontal: *horizontal, labelsFull: labelsMode == "full", rain: rain, matrixPalette: *matrixPalette, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
@@ -1187,11 +1240,21 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		// Цвет — как у обычного вывода: включаем только на терминале.
 		// В пайп/tmux строка остаётся чистым текстом (скрипты не ломаются).
 		tty := stdoutIsTTY() && w == io.Writer(os.Stdout)
-		if tty {
-			termSetup()
-			defer termRestore()
+		if cfg.jsonOut {
+			if err := writeJSONOnce(w, rs); err != nil {
+				fmt.Fprintf(os.Stderr, "lmon: %v\n", err)
+				return 1
+			}
+			if cfg.exitCode {
+				return exitCodeFor(rs)
+			}
+			return 0
 		}
+		// JSON не должен включать скрытый termSetup/ANSI.
 		fmt.Fprintln(w, newOnceUI(w, cfg, tty).dataRow(rs))
+		if cfg.exitCode {
+			return exitCodeFor(rs)
+		}
 		return 0
 	}
 

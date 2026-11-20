@@ -202,6 +202,37 @@ lmon пишет, что скрыто и чем заменить; отключи�
 По умолчанию: NET GTW CPU RUN MEM C° DSK SWP — сеть, процессор, память,
 температура и диск. GPU, вентиляторы, батарея и I/O — по флагам.
 
+### JSON, коды выхода и процессы
+
+Для скриптов и cron:
+
+```sh
+lmon --once --json
+lmon --once --exit-code
+lmon --top 10
+```
+
+JSON — один объект на замер; `state` бывает `ok`, `warning`, `critical`,
+`no_sensor`, `no_reply`, а `value` для отсутствующих данных — `null`.
+`--exit-code` работает только с `--once`: 0 — норма, 1 — warning,
+2 — critical. `--top` пока только Unix.
+
+Пресеты колонок:
+
+```sh
+lmon --profile server
+lmon --profile desktop
+lmon --profile network
+```
+
+Явный `--cols` или `cols` из конфига важнее профиля.
+
+### Без цвета
+
+Цвет отключается стандартным `NO_COLOR=1 lmon`. Отдельного `--no-color`
+пока нет; `--bars`/`--hybrid` без цвета переходят в читаемый текст.
+Настоящий монохромный `--mono` — в бэклоге.
+
 ### Конфиг
 
 ```sh
