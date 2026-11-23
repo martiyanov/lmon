@@ -36,7 +36,7 @@ func TestResizeNumericWidth(t *testing.T) {
 	if got := u.resizeText(r, 6); got != "12345" {
 		t.Fatalf("wide number = %q", got)
 	}
-	if got := u.resizeText(r, 3); got != "+++" {
+	if got := u.resizeText(r, 3); got != "12K" {
 		t.Fatalf("narrow number = %q", got)
 	}
 }

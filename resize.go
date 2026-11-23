@@ -18,9 +18,16 @@ func (u *ui) drawGrid(rs []reading) {
 	if cols < 1 {
 		cols = 80
 	}
+	if !u.gridReady || u.rows != rows || u.cols != cols {
+		fmt.Fprint(u.w, "\x1b[H\x1b[2J")
+		u.gridReady = true
+	}
 	u.rows, u.cols = rows, cols
-	fmt.Fprint(u.w, "\x1b[H\x1b[2J")
 	if len(rs) == 0 {
+		if len(u.baseRS) > 0 {
+			u.drawResizeHeaders(u.baseRS, rows, cols)
+			return
+		}
 		fmt.Fprintf(u.w, "\x1b[1;1H%s", clipANSI(u.head, cols))
 		return
 	}
@@ -84,6 +91,57 @@ func (u *ui) drawResizeThree(rs []reading, rows, cols int) {
 		}
 		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, u.resizeHeaderCell(r, widths[col]))
 		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y+1, x, u.resizeValueCell(r, widths[col]))
+	}
+}
+
+func (u *ui) drawResizeHeaders(rs []reading, rows, cols int) {
+	if u.threeColumns {
+		perRow := 3
+		if len(rs) < perRow {
+			perRow = len(rs)
+		}
+		cellW := cols / perRow
+		widths := make([]int, perRow)
+		extra := cols - cellW*perRow
+		for i := range widths {
+			widths[i] = cellW
+			if i < extra {
+				widths[i]++
+			}
+		}
+		for i, r := range rs {
+			group, col := i/perRow, i%perRow
+			x := 1
+			for j := 0; j < col; j++ {
+				x += widths[j]
+			}
+			y := group*3 + 1
+			if y > rows {
+				break
+			}
+			fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, u.resizeHeaderCell(r, widths[col]))
+		}
+		return
+	}
+	perRow := gridColumns(cols, rs)
+	shown := rs[:perRow]
+	cellW := cols / perRow
+	widths := make([]int, perRow)
+	extra := cols - cellW*perRow
+	for i := range widths {
+		widths[i] = cellW
+		if i < extra {
+			widths[i]++
+		}
+	}
+	y := rows
+	if u.rain || u.horizontal {
+		y = 1
+	}
+	x := 1
+	for i, r := range shown {
+		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, u.resizeHeaderCell(r, widths[i]))
+		x += widths[i]
 	}
 }
 
@@ -171,6 +229,7 @@ func (u *ui) drawResizeHorizontal(rs []reading, widths []int, rows int) {
 		if len(samples) == 0 {
 			samples = []reading{r}
 		}
+		fmt.Fprintf(u.w, "\x1b[2;%dH%s", x, strings.Repeat(" ", widths[i]))
 		pos := x
 		for _, sample := range samples {
 			w := 3
@@ -234,7 +293,29 @@ func (u *ui) resizeValueCell(r reading, width int) string {
 	return centerANSI(strings.TrimSpace(u.dataRow([]reading{r})), width)
 }
 
-// resizeText — числовое значение по доступной ширине.
+// compactNumber — длинное число в K/M/G, чтобы не было полотна цифр.
+func compactNumber(v, width int) string {
+	if v < 0 {
+		return "·"
+	}
+	type unit struct {
+		scale int
+		suf   string
+	}
+	units := []unit{{1_000_000_000, "G"}, {1_000_000, "M"}, {1000, "K"}}
+	for _, u := range units {
+		if v >= u.scale {
+			n := strconv.Itoa(v / u.scale)
+			if len([]rune(n))+1 <= width {
+				return n + u.suf
+			}
+		}
+	}
+	return "+++"
+}
+
+// resizeText — числовое значение по доступной ширине и с единицами
+// для сетевых/дисковых/температурных колонок.
 func (u *ui) resizeText(r reading, width int) string {
 	if r.v < 0 {
 		return "·"
@@ -242,15 +323,91 @@ func (u *ui) resizeText(r reading, width int) string {
 	if r.v == 999 && u.symbols {
 		return "..."
 	}
-	if r.id == "R" || r.id == "J" || r.id == "DR" || r.id == "DI" {
-		// у скоростей уже есть компактные K/M/G; не раздуваем их.
-		return strings.TrimSpace(u.displayText(r))
+	switch r.id {
+	case "N", "G", "A":
+		return durationText(r.v, width)
+	case "R", "J":
+		return rateWide(r.v, width)
+	case "DR":
+		return diskRateWide(r.v, width)
+	case "DI":
+		return iopsWide(r.v, width)
+	case "W", "PW":
+		return powerText(r.v, width)
+	case "T", "H", "Y":
+		return withSuffix(strconv.Itoa(r.v), "°", width)
+	case "C", "M", "S", "U", "B", "P", "K", "F", "Z":
+		return withSuffix(strconv.Itoa(r.v), "%", width)
+	case "L", "Q", "E", "O", "X":
+		text := strconv.Itoa(r.v)
+		if len([]rune(text)) <= width {
+			return text
+		}
+		return compactNumber(r.v, width)
 	}
 	text := strconv.Itoa(r.v)
 	if len([]rune(text)) <= width {
 		return text
 	}
-	return strings.TrimSpace(u.displayText(r))
+	return compactNumber(r.v, width)
+}
+
+func withSuffix(digits, suffix string, width int) string {
+	if len([]rune(digits))+len([]rune(suffix)) <= width {
+		return digits + suffix
+	}
+	return digits
+}
+
+func durationText(v, width int) string {
+	if v < 1000 {
+		return withSuffix(strconv.Itoa(v), "ms", width)
+	}
+	sec := float64(v) / 1000
+	if s := fmt.Sprintf("%.1fs", sec); len([]rune(s)) <= width {
+		return s
+	}
+	return withSuffix(strconv.Itoa(v/1000), "s", width)
+}
+
+func rateWide(v, width int) string {
+	// внутренние значения — КБ/с
+	switch {
+	case v < 1000:
+		return withSuffix(strconv.Itoa(v), "K", width)
+	case v < 1_000_000:
+		return withSuffix(strconv.Itoa(v/1000), "M", width)
+	default:
+		return withSuffix(strconv.Itoa(v/1_000_000), "G", width)
+	}
+}
+
+func diskRateWide(v, width int) string {
+	switch {
+	case v < 1000:
+		return withSuffix(strconv.Itoa(v), "M", width)
+	case v < 1_000_000:
+		return withSuffix(strconv.Itoa(v/1000), "G", width)
+	default:
+		return withSuffix(strconv.Itoa(v/1_000_000), "T", width)
+	}
+}
+
+func iopsWide(v, width int) string {
+	if v < 1000 {
+		return strconv.Itoa(v)
+	}
+	if v < 1_000_000 {
+		return withSuffix(strconv.Itoa(v/1000), "K", width)
+	}
+	return withSuffix(strconv.Itoa(v/1_000_000), "M", width)
+}
+
+func powerText(v, width int) string {
+	if v < 1000 {
+		return withSuffix(strconv.Itoa(v), "W", width)
+	}
+	return withSuffix(strconv.Itoa(v/1000), "kW", width)
 }
 
 func (u *ui) resizeBlockCell(r reading, width int) string {

@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.54.0"
+const version = "1.55.0"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -83,7 +83,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
                   от зелёного через жёлтый к красному по шкале каждой
                   колонки. Статус видно боковым зрением. Тусклый
                   квадрат — датчика нет.
-  --hybrid      — смешанный режим: точные цифры на подложке цвета
+  --hybrid      — устарел: гибрид теперь по умолчанию
+  --plain       — цифры без цветной подложки (выключить гибрид)
   --compact     — по одной букве и одному цветному блоку на параметр,
                   без пробелов (фиолетовый — нет датчика, красный — нет ответа).
   --horizontal  — горизонтальная цветная лента: параметр = строка,
@@ -149,7 +150,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon 20            — 20 строк и выход
   lmon --interval 5  — период обновления 5 секунд (по умолчанию 1)
   lmon --bars        — режим цветных квадратов
-  lmon --hybrid      — цифры на цветной подложке
+  lmon --plain       — цифры без цветной подложки
   lmon --compact     — минимализм: одна буква и один цветной блок на параметр
   lmon --horizontal  — строки-параметры, цветная история вправо
   lmon --three-columns — явный режим 3 колонок
@@ -211,6 +212,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --exit-code   LMON_EXIT_CODE  с --once: код 1 при warning, 2 при critical
   --profile     LMON_PROFILE    пресет колонок: server, desktop или network
   --top N       LMON_TOP        топ-N процессов по CPU и выход (Unix)
+  --plain       LMON_PLAIN      цифры без цветной подложки (гибрид выключен)
   --compact     LMON_COMPACT    одна буква и один цветной блок на параметр, без пробелов
   --horizontal  LMON_HORIZONTAL горизонтальная цветная лента (TUI)
   --resize-window LMON_RESIZE_WINDOW адаптивная таблица (по умолчанию)
@@ -325,7 +327,8 @@ Display modes:
   --bars        — colored blocks ███ instead of digits; green → yellow → red
                   along each column's scale. A purple block means no sensor,
                   a red block means no reply. --blocks is a legacy alias.
-  --hybrid      — mixed mode: exact digits on the state-colored background
+  --hybrid      — deprecated: hybrid is now the default
+  --plain       — digits without the state-colored background
   --compact     — one letter and one colored block per parameter, no gaps
                   (purple = no sensor, red = no reply).
   --horizontal  — horizontal color timeline: one row per parameter,
@@ -390,7 +393,7 @@ Usage:
   lmon 20            — 20 lines, then exit
   lmon --interval 5  — refresh period of 5 seconds (default 1)
   lmon --bars        — colored blocks mode
-  lmon --hybrid      — digits on the state-colored background
+  lmon --plain       — digits without the state-colored background
   lmon --compact     — minimal: one letter and one colored block per parameter
   lmon --horizontal  — parameter rows, color history to the right
   lmon --three-columns — explicit 3-column layout
@@ -452,6 +455,7 @@ Settings (flags and environment variables):
   --exit-code   LMON_EXIT_CODE  with --once: exit 1 on warning, 2 on critical
   --profile     LMON_PROFILE    column preset: server, desktop or network
   --top N       LMON_TOP        top-N processes by CPU and exit (Unix)
+  --plain       LMON_PLAIN      digits without the state-colored background
   --compact     LMON_COMPACT    one letter and one colored block per parameter, no gaps
   --horizontal  LMON_HORIZONTAL horizontal color timeline (TUI)
   --resize-window LMON_RESIZE_WINDOW responsive table (default on)
@@ -689,10 +693,11 @@ func parseConfig(args []string) (config, error) {
 	target := fs.String("target", envStr("LMON_TARGET", "8.8.8.8"), "external host")
 	gw := fs.String("gw", envStr("LMON_GW", ""), "gateway (auto-detected by default)")
 	interval := fs.Float64("interval", envFloat("LMON_INTERVAL", 1), "seconds between lines")
-	var blocks, hybrid, compact, rain bool
+	var blocks, compact, rain bool
 	fs.BoolVar(&blocks, "bars", false, "colored bars instead of digits")
 	fs.BoolVar(&blocks, "blocks", false, "alias for --bars (legacy name)")
-	fs.BoolVar(&hybrid, "hybrid", false, "digits on the state-colored background")
+	hybrid := fs.Bool("hybrid", true, "digits on state-colored background (deprecated: default)")
+	plain := fs.Bool("plain", false, "digits without colored background (disable hybrid)")
 	fs.BoolVar(&compact, "compact", envFlag("LMON_COMPACT"), "one character per column, no gaps")
 	mono := fs.Bool("mono", envFlag("LMON_MONO"), "monochrome fill: · ░ ▒ ▓ █ (also auto without color)")
 	fs.BoolVar(&rain, "rain", envFlag("LMON_RAIN"), "falling values: headers on top, values fall down")
@@ -769,15 +774,12 @@ func parseConfig(args []string) (config, error) {
 	if *threeColumns {
 		*resizeWindow = true
 	}
+	if *plain || blocks || compact {
+		*hybrid = false
+	}
 	lg := *lang
 	if lg != "en" && lg != "ru" {
 		return config{}, fmt.Errorf(lmsg(lg, "--lang=%q: expected en or ru", "--lang=%q: ожидается en или ru"), lg)
-	}
-	if blocks && hybrid {
-		return config{}, errors.New(lmsg(lg, "--bars/--blocks and --hybrid are mutually exclusive", "--bars/--blocks и --hybrid взаимоисключающи"))
-	}
-	if compact && hybrid {
-		return config{}, errors.New(lmsg(lg, "--compact cannot be combined with --hybrid", "--compact не сочетается с --hybrid"))
 	}
 	if compact {
 		blocks = false // compact already uses one block/glyph per value
@@ -786,8 +788,8 @@ func parseConfig(args []string) (config, error) {
 	if labelsMode != "full" && labelsMode != "short" {
 		return config{}, fmt.Errorf(lmsg(lg, "--labels=%q: expected full or short", "--labels=%q: ожидается full или short"), *labels)
 	}
-	if *horizontal && (blocks || hybrid || compact) {
-		return config{}, errors.New(lmsg(lg, "--horizontal cannot be combined with --bars/--blocks, --hybrid or --compact", "--horizontal не сочетается с --bars/--blocks, --hybrid или --compact"))
+	if *horizontal && (blocks || compact) {
+		return config{}, errors.New(lmsg(lg, "--horizontal cannot be combined with --bars/--blocks or --compact", "--horizontal не сочетается с --bars/--blocks или --compact"))
 	}
 	if *horizontal && once {
 		return config{}, errors.New(lmsg(lg, "--horizontal cannot be combined with --once; use the normal --once output", "--horizontal не сочетается с --once; используйте обычный вывод --once"))
@@ -918,7 +920,7 @@ func parseConfig(args []string) (config, error) {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once, jsonOut: *jsonOut, exitCode: *exitCode, profile: prof, topN: *topN,
-		blocks: blocks, hybrid: hybrid, compact: compact, mono: *mono, horizontal: *horizontal, resizeWindow: *resizeWindow, threeColumns: *threeColumns, labelsFull: labelsMode == "full", rain: rain, matrixPalette: *matrixPalette, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
+		blocks: blocks, hybrid: *hybrid, compact: compact, mono: *mono, horizontal: *horizontal, resizeWindow: *resizeWindow, threeColumns: *threeColumns, labelsFull: labelsMode == "full", rain: rain, matrixPalette: *matrixPalette, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
 		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans,
@@ -1327,7 +1329,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 
 	tty := stdoutIsTTY()
 	color := colorAllowed(tty) && !cfg.mono
-	u := &ui{w: w, tty: tty, color: color, mono: monoWanted(cfg, color), resizeWindow: cfg.resizeWindow, threeColumns: cfg.threeColumns, horizontal: cfg.horizontal, blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, matrix: cfg.matrixPalette, rain: cfg.rain, symbols: true, lang: cfg.lang}
+	u := &ui{w: w, tty: tty, color: color, mono: monoWanted(cfg, color), resizeWindow: cfg.resizeWindow, threeColumns: cfg.threeColumns, horizontal: cfg.horizontal, blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, matrix: cfg.matrixPalette, rain: cfg.rain, symbols: true, lang: cfg.lang, baseRS: cols}
 	if cfg.compact {
 		u.head, u.sep = headerOfCompact(cols)
 	} else {
@@ -2386,6 +2388,8 @@ type ui struct {
 	rows         int
 	cols         int
 	gridRows     [][]reading
+	gridReady    bool
+	baseRS       []reading
 	blocks       bool
 	hybrid       bool
 	compact      bool

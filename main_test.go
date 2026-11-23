@@ -79,9 +79,8 @@ func TestLang(t *testing.T) {
 	if _, err := parseConfig([]string{"--lang", "xx"}); err == nil || !strings.Contains(err.Error(), "en or ru") {
 		t.Errorf("--lang xx: err = %v, want ошибка языка", err)
 	}
-	if _, err := parseConfig([]string{"--bars", "--hybrid"}); err == nil ||
-		!strings.Contains(err.Error(), "mutually exclusive") {
-		t.Errorf("-b --hybrid: err = %v, want взаимоисключение", err)
+	if cfg, err := parseConfig([]string{"--bars", "--hybrid"}); err != nil || !cfg.blocks || cfg.hybrid {
+		t.Errorf("-b --hybrid: cfg=%+v err=%v, want bars wins", cfg, err)
 	}
 
 	// справки на месте у обоих языков
