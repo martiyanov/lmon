@@ -181,8 +181,10 @@ lmon help   # вся справка: при русской локали — по
 - **GPW** — потребление GPU, Вт (`--gpu-power`; Linux/NVIDIA).
 - **NVM** — температура NVMe, °C (`--nvme`; Linux).
 - **LAT/QUE** — латентность диска (мс) и очередь I/O (`--disk-io`; Linux).
-- **RX/TX/ERR** — сеть, КБ/с и ошибки/дропы в секунду (`--net-rate`; Linux/macOS).
-- **DR/DI** — скорость диска, МБ/с и IOPS (`--disk-rate`; macOS).
+- **RX/TX/ERR** — сеть, приём/передача и ошибки (`--net-rate`; Linux/macOS).
+  До 1000 — КБ/с; `M` — МБ/с, `G` — ГБ/с.
+- **DR/DI** — диск и IOPS (`--disk-rate`; macOS).
+  `DR`: МБ/с, крупнее в G/T; `DI`: IOPS, крупнее в K/G.
 - **MPS** — давление памяти: 0 normal, 1 warning, 2 critical (`--pressure`; macOS).
 - **PSI** — давление на память, avg10 % (`--psi`; Linux).
 - **SVC/UPD** — упавшие systemd-юниты и флаг перезагрузки (`--system`; Linux).

@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.51.0"
+const version = "1.52.0"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -56,10 +56,12 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   NVM (V)  — температура NVMe, °C (--nvme; Linux).
   LAT (A)  — средняя латентность диска, мс (--disk-io; Linux).
   QUE (Q)  — очередь запросов к диску (--disk-io; Linux).
-  RX (R)   — приём по сети, КБ/с (--net-rate; Linux/macOS).
-  TX (J)   — передача по сети, КБ/с (--net-rate; Linux/macOS).
+  RX (R)   — приём по сети (--net-rate; Linux/macOS): <1000 — КБ/с,
+             M — МБ/с, G — ГБ/с.
+  TX (J)   — передача по сети, те же единицы.
   ERR (E)  — ошибки/дропы сети в секунду (--net-rate; Linux/macOS).
-  DR/DI    — скорость диска, МБ/с и IOPS (--disk-rate; macOS).
+  DR/DI    — диск (--disk-rate; macOS): DR — МБ/с, крупнее в G/T;
+             DI — IOPS, крупнее в K/G.
   MPS (MP) — давление памяти: 0 normal, 1 warning, 2 critical (--pressure; macOS).
   PSI (Z)  — давление на память, avg10 % (--psi; Linux).
   SVC (O)  — упавшие systemd-юниты (--system; Linux).
@@ -295,10 +297,12 @@ Columns (letter in parentheses is for --cols):
   NVM (V)  — NVMe temperature, °C (--nvme; Linux).
   LAT (A)  — average disk latency, ms (--disk-io; Linux).
   QUE (Q)  — disk I/O queue (--disk-io; Linux).
-  RX (R)   — network receive, KB/s (--net-rate; Linux/macOS).
-  TX (J)   — network transmit, KB/s (--net-rate; Linux/macOS).
+  RX (R)   — network receive (--net-rate; Linux/macOS): <1000 KB/s,
+             M = MB/s, G = GB/s.
+  TX (J)   — network transmit, same units.
   ERR (E)  — network errors/drops per second (--net-rate; Linux/macOS).
-  DR/DI    — disk throughput, MB/s and IOPS (--disk-rate; macOS).
+  DR/DI    — disk (--disk-rate; macOS): DR MB/s, larger in G/T;
+             DI IOPS, larger in K/G.
   MPS (MP) — memory pressure: 0 normal, 1 warning, 2 critical (--pressure; macOS).
   PSI (Z)  — memory pressure, avg10 % (--psi; Linux).
   SVC (O)  — failed systemd units (--system; Linux).
@@ -2629,11 +2633,69 @@ func valueText(r reading) string {
 	if r.v < 0 { // датчика нет
 		return fmt.Sprintf("%3s", "·")
 	}
+	if r.id == "R" || r.id == "J" { // сеть: КБ/с → K/M/G в трёх клетках
+		return rateText(r.v)
+	}
+	if r.id == "DR" { // диск: MB/s → G/T
+		return diskRateText(r.v)
+	}
+	if r.id == "DI" { // IOPS → K/M/G
+		return iopsText(r.v)
+	}
 	switch {
 	case r.v > 999: // слишком большое — индикатор переполнения, ширина сохраняется
 		return "+++"
 	}
 	return fmt.Sprintf("%3d", r.v) // ° живёт в заголовке колонки, не в значениях
+}
+
+// rateText — компактный порядок для RX/TX: до 999 — КБ/с,
+// дальше M (МБ/с) и G (ГБ/с), чтобы не терять масштаб в клетке шириной 3.
+func rateText(v int) string {
+	switch {
+	case v < 0:
+		return fmt.Sprintf("%3s", "·")
+	case v >= 1_000_000_000:
+		return "+++"
+	case v >= 1_000_000:
+		return fmt.Sprintf("%3dG", v/1_000_000)
+	case v >= 1000:
+		return fmt.Sprintf("%3dM", v/1000)
+	default:
+		return fmt.Sprintf("%3d", v)
+	}
+}
+
+// diskRateText — DR в MB/s; крупные значения в GB/s и TB/s.
+func diskRateText(v int) string {
+	switch {
+	case v < 0:
+		return fmt.Sprintf("%3s", "·")
+	case v >= 1_000_000_000:
+		return "+++"
+	case v >= 1_000_000:
+		return fmt.Sprintf("%3dT", v/1_000_000)
+	case v >= 1000:
+		return fmt.Sprintf("%3dG", v/1000)
+	default:
+		return fmt.Sprintf("%3d", v)
+	}
+}
+
+// iopsText — DI в IOPS; K/M/G для больших значений.
+func iopsText(v int) string {
+	switch {
+	case v < 0:
+		return fmt.Sprintf("%3s", "·")
+	case v >= 1_000_000_000:
+		return "+++"
+	case v >= 1_000_000:
+		return fmt.Sprintf("%3dG", v/1_000_000)
+	case v >= 1000:
+		return fmt.Sprintf("%3dK", v/1000)
+	default:
+		return fmt.Sprintf("%3d", v)
+	}
 }
 
 // displayText — как valueText, но в режиме символов «нет ответа» показывает

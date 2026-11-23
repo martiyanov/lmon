@@ -191,8 +191,10 @@ align exactly with the values. In plain words:
 - **GPW** — GPU power, W (`--gpu-power`; Linux/NVIDIA).
 - **NVM** — NVMe temperature, °C (`--nvme`; Linux).
 - **LAT/QUE** — disk latency (ms) and I/O queue (`--disk-io`; Linux).
-- **RX/TX/ERR** — network KB/s and errors/drops per second (`--net-rate`; Linux/macOS).
-- **DR/DI** — disk throughput MB/s and IOPS (`--disk-rate`; macOS).
+- **RX/TX/ERR** — network receive/transmit and errors (`--net-rate`; Linux/macOS).
+  Values below 1000 are KB/s; `M` = MB/s, `G` = GB/s.
+- **DR/DI** — disk throughput and IOPS (`--disk-rate`; macOS).
+  `DR`: MB/s, larger in G/T; `DI`: IOPS, larger in K/G.
 - **MPS** — memory pressure state: 0 normal, 1 warning, 2 critical (`--pressure`; macOS).
 - **PSI** — memory pressure, avg10 % (`--psi`; Linux).
 - **SVC/UPD** — failed systemd units and reboot-required flag (`--system`; Linux).
