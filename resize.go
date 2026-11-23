@@ -226,12 +226,12 @@ func resizeLabel(r reading) string {
 }
 
 // gridColumns — сколько карточек помещается в ряд.
-// 10 — минимальная комфортная ширина карточки: имя + значение.
+// 8 — минимум для полного имени (7) и значения (3) в одной колонке.
 func gridColumns(cols, n int) int {
 	if n < 1 {
 		return 1
 	}
-	const minCell = 10
+	const minCell = 8
 	if cols >= n*minCell {
 		return n
 	}
