@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.53.3"
+const version = "1.53.4"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
