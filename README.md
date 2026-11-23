@@ -159,6 +159,7 @@ lmon 20                 # print 20 lines and exit
 lmon --bars                 # color blocks instead of digits
 lmon --matrix               # green cipher matrix, no digits
 lmon --rain --matrix        # same, values fall down
+lmon --resize-window        # responsive full-width card grid
 lmon --config ~/.config/lmon/config  # explicit config
 lmon --save-config      # save current settings and exit
 lmon --no-hints         # start without hints about hidden columns
@@ -309,6 +310,21 @@ lmon --rain --matrix # falling matrix glyphs
 `--rain` cannot be combined with `--horizontal` or `--once`. Rendered rows are
 frozen once created — they do not change while falling.
 
+### Responsive grid
+
+`--resize-window` turns the one-row layout into cards that fill the terminal
+width. The number of cards per row follows the width: at 100 columns all
+indicators fit in one row, around 30 columns it becomes a 3-column grid,
+and on a very narrow terminal it falls back to one column. Values keep
+their normal style (`--bars`, `--matrix`, `--mono`, and so on).
+
+```sh
+lmon --resize-window
+```
+
+It is a TUI-only mode; it cannot be combined with `--once`, `--rain` or
+`--horizontal`.
+
 ### Horizontal timeline
 
 `--horizontal` turns the view 90°: one row per parameter, time flows to the
@@ -445,6 +461,7 @@ header and the cell above it at the same time. `--once` is unchanged.
 | `--bars` | — | off | colored bars instead of digits (`--blocks` is a legacy alias) |
 | `--compact` | `LMON_COMPACT` | off | one letter and one colored block per parameter, no gaps |
 | `--horizontal` | `LMON_HORIZONTAL` | off | horizontal color timeline (TUI) |
+| `--resize-window` | `LMON_RESIZE_WINDOW` | off | responsive card grid: fills width, wraps to 3/1 columns |
 | `--rain` | `LMON_RAIN` | off | direction: new values on top, falling down (works with the selected mode) |
 | `--matrix` | `LMON_MATRIX` | off | matrix style: green, no digits, random safe cipher glyphs, zero = small centered symbol (any mode) |
 | `--mono` | `LMON_MONO` | off | monochrome fill (`· ░ ▒ ▓ █`); also automatic with `NO_COLOR` |
