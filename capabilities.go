@@ -42,9 +42,9 @@ func columnSupportedByOS(id, goos string) bool {
 	case "darwin":
 		switch id {
 		case "I", // iowait на macOS ядром не отдаётся
-			"H",                                                          // GPUTempC: powermetrics под sudo — не показываем
-			"F",                                                          // вентиляторы: нужен SMC/powermetrics с правами
-			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR": // Linux-метрики
+			"H",                                           // GPUTempC: powermetrics под sudo — не показываем
+			"F",                                           // вентиляторы: нужен SMC/powermetrics с правами
+			"W", "Y", "A", "Q", "Z", "O", "X", "PW", "WR": // Linux-метрики (R/J/E читаются из netstat)
 			return false
 		}
 		// K (занятость диска) читается через IOKit, без sudo.

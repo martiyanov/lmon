@@ -181,7 +181,7 @@ lmon help   # вся справка: при русской локали — по
 - **GPW** — потребление GPU, Вт (`--gpu-power`; Linux/NVIDIA).
 - **NVM** — температура NVMe, °C (`--nvme`; Linux).
 - **LAT/QUE** — латентность диска (мс) и очередь I/O (`--disk-io`; Linux).
-- **RX/TX/ERR** — сеть, КБ/с и ошибки/дропы в секунду (`--net-rate`; Linux).
+- **RX/TX/ERR** — сеть, КБ/с и ошибки/дропы в секунду (`--net-rate`; Linux/macOS).
 - **PSI** — давление на память, avg10 % (`--psi`; Linux).
 - **SVC/UPD** — упавшие systemd-юниты и флаг перезагрузки (`--system`; Linux).
 - **PWR/WEA** — потребление CPU (RAPL) и износ NVMe (SMART), `--cpu-power`/`--nvme-smart`; Linux, нужен root.

@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.49.0"
+const version = "1.50.0"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -56,9 +56,9 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   NVM (V)  — температура NVMe, °C (--nvme; Linux).
   LAT (A)  — средняя латентность диска, мс (--disk-io; Linux).
   QUE (Q)  — очередь запросов к диску (--disk-io; Linux).
-  RX (R)   — приём по сети, КБ/с (--net-rate; Linux).
-  TX (J)   — передача по сети, КБ/с (--net-rate; Linux).
-  ERR (E)  — ошибки/дропы сети в секунду (--net-rate; Linux).
+  RX (R)   — приём по сети, КБ/с (--net-rate; Linux/macOS).
+  TX (J)   — передача по сети, КБ/с (--net-rate; Linux/macOS).
+  ERR (E)  — ошибки/дропы сети в секунду (--net-rate; Linux/macOS).
   PSI (Z)  — давление на память, avg10 % (--psi; Linux).
   SVC (O)  — упавшие systemd-юниты (--system; Linux).
   UPD (X)  — нужна перезагрузка: 0/1 (--system; Linux).
@@ -221,7 +221,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --gpu-power   LMON_GPU_POWER  потребление GPU, Вт (Linux/NVIDIA)
   --nvme        LMON_NVME       температура NVMe, °C (Linux)
   --disk-io     LMON_DISK_IO    латентность и очередь диска (Linux)
-  --net-rate    LMON_NET_RATE   RX/TX КБ/с и ошибки сети (Linux)
+  --net-rate    LMON_NET_RATE   RX/TX КБ/с и ошибки сети (Linux/macOS)
   --psi         LMON_PSI        давление на память (Linux)
   --system      LMON_SYSTEM     упавшие юниты и reboot-required (Linux)
   --cpu-power   LMON_CPU_POWER  потребление CPU, Вт (Linux, нужен root)
@@ -291,9 +291,9 @@ Columns (letter in parentheses is for --cols):
   NVM (V)  — NVMe temperature, °C (--nvme; Linux).
   LAT (A)  — average disk latency, ms (--disk-io; Linux).
   QUE (Q)  — disk I/O queue (--disk-io; Linux).
-  RX (R)   — network receive, KB/s (--net-rate; Linux).
-  TX (J)   — network transmit, KB/s (--net-rate; Linux).
-  ERR (E)  — network errors/drops per second (--net-rate; Linux).
+  RX (R)   — network receive, KB/s (--net-rate; Linux/macOS).
+  TX (J)   — network transmit, KB/s (--net-rate; Linux/macOS).
+  ERR (E)  — network errors/drops per second (--net-rate; Linux/macOS).
   PSI (Z)  — memory pressure, avg10 % (--psi; Linux).
   SVC (O)  — failed systemd units (--system; Linux).
   UPD (X)  — reboot required: 0/1 (--system; Linux).
@@ -453,7 +453,7 @@ Settings (flags and environment variables):
   --gpu-power   LMON_GPU_POWER  GPU power, W (Linux/NVIDIA)
   --nvme        LMON_NVME       NVMe temperature, °C (Linux)
   --disk-io     LMON_DISK_IO    disk latency and queue (Linux)
-  --net-rate    LMON_NET_RATE   RX/TX KB/s and network errors (Linux)
+  --net-rate    LMON_NET_RATE   RX/TX KB/s and network errors (Linux/macOS)
   --psi         LMON_PSI        memory pressure (Linux)
   --system      LMON_SYSTEM     failed units and reboot-required (Linux)
   --cpu-power   LMON_CPU_POWER  CPU package power, W (Linux, root)

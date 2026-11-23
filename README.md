@@ -191,7 +191,7 @@ align exactly with the values. In plain words:
 - **GPW** — GPU power, W (`--gpu-power`; Linux/NVIDIA).
 - **NVM** — NVMe temperature, °C (`--nvme`; Linux).
 - **LAT/QUE** — disk latency (ms) and I/O queue (`--disk-io`; Linux).
-- **RX/TX/ERR** — network KB/s and errors/drops per second (`--net-rate`; Linux).
+- **RX/TX/ERR** — network KB/s and errors/drops per second (`--net-rate`; Linux/macOS).
 - **PSI** — memory pressure, avg10 % (`--psi`; Linux).
 - **SVC/UPD** — failed systemd units and reboot-required flag (`--system`; Linux).
 - **PWR/WEA** — CPU package power (RAPL) and NVMe wear (SMART), `--cpu-power`/`--nvme-smart`; Linux, require root.
@@ -467,7 +467,7 @@ header and the cell above it at the same time. `--once` is unchanged.
 | `--gpu-power` | `LMON_GPU_POWER` | off | GPU power, W (Linux/NVIDIA) |
 | `--nvme` | `LMON_NVME` | off | NVMe temperature, °C (Linux) |
 | `--disk-io` | `LMON_DISK_IO` | off | disk latency and queue (Linux) |
-| `--net-rate` | `LMON_NET_RATE` | off | RX/TX KB/s and errors (Linux) |
+| `--net-rate` | `LMON_NET_RATE` | off | RX/TX KB/s and errors (Linux/macOS) |
 | `--psi` | `LMON_PSI` | off | memory pressure (Linux) |
 | `--system` | `LMON_SYSTEM` | off | failed units and reboot-required (Linux) |
 | `--cpu-power` | `LMON_CPU_POWER` | off | CPU package power, W (Linux, root/RAPL) |
