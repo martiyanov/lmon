@@ -40,3 +40,26 @@ func TestResizeNumericWidth(t *testing.T) {
 		t.Fatalf("narrow number = %q", got)
 	}
 }
+
+func TestResizeDefaults(t *testing.T) {
+	cfg, err := parseConfig(nil)
+	if err != nil || !cfg.resizeWindow {
+		t.Fatalf("default resize = %+v err=%v", cfg.resizeWindow, err)
+	}
+	cfg, err = parseConfig([]string{"--once"})
+	if err != nil || cfg.resizeWindow {
+		t.Fatalf("once resize = %+v err=%v", cfg.resizeWindow, err)
+	}
+	cfg, err = parseConfig([]string{"--horizontal"})
+	if err != nil || cfg.resizeWindow {
+		t.Fatalf("horizontal resize = %+v err=%v", cfg.resizeWindow, err)
+	}
+	cfg, err = parseConfig([]string{"--three-columns"})
+	if err != nil || !cfg.resizeWindow || !cfg.threeColumns {
+		t.Fatalf("three columns = %+v err=%v", cfg, err)
+	}
+	cfg, err = parseConfig([]string{"--resize-window=false"})
+	if err != nil || cfg.resizeWindow {
+		t.Fatalf("explicit off = %+v err=%v", cfg.resizeWindow, err)
+	}
+}

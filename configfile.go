@@ -94,8 +94,8 @@ func parseConfigBool(s string) (bool, error) {
 var configBoolKeys = map[string]bool{
 	"bars": true, "blocks": true, "hybrid": true, "compact": true,
 	"rain": true, "matrix": true, "horizontal": true, "mono": true,
-	"resize-window": true,
-	"cpu":           true, "iowait": true, "swap": true, "disk": true,
+	"resize-window": true, "three-columns": true,
+	"cpu": true, "iowait": true, "swap": true, "disk": true,
 	"disk-busy": true, "batt": true, "gpu": true, "gputemp": true,
 	"all": true, "fans": true, "fans-all": true, "gpu-power": true,
 	"nvme": true, "disk-io": true, "net-rate": true, "psi": true,
@@ -224,8 +224,11 @@ func writeConfigFile(cfg config, path string) error {
 	if cfg.mono {
 		write("mono", "true")
 	}
-	if cfg.resizeWindow {
-		write("resize-window", "true")
+	if !cfg.resizeWindow {
+		write("resize-window", "false")
+	}
+	if cfg.threeColumns {
+		write("three-columns", "true")
 	}
 	if cfg.noHints {
 		write("no-hints", "true")

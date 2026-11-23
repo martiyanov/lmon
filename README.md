@@ -312,8 +312,10 @@ frozen once created — they do not change while falling.
 
 ### Responsive grid
 
-`--resize-window` keeps all headers on one line and distributes the terminal
-width between them. There are no 3-column/1-column header wraps:
+The responsive table is the **default** TUI layout; `--resize-window` is kept
+as an explicit switch. All headers stay on one line, and the terminal width
+is distributed between them. There are no automatic 3-column/1-column
+header wraps:
 
 - wide cell — full names (`Network`, `Gateway`, `Memory`, …);
 - medium cell — short names (`NET`, `GTW`, `CPU`, …);
@@ -332,9 +334,11 @@ wide column `12345` is shown as `12345` instead of `+++`. It is a TUI-only
 mode and cannot be combined with `--once`.
 
 ```sh
-lmon --resize-window
-lmon --rain --resize-window
-lmon --horizontal --resize-window
+lmon                       # responsive table by default
+lmon --three-columns       # explicit 3-column layout
+lmon --resize-window=false # old one-row table
+lmon --rain                # values fall down
+lmon --horizontal          # sideways timeline
 ```
 
 ### Horizontal timeline

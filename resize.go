@@ -24,6 +24,10 @@ func (u *ui) drawGrid(rs []reading) {
 		fmt.Fprintf(u.w, "\x1b[1;1H%s", clipANSI(u.head, cols))
 		return
 	}
+	if u.threeColumns {
+		u.drawResizeThree(rs, rows, cols)
+		return
+	}
 	perRow := gridColumns(cols, rs)
 	shown := rs[:perRow]
 	cellW := cols / perRow
@@ -50,6 +54,37 @@ func (u *ui) drawGrid(rs []reading) {
 		return
 	}
 	u.drawResizeStream(shown, widths, rows)
+}
+
+func (u *ui) drawResizeThree(rs []reading, rows, cols int) {
+	perRow := 3
+	if len(rs) < perRow {
+		perRow = len(rs)
+	}
+	cellW := cols / perRow
+	widths := make([]int, perRow)
+	extra := cols - cellW*perRow
+	for i := range widths {
+		widths[i] = cellW
+		if i < extra {
+			widths[i]++
+		}
+	}
+	groupH := 3
+	for i, r := range rs {
+		group := i / perRow
+		col := i % perRow
+		x := 1
+		for j := 0; j < col; j++ {
+			x += widths[j]
+		}
+		y := group*groupH + 1
+		if y+1 > rows {
+			break
+		}
+		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, u.resizeHeaderCell(r, widths[col]))
+		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y+1, x, u.resizeValueCell(r, widths[col]))
+	}
 }
 
 func (u *ui) drawResizeStream(rs []reading, widths []int, rows int) {

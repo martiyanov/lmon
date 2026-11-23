@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.53.8"
+const version = "1.54.0"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -152,7 +152,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   lmon --hybrid      — цифры на цветной подложке
   lmon --compact     — минимализм: одна буква и один цветной блок на параметр
   lmon --horizontal  — строки-параметры, цветная история вправо
-  lmon --resize-window — карточки на всю ширину, 3/1 колонки
+  lmon --three-columns — явный режим 3 колонок
   lmon --rain          — цифры падают вниз
   lmon --rain --bars   — блоки падают вниз
   lmon --rain --matrix — падающие символы по визуальному весу
@@ -213,7 +213,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --top N       LMON_TOP        топ-N процессов по CPU и выход (Unix)
   --compact     LMON_COMPACT    одна буква и один цветной блок на параметр, без пробелов
   --horizontal  LMON_HORIZONTAL горизонтальная цветная лента (TUI)
-  --resize-window LMON_RESIZE_WINDOW адаптивная таблица: вся ширина, 3/1 колонки
+  --resize-window LMON_RESIZE_WINDOW адаптивная таблица (по умолчанию)
+  --three-columns LMON_THREE_COLUMNS явный режим 3 колонок
   --labels      LMON_LABELS     подписи в горизонтальном режиме: full или short
   --rain        LMON_RAIN       направление вниз: новые значения сверху
   --matrix      LMON_MATRIX     матричный стиль (любой режим)
@@ -392,7 +393,7 @@ Usage:
   lmon --hybrid      — digits on the state-colored background
   lmon --compact     — minimal: one letter and one colored block per parameter
   lmon --horizontal  — parameter rows, color history to the right
-  lmon --resize-window — full-width cards, wrap to 3/1 columns
+  lmon --three-columns — explicit 3-column layout
   lmon --rain          — digits falling down
   lmon --rain --bars   — blocks falling down
   lmon --rain --matrix — falling weight-ordered glyphs
@@ -453,7 +454,8 @@ Settings (flags and environment variables):
   --top N       LMON_TOP        top-N processes by CPU and exit (Unix)
   --compact     LMON_COMPACT    one letter and one colored block per parameter, no gaps
   --horizontal  LMON_HORIZONTAL horizontal color timeline (TUI)
-  --resize-window LMON_RESIZE_WINDOW responsive table: full width, wrap to 3/1 columns
+  --resize-window LMON_RESIZE_WINDOW responsive table (default on)
+  --three-columns LMON_THREE_COLUMNS explicit 3-column layout
   --labels      LMON_LABELS     horizontal mode labels: full or short
   --rain        LMON_RAIN       down direction: new values on top
   --matrix      LMON_MATRIX     matrix style (any mode)
@@ -545,7 +547,8 @@ type config struct {
 	compact       bool
 	mono          bool // --mono: monochrome fill, works without color
 	horizontal    bool
-	resizeWindow  bool // --resize-window: responsive grid instead of a row
+	resizeWindow  bool // --resize-window: responsive table (default on)
+	threeColumns  bool // --three-columns: explicit 3-column layout
 	labelsFull    bool
 	rain          bool
 	matrixPalette bool
@@ -695,7 +698,12 @@ func parseConfig(args []string) (config, error) {
 	fs.BoolVar(&rain, "rain", envFlag("LMON_RAIN"), "falling values: headers on top, values fall down")
 	matrixPalette := fs.Bool("matrix", envFlag("LMON_MATRIX"), "green matrix palette (works with any mode)")
 	horizontal := fs.Bool("horizontal", envFlag("LMON_HORIZONTAL"), "horizontal color timeline (TUI)")
-	resizeWindow := fs.Bool("resize-window", envFlag("LMON_RESIZE_WINDOW"), "responsive grid: fill width, wrap to 3/1 columns")
+	resizeDefault := true
+	if v := os.Getenv("LMON_RESIZE_WINDOW"); v != "" {
+		resizeDefault = envFlag("LMON_RESIZE_WINDOW")
+	}
+	resizeWindow := fs.Bool("resize-window", resizeDefault, "responsive table: all headers on one line (default on)")
+	threeColumns := fs.Bool("three-columns", envFlag("LMON_THREE_COLUMNS"), "explicit 3-column table layout")
 	labels := fs.String("labels", envStr("LMON_LABELS", "short"), "horizontal labels: full or short")
 	lang := fs.String("lang", langAuto(), "message language: en or ru")
 	var cpu, iowait, swap, disk, diskBusy, batt, gpu, gputemp bool
@@ -746,6 +754,21 @@ func parseConfig(args []string) (config, error) {
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
 	}
+	explicitResize := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "resize-window" {
+			explicitResize = true
+		}
+	})
+	if once {
+		*resizeWindow = false
+	}
+	if *horizontal && !explicitResize {
+		*resizeWindow = false
+	}
+	if *threeColumns {
+		*resizeWindow = true
+	}
 	lg := *lang
 	if lg != "en" && lg != "ru" {
 		return config{}, fmt.Errorf(lmsg(lg, "--lang=%q: expected en or ru", "--lang=%q: ожидается en или ru"), lg)
@@ -769,14 +792,14 @@ func parseConfig(args []string) (config, error) {
 	if *horizontal && once {
 		return config{}, errors.New(lmsg(lg, "--horizontal cannot be combined with --once; use the normal --once output", "--horizontal не сочетается с --once; используйте обычный вывод --once"))
 	}
-	if *resizeWindow && once {
-		return config{}, errors.New(lmsg(lg, "--resize-window cannot be combined with --once", "--resize-window не сочетается с --once"))
-	}
 	if rain && *horizontal {
 		return config{}, errors.New(lmsg(lg, "--rain cannot be combined with --horizontal", "--rain не сочетается с --horizontal"))
 	}
 	if rain && once {
 		return config{}, errors.New(lmsg(lg, "--rain cannot be combined with --once; use the normal --once output", "--rain не сочетается с --once; используйте обычный вывод --once"))
+	}
+	if *threeColumns && once {
+		return config{}, errors.New(lmsg(lg, "--three-columns cannot be combined with --once", "--three-columns не сочетается с --once"))
 	}
 
 	if *topN < 0 || *topN > 1000 {
@@ -895,7 +918,7 @@ func parseConfig(args []string) (config, error) {
 		d = time.Second
 	}
 	return config{target: *target, gw: gwHost, gwAuto: gwAuto, interval: d, iters: iters, cols: cols, once: once, jsonOut: *jsonOut, exitCode: *exitCode, profile: prof, topN: *topN,
-		blocks: blocks, hybrid: hybrid, compact: compact, mono: *mono, horizontal: *horizontal, resizeWindow: *resizeWindow, labelsFull: labelsMode == "full", rain: rain, matrixPalette: *matrixPalette, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
+		blocks: blocks, hybrid: hybrid, compact: compact, mono: *mono, horizontal: *horizontal, resizeWindow: *resizeWindow, threeColumns: *threeColumns, labelsFull: labelsMode == "full", rain: rain, matrixPalette: *matrixPalette, cpu: cpu, iowait: iowait, swap: swap, disk: disk, diskBusy: diskBusy, batt: batt,
 		gpu: gpu, gputemp: gputemp, lang: lg, thresholds: thr, pings: pings,
 		noHints: *noHints, tempCmd: *tempCmd, symbols: *symbols,
 		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans,
@@ -1304,7 +1327,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 
 	tty := stdoutIsTTY()
 	color := colorAllowed(tty) && !cfg.mono
-	u := &ui{w: w, tty: tty, color: color, mono: monoWanted(cfg, color), resizeWindow: cfg.resizeWindow, horizontal: cfg.horizontal, blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, matrix: cfg.matrixPalette, rain: cfg.rain, symbols: true, lang: cfg.lang}
+	u := &ui{w: w, tty: tty, color: color, mono: monoWanted(cfg, color), resizeWindow: cfg.resizeWindow, threeColumns: cfg.threeColumns, horizontal: cfg.horizontal, blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, matrix: cfg.matrixPalette, rain: cfg.rain, symbols: true, lang: cfg.lang}
 	if cfg.compact {
 		u.head, u.sep = headerOfCompact(cols)
 	} else {
@@ -2359,6 +2382,7 @@ type ui struct {
 	color        bool
 	mono         bool
 	resizeWindow bool
+	threeColumns bool
 	rows         int
 	cols         int
 	gridRows     [][]reading
