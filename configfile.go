@@ -99,6 +99,7 @@ var configBoolKeys = map[string]bool{
 	"all": true, "fans": true, "fans-all": true, "gpu-power": true,
 	"nvme": true, "disk-io": true, "net-rate": true, "psi": true,
 	"system": true, "cpu-power": true, "nvme-smart": true,
+	"disk-rate": true, "pressure": true,
 	"no-hints": true, "symbols": true, "once": true,
 	"gpu-list": true, "fans-list": true,
 }

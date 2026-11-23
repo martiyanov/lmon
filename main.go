@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.50.0"
+const version = "1.51.0"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -59,6 +59,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   RX (R)   — приём по сети, КБ/с (--net-rate; Linux/macOS).
   TX (J)   — передача по сети, КБ/с (--net-rate; Linux/macOS).
   ERR (E)  — ошибки/дропы сети в секунду (--net-rate; Linux/macOS).
+  DR/DI    — скорость диска, МБ/с и IOPS (--disk-rate; macOS).
+  MPS (MP) — давление памяти: 0 normal, 1 warning, 2 critical (--pressure; macOS).
   PSI (Z)  — давление на память, avg10 % (--psi; Linux).
   SVC (O)  — упавшие systemd-юниты (--system; Linux).
   UPD (X)  — нужна перезагрузка: 0/1 (--system; Linux).
@@ -222,6 +224,8 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --nvme        LMON_NVME       температура NVMe, °C (Linux)
   --disk-io     LMON_DISK_IO    латентность и очередь диска (Linux)
   --net-rate    LMON_NET_RATE   RX/TX КБ/с и ошибки сети (Linux/macOS)
+  --disk-rate   LMON_DISK_RATE  скорость диска, МБ/с и IOPS (macOS)
+  --pressure    LMON_PRESSURE   давление памяти 0/1/2 (macOS)
   --psi         LMON_PSI        давление на память (Linux)
   --system      LMON_SYSTEM     упавшие юниты и reboot-required (Linux)
   --cpu-power   LMON_CPU_POWER  потребление CPU, Вт (Linux, нужен root)
@@ -294,6 +298,8 @@ Columns (letter in parentheses is for --cols):
   RX (R)   — network receive, KB/s (--net-rate; Linux/macOS).
   TX (J)   — network transmit, KB/s (--net-rate; Linux/macOS).
   ERR (E)  — network errors/drops per second (--net-rate; Linux/macOS).
+  DR/DI    — disk throughput, MB/s and IOPS (--disk-rate; macOS).
+  MPS (MP) — memory pressure: 0 normal, 1 warning, 2 critical (--pressure; macOS).
   PSI (Z)  — memory pressure, avg10 % (--psi; Linux).
   SVC (O)  — failed systemd units (--system; Linux).
   UPD (X)  — reboot required: 0/1 (--system; Linux).
@@ -454,6 +460,8 @@ Settings (flags and environment variables):
   --nvme        LMON_NVME       NVMe temperature, °C (Linux)
   --disk-io     LMON_DISK_IO    disk latency and queue (Linux)
   --net-rate    LMON_NET_RATE   RX/TX KB/s and network errors (Linux/macOS)
+  --disk-rate   LMON_DISK_RATE  disk throughput, MB/s and IOPS (macOS)
+  --pressure    LMON_PRESSURE   memory pressure 0/1/2 (macOS)
   --psi         LMON_PSI        memory pressure (Linux)
   --system      LMON_SYSTEM     failed units and reboot-required (Linux)
   --cpu-power   LMON_CPU_POWER  CPU package power, W (Linux, root)
@@ -555,7 +563,9 @@ type config struct {
 	fansList      bool              // --fans-list: показать список вентиляторов
 	gpuPower      bool              // --gpu-power: GPU power, W
 	nvme          bool              // --nvme: NVMe temperature
-	diskIO        bool              // --disk-io: await + queue
+	diskIO        bool              // --disk-io: await + queue (Linux)
+	diskRate      bool              // --disk-rate: disk MB/s + IOPS (macOS)
+	pressure      bool              // --pressure: memory pressure (macOS)
 	netRate       bool              // --net-rate: RX/TX KB/s + errors
 	psi           bool              // --psi: memory pressure
 	system        bool              // --system: failed units + reboot required
@@ -695,7 +705,9 @@ func parseConfig(args []string) (config, error) {
 	fansList := fs.Bool("fans-list", envFlag("LMON_FANS_LIST"), "list fans and exit")
 	gpuPower := fs.Bool("gpu-power", envFlag("LMON_GPU_POWER"), "add GPU power column (W)")
 	nvme := fs.Bool("nvme", envFlag("LMON_NVME"), "add NVMe temperature column")
-	diskIO := fs.Bool("disk-io", envFlag("LMON_DISK_IO"), "add disk await and queue columns")
+	diskIO := fs.Bool("disk-io", envFlag("LMON_DISK_IO"), "add disk await and queue columns (Linux)")
+	diskRate := fs.Bool("disk-rate", envFlag("LMON_DISK_RATE"), "add disk throughput MB/s and IOPS (macOS)")
+	pressure := fs.Bool("pressure", envFlag("LMON_PRESSURE"), "add macOS memory pressure state")
 	netRate := fs.Bool("net-rate", envFlag("LMON_NET_RATE"), "add network RX/TX and errors columns")
 	psi := fs.Bool("psi", envFlag("LMON_PSI"), "add memory pressure column (PSI)")
 	system := fs.Bool("system", envFlag("LMON_SYSTEM"), "add failed units and reboot-required columns")
@@ -848,16 +860,16 @@ func parseConfig(args []string) (config, error) {
 				"--all и --cols взаимоисключающие"))
 		}
 		cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "P", "H", "K", "F",
-			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR"}
+			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR", "DR", "DI", "MP"}
 		cpu, iowait, swap, disk, diskBusy, batt, gpu, gputemp = true, true, true, true, true, true, true, true
-		*gpuPower, *nvme, *diskIO, *netRate, *psi, *system = true, true, true, true, true, true
+		*gpuPower, *nvme, *diskIO, *diskRate, *pressure, *netRate, *psi, *system = true, true, true, true, true, true, true, true
 		*cpuPower, *nvmeSmart = true, true
 		*fans = true
 		*fansAll = true
 		if len(gpuIdx) > 1 {
 			// при нескольких GPU вместо P/H будут динамические G0/G1, T0/T1
 			cols = []string{"N", "G", "L", "M", "T", "C", "I", "S", "U", "B", "K", "F",
-				"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR"}
+				"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR", "DR", "DI", "MP"}
 		}
 	}
 	if len(gpuIdx) > 1 && !gpu && !gputemp {
@@ -877,7 +889,7 @@ func parseConfig(args []string) (config, error) {
 		gpuIdx: gpuIdx, gpuList: *gpuList, all: *all, fans: *fans,
 		fansAll: *fansAll, fansList: *fansList,
 		gpuPower: *gpuPower, nvme: *nvme, diskIO: *diskIO,
-		netRate: *netRate, psi: *psi, system: *system,
+		diskRate: *diskRate, pressure: *pressure, netRate: *netRate, psi: *psi, system: *system,
 		cpuPower: *cpuPower, nvmeSmart: *nvmeSmart}, nil
 }
 
@@ -1508,20 +1520,23 @@ var colRegistry = map[string]reading{
 	"B":  {id: "B", head: "BAT", green: 50, yellow: 20, red: 0, invert: true},
 	"P":  {id: "P", head: "GPU", green: 50, yellow: 85, red: 100},
 	"H":  {id: "H", head: " G°", green: 60, yellow: 80, red: 90},
-	"K":  {id: "K", head: "I/O", green: 60, yellow: 85, red: 100},     // диск занят (Windows, PDH)
-	"F":  {id: "F", head: "FAN", green: 60, yellow: 85, red: 100},     // вентиляторы, % (Linux)
-	"W":  {id: "W", head: "GPW", green: 100, yellow: 150, red: 170},   // GPU power, W
-	"Y":  {id: "Y", head: "NVM", green: 60, yellow: 75, red: 90},      // NVMe temp, °C
-	"A":  {id: "A", head: "LAT", green: 10, yellow: 50, red: 100},     // disk await, ms
-	"Q":  {id: "Q", head: "QUE", green: 1, yellow: 4, red: 8},         // disk queue
-	"R":  {id: "R", head: " RX", green: 100, yellow: 1000, red: 5000}, // net RX, KB/s
-	"J":  {id: "J", head: " TX", green: 100, yellow: 1000, red: 5000}, // net TX, KB/s
-	"E":  {id: "E", head: "ERR", green: 0, yellow: 1, red: 10},        // net errors/drops per s
-	"Z":  {id: "Z", head: "PSI", green: 10, yellow: 40, red: 70},      // memory pressure avg10, %
-	"O":  {id: "O", head: "SVC", green: 0, yellow: 1, red: 5},         // failed systemd units
-	"X":  {id: "X", head: "UPD", green: 0, yellow: 1, red: 5},         // reboot/updates required
-	"PW": {id: "PW", head: "PWR", green: 40, yellow: 65, red: 85},     // CPU package, W (root/RAPL)
-	"WR": {id: "WR", head: "WEA", green: 20, yellow: 50, red: 80},     // NVMe wear, % (root/SMART)
+	"K":  {id: "K", head: "I/O", green: 60, yellow: 85, red: 100},      // диск занят (Windows, PDH)
+	"F":  {id: "F", head: "FAN", green: 60, yellow: 85, red: 100},      // вентиляторы, % (Linux)
+	"W":  {id: "W", head: "GPW", green: 100, yellow: 150, red: 170},    // GPU power, W
+	"Y":  {id: "Y", head: "NVM", green: 60, yellow: 75, red: 90},       // NVMe temp, °C
+	"A":  {id: "A", head: "LAT", green: 10, yellow: 50, red: 100},      // disk await, ms
+	"Q":  {id: "Q", head: "QUE", green: 1, yellow: 4, red: 8},          // disk queue
+	"DR": {id: "DR", head: " DR", green: 100, yellow: 300, red: 600},   // disk MB/s (macOS)
+	"DI": {id: "DI", head: " DI", green: 500, yellow: 2000, red: 5000}, // disk IOPS (macOS)
+	"MP": {id: "MP", head: "MPS", green: 0, yellow: 1, red: 2},         // memory pressure 0/1/2
+	"R":  {id: "R", head: " RX", green: 100, yellow: 1000, red: 5000},  // net RX, KB/s
+	"J":  {id: "J", head: " TX", green: 100, yellow: 1000, red: 5000},  // net TX, KB/s
+	"E":  {id: "E", head: "ERR", green: 0, yellow: 1, red: 10},         // net errors/drops per s
+	"Z":  {id: "Z", head: "PSI", green: 10, yellow: 40, red: 70},       // memory pressure avg10, %
+	"O":  {id: "O", head: "SVC", green: 0, yellow: 1, red: 5},          // failed systemd units
+	"X":  {id: "X", head: "UPD", green: 0, yellow: 1, red: 5},          // reboot/updates required
+	"PW": {id: "PW", head: "PWR", green: 40, yellow: 65, red: 85},      // CPU package, W (root/RAPL)
+	"WR": {id: "WR", head: "WEA", green: 20, yellow: 50, red: 80},      // NVMe wear, % (root/SMART)
 }
 
 // layout возвращает колонки в порядке вывода; значения заполнит sampleRow.
@@ -1567,6 +1582,9 @@ func requestedLayout(cfg config) []reading {
 	add("Y", cfg.nvme)
 	add("A", cfg.diskIO)
 	add("Q", cfg.diskIO)
+	add("DR", cfg.diskRate)
+	add("DI", cfg.diskRate)
+	add("MP", cfg.pressure)
 	add("R", cfg.netRate)
 	add("J", cfg.netRate)
 	add("E", cfg.netRate)
@@ -1845,6 +1863,13 @@ func measure(ctx context.Context, cfg config) []reading {
 	if need("A") || need("Q") {
 		a, q := meter.DiskIO()
 		vals["A"], vals["Q"] = a, q
+	}
+	if need("DR") || need("DI") {
+		mb, iops := meter.DiskRate()
+		vals["DR"], vals["DI"] = mb, iops
+	}
+	if need("MP") {
+		vals["MP"] = meter.MemoryPressure()
 	}
 	if need("R") || need("J") || need("E") {
 		rx, tx, e := meter.NetRate()

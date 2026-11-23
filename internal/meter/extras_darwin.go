@@ -90,3 +90,51 @@ func NetRate() (rxKB, txKB, errPerSec int) {
 	}
 	return int(float64(dRx)/1024/dt + 0.5), int(float64(dTx)/1024/dt + 0.5), int(float64(dErr)/dt + 0.5)
 }
+
+// DiskRate — суммарные MB/s и IOPS по дискам из iostat.
+// iostat -d -c 1 печатает одну выборку: KB/t, tps, MB/s для каждого диска.
+func DiskRate() (mbps, iops int) {
+	out, err := exec.Command("iostat", "-d", "-c", "1").Output()
+	if err != nil {
+		return -1, -1
+	}
+	var totalMB, totalTPS float64
+	for _, line := range strings.Split(string(out), "\n") {
+		f := strings.Fields(line)
+		if len(f) < 3 {
+			continue
+		}
+		for i := 0; i+2 < len(f); i += 3 {
+			tps, e1 := strconv.ParseFloat(f[i+1], 64)
+			mb, e2 := strconv.ParseFloat(f[i+2], 64)
+			if e1 == nil && e2 == nil {
+				totalTPS += tps
+				totalMB += mb
+			}
+		}
+	}
+	if totalTPS == 0 && totalMB == 0 {
+		return 0, 0
+	}
+	return int(totalMB + 0.5), int(totalTPS + 0.5)
+}
+
+// MemoryPressure — состояние давления памяти macOS: 0 normal, 1 warning, 2 critical.
+func MemoryPressure() int {
+	out, err := exec.Command("sysctl", "-n", "kern.memorystatus_vm_pressure_level").Output()
+	if err != nil {
+		return -1
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		return -1
+	}
+	switch {
+	case n >= 4:
+		return 2
+	case n >= 2:
+		return 1
+	default:
+		return 0
+	}
+}

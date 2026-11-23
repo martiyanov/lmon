@@ -31,10 +31,11 @@ func columnSupportedByOS(id, goos string) bool {
 	case "windows":
 		switch id {
 		case "L", // load average в Windows отсутствует
-			"T",                                                          // нет официального API температуры CPU (только --temp-cmd)
-			"I",                                                          // iowait есть только в Linux
-			"F",                                                          // скорость вентиляторов: нужен LHM/HWiNFO
-			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR": // Linux-метрики
+			"T", // нет официального API температуры CPU (только --temp-cmd)
+			"I", // iowait есть только в Linux
+			"F", // скорость вентиляторов: нужен LHM/HWiNFO
+			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR",
+			"DR", "DI", "MP": // Linux/macOS-метрики
 			return false
 		}
 		// S (pagefile) читается через PDH; P/H — NVML/nvidia-smi/PDH;
@@ -52,7 +53,7 @@ func columnSupportedByOS(id, goos string) bool {
 		switch id {
 		case "F":
 			// FAN читается из hwmon PWM; если датчиков нет — колонка покажет «·».
-		case "K": // занятость диска: на Linux пока нет (для I/O есть IOW)
+		case "K", "DR", "DI", "MP": // занятость/скорость диска и pressure: пока macOS
 			return false
 		}
 		// Остальные колонки в Linux доступны; отдельные датчики (GPU, TMP)
@@ -60,7 +61,8 @@ func columnSupportedByOS(id, goos string) bool {
 	default:
 		switch id {
 		case "L", "T", "I", "S", "P", "H", "F",
-			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR":
+			"W", "Y", "A", "Q", "R", "J", "E", "Z", "O", "X", "PW", "WR",
+			"DR", "DI", "MP":
 			return false
 		}
 	}
