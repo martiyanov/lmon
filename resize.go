@@ -96,6 +96,10 @@ func (u *ui) resizeHeaderCell(r reading, width int) string {
 }
 
 func (u *ui) resizeValueCell(r reading, width int) string {
+	// blocks: заливаем значением всю ширину колонки, а не только 3 клетки.
+	if u.blocks && (u.color || u.mono) {
+		return u.resizeBlockCell(r, width)
+	}
 	// hybrid: заливаем цветом всю ширину ячейки, не только три цифры.
 	if u.hybrid && u.color && !u.matrix {
 		text := u.displayText(r)
@@ -105,6 +109,52 @@ func (u *ui) resizeValueCell(r reading, width int) string {
 		return bgSev(r.severity(), false) + centerPlain(text, width) + reset
 	}
 	return centerANSI(u.dataRow([]reading{r}), width)
+}
+
+func (u *ui) resizeBlockCell(r reading, width int) string {
+	if u.mono {
+		if r.blank {
+			return strings.Repeat(" ", width)
+		}
+		if r.v < 0 {
+			return strings.Repeat("?", width)
+		}
+		if r.v == 999 {
+			return strings.Repeat("!", width)
+		}
+		ramp := []rune{'░', '▒', '▓', '█'}
+		n := int(r.severity()*3 + 0.5)
+		if n < 0 {
+			n = 0
+		}
+		if n > 3 {
+			n = 3
+		}
+		return strings.Repeat(string(ramp[n]), width)
+	}
+	if r.blank {
+		return strings.Repeat(" ", width)
+	}
+	// Заливка фоном, а не сотней блоков: так ячейка гарантированно
+	// остаётся в своей колонке и не вызывает перенос/прокрутку.
+	var c string
+	switch {
+	case r.v < 0:
+		if u.matrix {
+			c = bgSev(0, true)
+		} else {
+			c = purpleBg
+		}
+	case r.v == 999:
+		if u.matrix {
+			c = bgSev(1, true)
+		} else {
+			c = redBg
+		}
+	default:
+		c = bgSev(r.severity(), u.matrix)
+	}
+	return c + strings.Repeat(" ", width) + reset
 }
 
 func centerPlain(s string, width int) string {
@@ -181,12 +231,12 @@ func gridColumns(cols, n int) int {
 	if n < 1 {
 		return 1
 	}
-	perRow := cols / 10
-	if perRow < 1 {
-		perRow = 1
+	const minCell = 10
+	if cols >= n*minCell {
+		return n
 	}
-	if perRow > n {
-		perRow = n
+	if cols >= 3*minCell {
+		return 3
 	}
-	return perRow
+	return 1
 }

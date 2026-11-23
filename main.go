@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.53.4"
+const version = "1.53.5"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -1330,9 +1330,11 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 	first := measure(ctx, cfg)
 	if !cfg.noHints {
 		if hs := startupHints(cfg, first, runtime.GOOS, dropped); len(hs) > 0 {
-			if tty {
+			// В адаптивной таблице нет области данных для прокрутки:
+			// подсказки сдвинули бы сетку. Их можно отключить --no-hints.
+			if tty && !cfg.resizeWindow {
 				u.note(hs)
-			} else {
+			} else if !tty {
 				printHints(os.Stderr, hs)
 			}
 		}
