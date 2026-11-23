@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -174,14 +175,47 @@ func (u *ui) resizeValueCell(r reading, width int) string {
 	if u.blocks && (u.color || u.mono) {
 		return u.resizeBlockCell(r, width)
 	}
-	if u.hybrid && u.color && !u.matrix {
-		text := strings.TrimSpace(u.displayText(r))
-		if r.v < 0 {
-			return dim + centerPlain(text, width) + reset
+	// matrix/compact оставляем символьными; цифры и hybrid могут занять
+	// всю ширину колонки, если число длиннее трёх символов.
+	if !u.matrix && !u.compact {
+		text := u.resizeText(r, width)
+		if u.hybrid && u.color {
+			if r.v < 0 {
+				return dim + centerPlain(text, width) + reset
+			}
+			return bgSev(r.severity(), false) + centerPlain(text, width) + reset
 		}
-		return bgSev(r.severity(), false) + centerPlain(text, width) + reset
+		if u.color {
+			if r.v < 0 {
+				return dim + centerPlain(text, width) + reset
+			}
+			if r.v == 999 {
+				return red + centerPlain(text, width) + reset
+			}
+			return fgSev(r.severity(), false) + centerPlain(text, width) + reset
+		}
+		return centerPlain(text, width)
 	}
 	return centerANSI(strings.TrimSpace(u.dataRow([]reading{r})), width)
+}
+
+// resizeText — числовое значение по доступной ширине.
+func (u *ui) resizeText(r reading, width int) string {
+	if r.v < 0 {
+		return "·"
+	}
+	if r.v == 999 && u.symbols {
+		return "..."
+	}
+	if r.id == "R" || r.id == "J" || r.id == "DR" || r.id == "DI" {
+		// у скоростей уже есть компактные K/M/G; не раздуваем их.
+		return strings.TrimSpace(u.displayText(r))
+	}
+	text := strconv.Itoa(r.v)
+	if len([]rune(text)) <= width {
+		return text
+	}
+	return strings.TrimSpace(u.displayText(r))
 }
 
 func (u *ui) resizeBlockCell(r reading, width int) string {

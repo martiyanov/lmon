@@ -29,3 +29,14 @@ func TestResizeLabelsFit(t *testing.T) {
 		t.Fatalf("wide label = %q, want Network", got)
 	}
 }
+
+func TestResizeNumericWidth(t *testing.T) {
+	u := &ui{}
+	r := reading{id: "L", v: 12345}
+	if got := u.resizeText(r, 6); got != "12345" {
+		t.Fatalf("wide number = %q", got)
+	}
+	if got := u.resizeText(r, 3); got != "+++" {
+		t.Fatalf("narrow number = %q", got)
+	}
+}

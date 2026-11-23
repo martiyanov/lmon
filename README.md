@@ -159,7 +159,7 @@ lmon 20                 # print 20 lines and exit
 lmon --bars                 # color blocks instead of digits
 lmon --matrix               # green cipher matrix, no digits
 lmon --rain --matrix        # same, values fall down
-lmon --resize-window        # responsive full-width card grid
+lmon --resize-window        # full-width table, headers stay on one line
 lmon --config ~/.config/lmon/config  # explicit config
 lmon --save-config      # save current settings and exit
 lmon --no-hints         # start without hints about hidden columns
@@ -327,8 +327,9 @@ Values follow the selected direction:
   of recent values (sideways).
 
 `--bars`/`--blocks` fill the whole cell with color; `--hybrid` fills the
-whole cell background. It is a TUI-only mode and cannot be combined with
-`--once`.
+whole cell background. Numeric values use the available column width: in a
+wide column `12345` is shown as `12345` instead of `+++`. It is a TUI-only
+mode and cannot be combined with `--once`.
 
 ```sh
 lmon --resize-window
