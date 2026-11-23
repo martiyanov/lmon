@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.53.0"
+const version = "1.53.1"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -2684,51 +2684,90 @@ func valueText(r reading) string {
 }
 
 // rateText — компактный порядок для RX/TX: до 999 — КБ/с,
-// дальше M (МБ/с) и G (ГБ/с), чтобы не терять масштаб в клетке шириной 3.
+// дальше M (МБ/с), G (ГБ/с), T (ТБ/с). Ровно три клетки.
 func rateText(v int) string {
-	switch {
-	case v < 0:
+	if v < 0 {
 		return fmt.Sprintf("%3s", "·")
-	case v >= 1_000_000_000:
-		return "+++"
-	case v >= 1_000_000:
-		return fmt.Sprintf("%3dG", v/1_000_000)
-	case v >= 1000:
-		return fmt.Sprintf("%3dM", v/1000)
-	default:
+	}
+	switch {
+	case v < 1000:
 		return fmt.Sprintf("%3d", v)
+	case v < 10000: // 1..9 MB/s
+		return fmt.Sprintf("%2dM", v/1000)
+	case v < 100000: // 10..99 MB/s
+		return fmt.Sprintf("%2dM", v/1000)
+	case v < 1_000_000: // 100..999 MB/s → десятые GB/s
+		n := (v + 50_000) / 100_000
+		if n >= 10 {
+			return " 1G"
+		}
+		return fmt.Sprintf(".%dG", n)
+	case v < 10_000_000: // 1..9 GB/s
+		return fmt.Sprintf("%2dG", v/1_000_000)
+	case v < 100_000_000: // 10..99 GB/s
+		return fmt.Sprintf("%2dG", v/1_000_000)
+	case v < 1_000_000_000: // 100..999 GB/s → десятые TB/s
+		n := (v + 50_000_000) / 100_000_000
+		if n >= 10 {
+			return " 1T"
+		}
+		return fmt.Sprintf(".%dT", n)
+	default:
+		return "+++"
 	}
 }
 
-// diskRateText — DR в MB/s; крупные значения в GB/s и TB/s.
+// diskRateText — DR в MB/s; ровно три клетки.
 func diskRateText(v int) string {
-	switch {
-	case v < 0:
+	if v < 0 {
 		return fmt.Sprintf("%3s", "·")
-	case v >= 1_000_000_000:
-		return "+++"
-	case v >= 1_000_000:
-		return fmt.Sprintf("%3dT", v/1_000_000)
-	case v >= 1000:
-		return fmt.Sprintf("%3dG", v/1000)
-	default:
+	}
+	switch {
+	case v < 1000:
 		return fmt.Sprintf("%3d", v)
+	case v < 100000:
+		return fmt.Sprintf("%2dG", v/1000)
+	case v < 1_000_000:
+		n := (v + 50_000) / 100_000
+		if n >= 10 {
+			return " 1T"
+		}
+		return fmt.Sprintf(".%dT", n)
+	case v < 10_000_000:
+		return fmt.Sprintf("%2dT", v/1_000_000)
+	default:
+		return "+++"
 	}
 }
 
-// iopsText — DI в IOPS; K/M/G для больших значений.
+// iopsText — DI в IOPS; ровно три клетки.
 func iopsText(v int) string {
-	switch {
-	case v < 0:
+	if v < 0 {
 		return fmt.Sprintf("%3s", "·")
-	case v >= 1_000_000_000:
-		return "+++"
-	case v >= 1_000_000:
-		return fmt.Sprintf("%3dG", v/1_000_000)
-	case v >= 1000:
-		return fmt.Sprintf("%3dK", v/1000)
-	default:
+	}
+	switch {
+	case v < 1000:
 		return fmt.Sprintf("%3d", v)
+	case v < 100000:
+		return fmt.Sprintf("%2dK", v/1000)
+	case v < 1_000_000:
+		n := (v + 50_000) / 100_000
+		if n >= 10 {
+			return " 1M"
+		}
+		return fmt.Sprintf(".%dM", n)
+	case v < 10_000_000:
+		return fmt.Sprintf("%2dM", v/1_000_000)
+	case v < 100_000_000:
+		return fmt.Sprintf("%2dM", v/1_000_000)
+	case v < 1_000_000_000:
+		n := (v + 50_000_000) / 100_000_000
+		if n >= 10 {
+			return " 1G"
+		}
+		return fmt.Sprintf(".%dG", n)
+	default:
+		return "+++"
 	}
 }
 
