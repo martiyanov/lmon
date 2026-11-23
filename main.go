@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.53.6"
+const version = "1.53.7"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -746,12 +746,6 @@ func parseConfig(args []string) (config, error) {
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
 	}
-	// --resize-window — самостоятельный TUI-режим: старый rain из конфига
-	// не должен включать падающие строки.
-	if *resizeWindow {
-		rain = false
-	}
-
 	lg := *lang
 	if lg != "en" && lg != "ru" {
 		return config{}, fmt.Errorf(lmsg(lg, "--lang=%q: expected en or ru", "--lang=%q: ожидается en или ru"), lg)
@@ -777,9 +771,6 @@ func parseConfig(args []string) (config, error) {
 	}
 	if *resizeWindow && once {
 		return config{}, errors.New(lmsg(lg, "--resize-window cannot be combined with --once", "--resize-window не сочетается с --once"))
-	}
-	if *resizeWindow && *horizontal {
-		return config{}, errors.New(lmsg(lg, "--resize-window cannot be combined with --horizontal", "--resize-window не сочетается с --horizontal"))
 	}
 	if rain && *horizontal {
 		return config{}, errors.New(lmsg(lg, "--rain cannot be combined with --horizontal", "--rain не сочетается с --horizontal"))
@@ -1300,7 +1291,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 		return 0
 	}
 
-	if cfg.horizontal {
+	if cfg.horizontal && !cfg.resizeWindow {
 		if !stdoutIsTTY() {
 			fmt.Fprintln(os.Stderr, lmsg(cfg.lang, "lmon: --horizontal requires a terminal", "lmon: --horizontal требует терминал"))
 			return 2
@@ -1313,7 +1304,7 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 
 	tty := stdoutIsTTY()
 	color := colorAllowed(tty) && !cfg.mono
-	u := &ui{w: w, tty: tty, color: color, mono: monoWanted(cfg, color), resizeWindow: cfg.resizeWindow, blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, matrix: cfg.matrixPalette, rain: cfg.rain, symbols: true, lang: cfg.lang}
+	u := &ui{w: w, tty: tty, color: color, mono: monoWanted(cfg, color), resizeWindow: cfg.resizeWindow, horizontal: cfg.horizontal, blocks: cfg.blocks, hybrid: cfg.hybrid, compact: cfg.compact, matrix: cfg.matrixPalette, rain: cfg.rain, symbols: true, lang: cfg.lang}
 	if cfg.compact {
 		u.head, u.sep = headerOfCompact(cols)
 	} else {
@@ -2376,6 +2367,7 @@ type ui struct {
 	compact      bool
 	matrix       bool
 	rain         bool
+	horizontal   bool
 	rainLines    []string
 	glyphCount   map[string]int
 	symbols      bool // показывать «...» вместо 999 (нет ответа)

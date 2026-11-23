@@ -3,24 +3,29 @@ package main
 import "testing"
 
 func TestGridColumns(t *testing.T) {
-	cases := []struct{ cols, n, want int }{
-		{100, 8, 8}, {80, 8, 8}, {74, 8, 8}, {72, 8, 8}, {64, 8, 8},
-		{63, 8, 3}, {60, 8, 3}, {40, 8, 3}, {30, 8, 3}, {23, 8, 1},
-		{20, 8, 1}, {12, 8, 1}, {5, 8, 1}, {100, 2, 2},
+	rs := []reading{
+		{id: "N", head: "NET"}, {id: "G", head: "GTW"}, {id: "C", head: "CPU"},
+		{id: "L", head: "RUN"}, {id: "M", head: "MEM"}, {id: "T", head: " C°"},
+		{id: "U", head: "DSK"}, {id: "S", head: "SWP"},
+	}
+	cases := []struct{ cols, want int }{
+		{100, 8}, {80, 8}, {74, 8}, {64, 8}, {63, 8}, {56, 8},
+		{55, 8}, {47, 8}, {30, 8}, {24, 8}, {23, 8}, {21, 8},
+		{20, 8}, {15, 8}, {5, 5},
 	}
 	for _, c := range cases {
-		if got := gridColumns(c.cols, c.n); got != c.want {
-			t.Errorf("gridColumns(%d,%d) = %d, want %d", c.cols, c.n, got, c.want)
+		if got := gridColumns(c.cols, rs); got != c.want {
+			t.Errorf("gridColumns(%d) = %d, want %d", c.cols, got, c.want)
 		}
 	}
 }
 
-func TestResizeIgnoresRain(t *testing.T) {
-	cfg, err := parseConfig([]string{"--resize-window", "--rain", "--hybrid"})
-	if err != nil {
-		t.Fatal(err)
+func TestResizeLabelsFit(t *testing.T) {
+	n := reading{id: "N", head: "NET"}
+	if got := resizeLabelFor(n, 6); got != "NET" {
+		t.Fatalf("narrow label = %q, want NET", got)
 	}
-	if !cfg.resizeWindow || cfg.rain || !cfg.hybrid {
-		t.Fatalf("cfg = %+v", cfg)
+	if got := resizeLabelFor(n, 8); got != "Network" {
+		t.Fatalf("wide label = %q, want Network", got)
 	}
 }

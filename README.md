@@ -312,19 +312,29 @@ frozen once created — they do not change while falling.
 
 ### Responsive grid
 
-`--resize-window` turns the one-row layout into cards that fill the terminal
-width. The number of cards per row follows the width: at 100 columns all
-indicators fit in one row, around 30 columns it becomes a 3-column grid,
-and on a very narrow terminal it falls back to one column. Values keep
-their normal style (`--bars`, `--matrix`, `--mono`, and so on).
+`--resize-window` keeps all headers on one line and distributes the terminal
+width between them. There are no 3-column/1-column header wraps:
+
+- wide cell — full names (`Network`, `Gateway`, `Memory`, …);
+- medium cell — short names (`NET`, `GTW`, `CPU`, …);
+- very narrow cell — one-letter labels (`N`, `G`, `C`, …).
+
+Values follow the selected direction:
+
+- default — header at the bottom, values move upward;
+- `--rain` — header at the top, values move downward;
+- `--horizontal` — header at the top, each column shows a horizontal strip
+  of recent values (sideways).
+
+`--bars`/`--blocks` fill the whole cell with color; `--hybrid` fills the
+whole cell background. It is a TUI-only mode and cannot be combined with
+`--once`.
 
 ```sh
 lmon --resize-window
+lmon --rain --resize-window
+lmon --horizontal --resize-window
 ```
-
-It is a TUI-only mode; it cannot be combined with `--once` or
-`--horizontal`. `--rain` is ignored here: resize always renders a normal
-card grid.
 
 ### Horizontal timeline
 

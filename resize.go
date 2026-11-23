@@ -5,7 +5,9 @@ import (
 	"strings"
 )
 
-// drawGrid — адаптивная таблица: широкие колонки, затем 3 колонки, затем 1.
+// drawGrid — таблица во всю ширину: все заголовки всегда в одной строке.
+// Обычный режим: шапка снизу, значения идут вверх.
+// --rain: шапка сверху, значения идут вниз.
 func (u *ui) drawGrid(rs []reading) {
 	rows := termRows()
 	cols := termCols()
@@ -21,59 +23,132 @@ func (u *ui) drawGrid(rs []reading) {
 		fmt.Fprintf(u.w, "\x1b[1;1H%s", clipANSI(u.head, cols))
 		return
 	}
-	perRow := gridColumns(cols, len(rs))
+	perRow := gridColumns(cols, rs)
+	shown := rs[:perRow]
 	cellW := cols / perRow
 	if cellW < 1 {
 		cellW = 1
 	}
-	// Если все колонки помещаются в один ряд — сохраняем обычный поток:
-	// новые значения снизу, заголовок закреплён внизу.
-	if perRow == len(rs) && len(u.gridRows) > 0 && cols >= len(rs)*10 {
-		u.drawResizeStream(rs, cellW, rows)
+	widths := make([]int, perRow)
+	extra := cols - cellW*perRow
+	if extra < 0 {
+		extra = 0
+	}
+	for i := range widths {
+		widths[i] = cellW
+		if i < extra {
+			widths[i]++
+		}
+	}
+	if u.horizontal {
+		u.drawResizeHorizontal(shown, widths, rows)
 		return
 	}
-	// header + value + пустая строка между группами
-	groupH := 3
-	groups := (len(rs) + perRow - 1) / perRow
-	if groups*groupH > rows {
-		groupH = 2
+	if u.rain {
+		u.drawResizeRain(shown, widths, rows)
+		return
 	}
-	for i, r := range rs {
-		group := i / perRow
-		col := i % perRow
-		x := col*cellW + 1
-		y := group*groupH + 1
-		if y+1 > rows {
-			break
-		}
-		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, u.resizeHeaderCell(r, cellW))
-		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y+1, x, u.resizeValueCell(r, cellW))
-	}
+	u.drawResizeStream(shown, widths, rows)
 }
 
-func (u *ui) drawResizeStream(rs []reading, cellW, rows int) {
-	// header внизу, как у обычного TUI
+func (u *ui) drawResizeStream(rs []reading, widths []int, rows int) {
+	// шапка внизу, новые значения над ней
 	headerY := rows
+	x := 1
 	for i, r := range rs {
-		x := i*cellW + 1
-		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", headerY, x, u.resizeHeaderCell(r, cellW))
+		w := widths[i]
+		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", headerY, x, u.resizeHeaderCell(r, w))
+		x += w
 	}
 	start := len(u.gridRows) - 1
 	for n := 0; n < rows-1 && start-n >= 0; n++ {
 		y := rows - 1 - n
 		row := u.gridRows[start-n]
+		x = 1
 		for i, r := range row {
 			if i >= len(rs) {
 				break
 			}
-			x := i*cellW + 1
-			fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, u.resizeValueCell(r, cellW))
+			w := widths[i]
+			fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, u.resizeValueCell(r, w))
+			x += w
+		}
+	}
+}
+
+func (u *ui) drawResizeRain(rs []reading, widths []int, rows int) {
+	// шапка сверху, новые значения под ней, старые уходят вниз
+	x := 1
+	for i, r := range rs {
+		w := widths[i]
+		fmt.Fprintf(u.w, "\x1b[1;%dH%s", x, u.resizeHeaderCell(r, w))
+		x += w
+	}
+	start := len(u.gridRows) - 1
+	for n := 0; n < rows-2 && start-n >= 0; n++ {
+		y := 2 + n
+		row := u.gridRows[start-n]
+		x = 1
+		for i, r := range row {
+			if i >= len(rs) {
+				break
+			}
+			w := widths[i]
+			fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, u.resizeValueCell(r, w))
+			x += w
+		}
+	}
+}
+
+func (u *ui) drawResizeHorizontal(rs []reading, widths []int, rows int) {
+	// шапка сверху; внутри каждой колонки — горизонтальная лента значений
+	x := 1
+	for i, r := range rs {
+		w := widths[i]
+		fmt.Fprintf(u.w, "\x1b[1;%dH%s", x, u.resizeHeaderCell(r, w))
+		x += w
+	}
+	slots := 1
+	minCell := widths[0]
+	for _, w := range widths {
+		if w < minCell {
+			minCell = w
+		}
+	}
+	slots = (minCell + 1) / 4
+	if slots < 1 {
+		slots = 1
+	}
+	for i, r := range rs {
+		_ = r
+		x := 1
+		for j := 0; j < i; j++ {
+			x += widths[j]
+		}
+		// последние slots значений этой колонки, слева направо
+		var samples []reading
+		for n := len(u.gridRows) - 1; n >= 0 && len(samples) < slots; n-- {
+			if i < len(u.gridRows[n]) {
+				samples = append([]reading{u.gridRows[n][i]}, samples...)
+			}
+		}
+		if len(samples) == 0 {
+			samples = []reading{r}
+		}
+		pos := x
+		for _, sample := range samples {
+			w := 3
+			if pos+3 > x+widths[i] {
+				break
+			}
+			fmt.Fprintf(u.w, "\x1b[2;%dH%s", pos, u.resizeValueCell(sample, w))
+			pos += 4
 		}
 	}
 }
 
 func (u *ui) resizeHeaderCell(r reading, width int) string {
-	label := resizeLabel(r)
+	label := resizeLabelFor(r, width)
 	if !u.color {
 		return centerPlain(label, width)
 	}
@@ -96,19 +171,17 @@ func (u *ui) resizeHeaderCell(r reading, width int) string {
 }
 
 func (u *ui) resizeValueCell(r reading, width int) string {
-	// blocks: заливаем значением всю ширину колонки, а не только 3 клетки.
 	if u.blocks && (u.color || u.mono) {
 		return u.resizeBlockCell(r, width)
 	}
-	// hybrid: заливаем цветом всю ширину ячейки, не только три цифры.
 	if u.hybrid && u.color && !u.matrix {
-		text := u.displayText(r)
+		text := strings.TrimSpace(u.displayText(r))
 		if r.v < 0 {
 			return dim + centerPlain(text, width) + reset
 		}
 		return bgSev(r.severity(), false) + centerPlain(text, width) + reset
 	}
-	return centerANSI(u.dataRow([]reading{r}), width)
+	return centerANSI(strings.TrimSpace(u.dataRow([]reading{r})), width)
 }
 
 func (u *ui) resizeBlockCell(r reading, width int) string {
@@ -135,8 +208,6 @@ func (u *ui) resizeBlockCell(r reading, width int) string {
 	if r.blank {
 		return strings.Repeat(" ", width)
 	}
-	// Заливка фоном, а не сотней блоков: так ячейка гарантированно
-	// остаётся в своей колонке и не вызывает перенос/прокрутку.
 	var c string
 	switch {
 	case r.v < 0:
@@ -175,6 +246,19 @@ func centerANSI(s string, width int) string {
 	left := (width - n) / 2
 	right := width - n - left
 	return strings.Repeat(" ", left) + s + strings.Repeat(" ", right)
+}
+
+// resizeLabelFor — полное, короткое или однобуквенное имя по ширине.
+func resizeLabelFor(r reading, width int) string {
+	full := resizeLabel(r)
+	if ansiWidth(full) < width {
+		return full
+	}
+	short := strings.TrimSpace(r.head)
+	if ansiWidth(short) < width {
+		return short
+	}
+	return compactLabel(r)
 }
 
 // resizeLabel — человеческие имена для широкого режима.
@@ -225,18 +309,13 @@ func resizeLabel(r reading) string {
 	return strings.TrimSpace(r.head)
 }
 
-// gridColumns — сколько карточек помещается в ряд.
-// 8 — минимум для полного имени (7) и значения (3) в одной колонке.
-func gridColumns(cols, n int) int {
-	if n < 1 {
+// gridColumns — все колонки всегда в одном ряду; ширина только сжимается.
+func gridColumns(cols int, rs []reading) int {
+	if len(rs) == 0 {
 		return 1
 	}
-	const minCell = 8
-	if cols >= n*minCell {
-		return n
+	if cols < len(rs) {
+		return cols
 	}
-	if cols >= 3*minCell {
-		return 3
-	}
-	return 1
+	return len(rs)
 }
