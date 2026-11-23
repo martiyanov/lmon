@@ -13,3 +13,13 @@ func TestGridColumns(t *testing.T) {
 		}
 	}
 }
+
+func TestResizeIgnoresRain(t *testing.T) {
+	cfg, err := parseConfig([]string{"--resize-window", "--rain", "--hybrid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.resizeWindow || cfg.rain || !cfg.hybrid {
+		t.Fatalf("cfg = %+v", cfg)
+	}
+}

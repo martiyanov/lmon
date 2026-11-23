@@ -40,18 +40,66 @@ func (u *ui) drawGrid(rs []reading) {
 		if y > rows {
 			break
 		}
-		label := strings.TrimSpace(r.head)
+		label := resizeLabel(r)
 		value := u.dataRow([]reading{r})
 		if cardH == 1 {
-			line := label + " " + value
-			fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, clipANSI(line, cardW))
+			fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, clipANSI(label+" "+value, cardW))
 			continue
 		}
+		// Всегда две строки: имя карточки и значение под ним.
 		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, clipANSI(label, cardW))
 		if y+1 <= rows {
 			fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y+1, x, clipANSI(value, cardW))
 		}
 	}
+}
+
+// resizeLabel — человеческие имена для широкого режима.
+func resizeLabel(r reading) string {
+	switch r.id {
+	case "N":
+		return "Network"
+	case "G":
+		return "Gateway"
+	case "C":
+		return "CPU"
+	case "L":
+		return "Load"
+	case "M":
+		return "Memory"
+	case "T":
+		return "Temp"
+	case "U":
+		return "Disk"
+	case "S":
+		return "Swap"
+	case "I":
+		return "IO wait"
+	case "K":
+		return "Disk busy"
+	case "B":
+		return "Battery"
+	case "P":
+		return "GPU"
+	case "H":
+		return "GPU temp"
+	case "R":
+		return "Net RX"
+	case "J":
+		return "Net TX"
+	case "E":
+		return "Net err"
+	case "DR":
+		return "Disk MB/s"
+	case "DI":
+		return "Disk IOPS"
+	case "MP":
+		return "Pressure"
+	}
+	if strings.TrimSpace(r.head) == "" {
+		return r.id
+	}
+	return strings.TrimSpace(r.head)
 }
 
 // gridColumns — сколько карточек помещается в ряд.

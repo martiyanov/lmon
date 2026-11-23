@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.53.1"
+const version = "1.53.2"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -746,6 +746,11 @@ func parseConfig(args []string) (config, error) {
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
 	}
+	// --resize-window — самостоятельный TUI-режим: старый rain из конфига
+	// не должен включать падающие строки.
+	if *resizeWindow {
+		rain = false
+	}
 
 	lg := *lang
 	if lg != "en" && lg != "ru" {
@@ -775,9 +780,6 @@ func parseConfig(args []string) (config, error) {
 	}
 	if *resizeWindow && *horizontal {
 		return config{}, errors.New(lmsg(lg, "--resize-window cannot be combined with --horizontal", "--resize-window не сочетается с --horizontal"))
-	}
-	if *resizeWindow && rain {
-		return config{}, errors.New(lmsg(lg, "--resize-window cannot be combined with --rain", "--resize-window не сочетается с --rain"))
 	}
 	if rain && *horizontal {
 		return config{}, errors.New(lmsg(lg, "--rain cannot be combined with --horizontal", "--rain не сочетается с --horizontal"))

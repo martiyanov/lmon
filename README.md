@@ -322,8 +322,9 @@ their normal style (`--bars`, `--matrix`, `--mono`, and so on).
 lmon --resize-window
 ```
 
-It is a TUI-only mode; it cannot be combined with `--once`, `--rain` or
-`--horizontal`.
+It is a TUI-only mode; it cannot be combined with `--once` or
+`--horizontal`. `--rain` is ignored here: resize always renders a normal
+card grid.
 
 ### Horizontal timeline
 
