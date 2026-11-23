@@ -5,8 +5,7 @@ import (
 	"strings"
 )
 
-// drawGrid — экспериментальный responsive-режим: карточки индикаторов
-// заполняют ширину терминала и перестраиваются при его сужении.
+// drawGrid — адаптивная таблица: широкие колонки, затем 3 колонки, затем 1.
 func (u *ui) drawGrid(rs []reading) {
 	rows := termRows()
 	cols := termCols()
@@ -23,35 +22,109 @@ func (u *ui) drawGrid(rs []reading) {
 		return
 	}
 	perRow := gridColumns(cols, len(rs))
-	cardW := cols / perRow
-	if cardW < 1 {
-		cardW = 1
+	cellW := cols / perRow
+	if cellW < 1 {
+		cellW = 1
 	}
-	cardH := 2
-	needRows := ((len(rs) + perRow - 1) / perRow) * cardH
-	if needRows > rows {
-		cardH = 1 // тесный терминал: одна строка на карточку
+	// Если все колонки помещаются в один ряд — сохраняем обычный поток:
+	// новые значения снизу, заголовок закреплён внизу.
+	if perRow == len(rs) && len(u.gridRows) > 0 && cols >= len(rs)*10 {
+		u.drawResizeStream(rs, cellW, rows)
+		return
+	}
+	// header + value + пустая строка между группами
+	groupH := 3
+	groups := (len(rs) + perRow - 1) / perRow
+	if groups*groupH > rows {
+		groupH = 2
 	}
 	for i, r := range rs {
-		row := i / perRow
+		group := i / perRow
 		col := i % perRow
-		x := col*cardW + 1
-		y := row*cardH + 1
-		if y > rows {
+		x := col*cellW + 1
+		y := group*groupH + 1
+		if y+1 > rows {
 			break
 		}
-		label := resizeLabel(r)
-		value := u.dataRow([]reading{r})
-		if cardH == 1 {
-			fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, clipANSI(label+" "+value, cardW))
-			continue
-		}
-		// Всегда две строки: имя карточки и значение под ним.
-		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, clipANSI(label, cardW))
-		if y+1 <= rows {
-			fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y+1, x, clipANSI(value, cardW))
+		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, u.resizeHeaderCell(r, cellW))
+		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y+1, x, u.resizeValueCell(r, cellW))
+	}
+}
+
+func (u *ui) drawResizeStream(rs []reading, cellW, rows int) {
+	// header внизу, как у обычного TUI
+	headerY := rows
+	for i, r := range rs {
+		x := i*cellW + 1
+		fmt.Fprintf(u.w, "\x1b[%d;%dH%s", headerY, x, u.resizeHeaderCell(r, cellW))
+	}
+	start := len(u.gridRows) - 1
+	for n := 0; n < rows-1 && start-n >= 0; n++ {
+		y := rows - 1 - n
+		row := u.gridRows[start-n]
+		for i, r := range row {
+			if i >= len(rs) {
+				break
+			}
+			x := i*cellW + 1
+			fmt.Fprintf(u.w, "\x1b[%d;%dH%s", y, x, u.resizeValueCell(r, cellW))
 		}
 	}
+}
+
+func (u *ui) resizeHeaderCell(r reading, width int) string {
+	label := resizeLabel(r)
+	if !u.color {
+		return centerPlain(label, width)
+	}
+	switch {
+	case r.blank:
+		return centerPlain("   ", width)
+	case r.v < 0:
+		if u.matrix {
+			return bgSev(0, true) + centerPlain(label, width) + reset
+		}
+		return purpleBg + centerPlain(label, width) + reset
+	case r.v == 999:
+		if u.matrix {
+			return bgSev(1, true) + centerPlain(label, width) + reset
+		}
+		return redBg + centerPlain(label, width) + reset
+	default:
+		return bgSev(r.severity(), u.matrix) + centerPlain(label, width) + reset
+	}
+}
+
+func (u *ui) resizeValueCell(r reading, width int) string {
+	// hybrid: заливаем цветом всю ширину ячейки, не только три цифры.
+	if u.hybrid && u.color && !u.matrix {
+		text := u.displayText(r)
+		if r.v < 0 {
+			return dim + centerPlain(text, width) + reset
+		}
+		return bgSev(r.severity(), false) + centerPlain(text, width) + reset
+	}
+	return centerANSI(u.dataRow([]reading{r}), width)
+}
+
+func centerPlain(s string, width int) string {
+	rs := []rune(s)
+	if len(rs) >= width {
+		return string(rs[:width])
+	}
+	left := (width - len(rs)) / 2
+	right := width - len(rs) - left
+	return strings.Repeat(" ", left) + s + strings.Repeat(" ", right)
+}
+
+func centerANSI(s string, width int) string {
+	n := ansiWidth(s)
+	if n >= width {
+		return clipANSI(s, width)
+	}
+	left := (width - n) / 2
+	right := width - n - left
+	return strings.Repeat(" ", left) + s + strings.Repeat(" ", right)
 }
 
 // resizeLabel — человеческие имена для широкого режима.
@@ -117,5 +190,3 @@ func gridColumns(cols, n int) int {
 	}
 	return perRow
 }
-
-func (u *ui) gridEnabled() bool { return u.resizeWindow }

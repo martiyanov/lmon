@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.53.2"
+const version = "1.53.3"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -213,7 +213,7 @@ const helpTextRu = `lmon ` + version + ` — минимальный монито
   --top N       LMON_TOP        топ-N процессов по CPU и выход (Unix)
   --compact     LMON_COMPACT    одна буква и один цветной блок на параметр, без пробелов
   --horizontal  LMON_HORIZONTAL горизонтальная цветная лента (TUI)
-  --resize-window LMON_RESIZE_WINDOW адаптивная сетка: вся ширина, 3/1 колонки
+  --resize-window LMON_RESIZE_WINDOW адаптивная таблица: вся ширина, 3/1 колонки
   --labels      LMON_LABELS     подписи в горизонтальном режиме: full или short
   --rain        LMON_RAIN       направление вниз: новые значения сверху
   --matrix      LMON_MATRIX     матричный стиль (любой режим)
@@ -453,7 +453,7 @@ Settings (flags and environment variables):
   --top N       LMON_TOP        top-N processes by CPU and exit (Unix)
   --compact     LMON_COMPACT    one letter and one colored block per parameter, no gaps
   --horizontal  LMON_HORIZONTAL horizontal color timeline (TUI)
-  --resize-window LMON_RESIZE_WINDOW responsive grid: full width, wrap to 3/1 columns
+  --resize-window LMON_RESIZE_WINDOW responsive table: full width, wrap to 3/1 columns
   --labels      LMON_LABELS     horizontal mode labels: full or short
   --rain        LMON_RAIN       down direction: new values on top
   --matrix      LMON_MATRIX     matrix style (any mode)
@@ -2368,6 +2368,7 @@ type ui struct {
 	resizeWindow bool
 	rows         int
 	cols         int
+	gridRows     [][]reading
 	blocks       bool
 	hybrid       bool
 	compact      bool
@@ -2544,6 +2545,10 @@ func (u *ui) emit(rs []reading) {
 		return
 	}
 	if u.resizeWindow {
+		u.gridRows = append(u.gridRows, append([]reading(nil), rs...))
+		if len(u.gridRows) > 200 {
+			u.gridRows = u.gridRows[len(u.gridRows)-200:]
+		}
 		u.drawGrid(rs)
 		return
 	}
