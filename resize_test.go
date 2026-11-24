@@ -62,4 +62,8 @@ func TestResizeDefaults(t *testing.T) {
 	if err != nil || cfg.resizeWindow {
 		t.Fatalf("explicit off = %+v err=%v", cfg.resizeWindow, err)
 	}
+	cfg, err = parseConfig([]string{"--compact"})
+	if err != nil || cfg.resizeWindow || !cfg.compact {
+		t.Fatalf("compact = %+v err=%v", cfg, err)
+	}
 }

@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.55.0"
+const version = "1.55.1"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -783,6 +783,8 @@ func parseConfig(args []string) (config, error) {
 	}
 	if compact {
 		blocks = false // compact already uses one block/glyph per value
+		*resizeWindow = false
+		*threeColumns = false
 	}
 	labelsMode := strings.ToLower(strings.TrimSpace(*labels))
 	if labelsMode != "full" && labelsMode != "short" {

@@ -364,6 +364,7 @@ lmon --horizontal --labels full
 
 `lmon --compact` is the narrowest view: one letter per parameter in the
 header and one colored block `█` per value, with no spaces between columns.
+It keeps the old compact layout and disables the responsive table.
 The header uses the same letters as `--cols`; pings and multi-letter columns
 (`PW`, `WR`) show their first character. Purple means no sensor, bright red
 means no reply. It fits tmux/status bars and can be combined with the other
