@@ -36,7 +36,7 @@ func TestResizeNumericWidth(t *testing.T) {
 	if got := u.resizeText(r, 6); got != "12345" {
 		t.Fatalf("wide number = %q", got)
 	}
-	if got := u.resizeText(r, 3); got != "12K" {
+	if got := u.resizeText(r, 3); got != "+++" {
 		t.Fatalf("narrow number = %q", got)
 	}
 }
@@ -65,5 +65,21 @@ func TestResizeDefaults(t *testing.T) {
 	cfg, err = parseConfig([]string{"--compact"})
 	if err != nil || cfg.resizeWindow || !cfg.compact {
 		t.Fatalf("compact = %+v err=%v", cfg, err)
+	}
+}
+
+func TestUnitsNeedSpace(t *testing.T) {
+	u := &ui{}
+	if got := u.resizeText(reading{id: "C", v: 74}, 3); got != "74" {
+		t.Fatalf("narrow percent = %q", got)
+	}
+	if got := u.resizeText(reading{id: "C", v: 74}, 4); got != "74 %" {
+		t.Fatalf("wide percent = %q", got)
+	}
+	if got := rateWide(500, 5); got != "500 K" {
+		t.Fatalf("rate = %q", got)
+	}
+	if got := rateWide(500, 4); got != "500" {
+		t.Fatalf("rate narrow = %q", got)
 	}
 }

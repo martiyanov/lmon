@@ -24,7 +24,7 @@ import (
 	"github.com/martiyanov/lmon/internal/netping"
 )
 
-const version = "1.55.1"
+const version = "1.56.0"
 
 const helpTextRu = `lmon ` + version + ` — минимальный монитор сети и нагрузки.
 
@@ -1340,7 +1340,9 @@ func monitor(ctx context.Context, cfg config, w io.Writer) int {
 
 	defer u.restore()
 	u.setup()
-	u.warnIfNarrow()
+	if !cfg.resizeWindow {
+		u.warnIfNarrow()
+	}
 
 	// Первый замер — он же основа стартовых подсказок: какая колонка не
 	// дала данных, почему и что сделать. Подсказки печатаются один раз,

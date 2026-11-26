@@ -306,8 +306,8 @@ func compactNumber(v, width int) string {
 	for _, u := range units {
 		if v >= u.scale {
 			n := strconv.Itoa(v / u.scale)
-			if len([]rune(n))+1 <= width {
-				return n + u.suf
+			if len([]rune(n))+2 <= width {
+				return n + " " + u.suf
 			}
 		}
 	}
@@ -353,21 +353,22 @@ func (u *ui) resizeText(r reading, width int) string {
 }
 
 func withSuffix(digits, suffix string, width int) string {
-	if len([]rune(digits))+len([]rune(suffix)) <= width {
-		return digits + suffix
+	// Единица только через пробел и только если реально помещается.
+	if len([]rune(digits))+1+len([]rune(suffix)) <= width {
+		return digits + " " + suffix
 	}
-	return digits
+	if len([]rune(digits)) <= width {
+		return digits
+	}
+	return "+++"
 }
 
 func durationText(v, width int) string {
 	if v < 1000 {
 		return withSuffix(strconv.Itoa(v), "ms", width)
 	}
-	sec := float64(v) / 1000
-	if s := fmt.Sprintf("%.1fs", sec); len([]rune(s)) <= width {
-		return s
-	}
-	return withSuffix(strconv.Itoa(v/1000), "s", width)
+	sec := fmt.Sprintf("%.1f", float64(v)/1000)
+	return withSuffix(sec, "s", width)
 }
 
 func rateWide(v, width int) string {
