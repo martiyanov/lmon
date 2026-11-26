@@ -25,8 +25,11 @@ func TestResizeLabelsFit(t *testing.T) {
 	if got := resizeLabelFor(n, 6); got != "NET" {
 		t.Fatalf("narrow label = %q, want NET", got)
 	}
-	if got := resizeLabelFor(n, 8); got != "Network" {
-		t.Fatalf("wide label = %q, want Network", got)
+	if got := resizeLabelFor(n, 12); got != "Network(ms)" {
+		t.Fatalf("wide label = %q, want Network(ms)", got)
+	}
+	if got := resizeLabelFor(n, 8); got != "NET(ms)" {
+		t.Fatalf("medium label = %q, want NET(ms)", got)
 	}
 }
 
@@ -36,7 +39,7 @@ func TestResizeNumericWidth(t *testing.T) {
 	if got := u.resizeText(r, 6); got != "12345" {
 		t.Fatalf("wide number = %q", got)
 	}
-	if got := u.resizeText(r, 3); got != "+++" {
+	if got := u.resizeText(r, 3); got != "12K" {
 		t.Fatalf("narrow number = %q", got)
 	}
 }
@@ -68,18 +71,18 @@ func TestResizeDefaults(t *testing.T) {
 	}
 }
 
-func TestUnitsNeedSpace(t *testing.T) {
+func TestUnitsInHeaders(t *testing.T) {
 	u := &ui{}
 	if got := u.resizeText(reading{id: "C", v: 74}, 3); got != "74" {
-		t.Fatalf("narrow percent = %q", got)
+		t.Fatalf("value has no unit: %q", got)
 	}
-	if got := u.resizeText(reading{id: "C", v: 74}, 4); got != "74 %" {
-		t.Fatalf("wide percent = %q", got)
+	if got := resizeLabelFor(reading{id: "C", head: "CPU"}, 8); got != "CPU(%)" {
+		t.Fatalf("CPU header = %q", got)
 	}
-	if got := rateWide(500, 5); got != "500 K" {
-		t.Fatalf("rate = %q", got)
+	if got := resizeLabelFor(reading{id: "N", head: "NET"}, 12); got != "Network(ms)" {
+		t.Fatalf("network header = %q", got)
 	}
-	if got := rateWide(500, 4); got != "500" {
-		t.Fatalf("rate narrow = %q", got)
+	if got := resizeLabelFor(reading{id: "N", head: "NET"}, 5); got != "NET" {
+		t.Fatalf("narrow header = %q", got)
 	}
 }

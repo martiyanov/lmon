@@ -330,12 +330,13 @@ Values follow the selected direction:
 
 `--bars`/`--blocks` fill the whole cell with color; `--hybrid` fills the
 whole cell background. Numeric values use the available column width: in a
-wide column `12345` is shown as `12345` instead of `+++`. Units are separated
-by a space and only appear when they fit; otherwise only the number remains:
+wide column `12345` is shown as `12345` instead of `+++`. Units live in the
+headers: `Network(ms)`, `CPU(%)`, `Temp(°C)`, `Disk(%)`. Values contain only
+numbers; when a header unit does not fit, it is omitted:
 
 ```text
-74 %   50 ms   55 °   12 K
-74     50      55     12
+Network(ms)   CPU(%)   Temp(°C)
+      74        50        55
 ``` It is a TUI-only
 mode and cannot be combined with `--once`.
 

@@ -306,16 +306,15 @@ func compactNumber(v, width int) string {
 	for _, u := range units {
 		if v >= u.scale {
 			n := strconv.Itoa(v / u.scale)
-			if len([]rune(n))+2 <= width {
-				return n + " " + u.suf
+			if len([]rune(n))+1 <= width {
+				return n + u.suf
 			}
 		}
 	}
 	return "+++"
 }
 
-// resizeText — числовое значение по доступной ширине и с единицами
-// для сетевых/дисковых/температурных колонок.
+// resizeText — только число; единицы живут в заголовке.
 func (u *ui) resizeText(r reading, width int) string {
 	if r.v < 0 {
 		return "·"
@@ -323,92 +322,15 @@ func (u *ui) resizeText(r reading, width int) string {
 	if r.v == 999 && u.symbols {
 		return "..."
 	}
-	switch r.id {
-	case "N", "G", "A":
-		return durationText(r.v, width)
-	case "R", "J":
-		return rateWide(r.v, width)
-	case "DR":
-		return diskRateWide(r.v, width)
-	case "DI":
-		return iopsWide(r.v, width)
-	case "W", "PW":
-		return powerText(r.v, width)
-	case "T", "H", "Y":
-		return withSuffix(strconv.Itoa(r.v), "°", width)
-	case "C", "M", "S", "U", "B", "P", "K", "F", "Z":
-		return withSuffix(strconv.Itoa(r.v), "%", width)
-	case "L", "Q", "E", "O", "X":
-		text := strconv.Itoa(r.v)
-		if len([]rune(text)) <= width {
-			return text
-		}
-		return compactNumber(r.v, width)
-	}
-	text := strconv.Itoa(r.v)
+	return numericWide(r.v, width)
+}
+
+func numericWide(v, width int) string {
+	text := strconv.Itoa(v)
 	if len([]rune(text)) <= width {
 		return text
 	}
-	return compactNumber(r.v, width)
-}
-
-func withSuffix(digits, suffix string, width int) string {
-	// Единица только через пробел и только если реально помещается.
-	if len([]rune(digits))+1+len([]rune(suffix)) <= width {
-		return digits + " " + suffix
-	}
-	if len([]rune(digits)) <= width {
-		return digits
-	}
-	return "+++"
-}
-
-func durationText(v, width int) string {
-	if v < 1000 {
-		return withSuffix(strconv.Itoa(v), "ms", width)
-	}
-	sec := fmt.Sprintf("%.1f", float64(v)/1000)
-	return withSuffix(sec, "s", width)
-}
-
-func rateWide(v, width int) string {
-	// внутренние значения — КБ/с
-	switch {
-	case v < 1000:
-		return withSuffix(strconv.Itoa(v), "K", width)
-	case v < 1_000_000:
-		return withSuffix(strconv.Itoa(v/1000), "M", width)
-	default:
-		return withSuffix(strconv.Itoa(v/1_000_000), "G", width)
-	}
-}
-
-func diskRateWide(v, width int) string {
-	switch {
-	case v < 1000:
-		return withSuffix(strconv.Itoa(v), "M", width)
-	case v < 1_000_000:
-		return withSuffix(strconv.Itoa(v/1000), "G", width)
-	default:
-		return withSuffix(strconv.Itoa(v/1_000_000), "T", width)
-	}
-}
-
-func iopsWide(v, width int) string {
-	if v < 1000 {
-		return strconv.Itoa(v)
-	}
-	if v < 1_000_000 {
-		return withSuffix(strconv.Itoa(v/1000), "K", width)
-	}
-	return withSuffix(strconv.Itoa(v/1_000_000), "M", width)
-}
-
-func powerText(v, width int) string {
-	if v < 1000 {
-		return withSuffix(strconv.Itoa(v), "W", width)
-	}
-	return withSuffix(strconv.Itoa(v/1000), "kW", width)
+	return compactNumber(v, width)
 }
 
 func (u *ui) resizeBlockCell(r reading, width int) string {
@@ -478,14 +400,47 @@ func centerANSI(s string, width int) string {
 // resizeLabelFor — полное, короткое или однобуквенное имя по ширине.
 func resizeLabelFor(r reading, width int) string {
 	full := resizeLabel(r)
+	unit := resizeUnit(r)
+	if unit != "" {
+		if cand := full + "(" + unit + ")"; ansiWidth(cand) < width {
+			return cand
+		}
+	}
+	short := strings.TrimSpace(r.head)
+	if unit != "" && r.id != "T" && r.id != "H" {
+		if cand := short + "(" + unit + ")"; ansiWidth(cand) < width {
+			return cand
+		}
+	}
 	if ansiWidth(full) < width {
 		return full
 	}
-	short := strings.TrimSpace(r.head)
 	if ansiWidth(short) < width {
 		return short
 	}
 	return compactLabel(r)
+}
+
+func resizeUnit(r reading) string {
+	switch r.id {
+	case "N", "G", "A":
+		return "ms"
+	case "C", "M", "S", "U", "B", "P", "K", "F", "Z":
+		return "%"
+	case "T", "H", "Y":
+		return "°C"
+	case "W", "PW":
+		return "W"
+	case "R", "J":
+		return "KB/s"
+	case "DR":
+		return "MB/s"
+	case "DI":
+		return "IOPS"
+	case "E":
+		return "err/s"
+	}
+	return ""
 }
 
 // resizeLabel — человеческие имена для широкого режима.
