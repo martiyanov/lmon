@@ -319,7 +319,9 @@ header wraps:
 
 - wide cell — full names (`Network`, `Gateway`, `Memory`, …);
 - medium cell — short names (`NET`, `GTW`, `CPU`, …);
-- very narrow cell — one-letter labels (`N`, `G`, `C`, …).
+- very narrow cell — one-letter labels (`N`, `G`, `C`, …);
+- if a value cell is narrower than 3 symbols, only the state color is shown,
+  without digits.
 
 Values follow the selected direction:
 

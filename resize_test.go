@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestGridColumns(t *testing.T) {
 	rs := []reading{
@@ -84,5 +87,17 @@ func TestUnitsInHeaders(t *testing.T) {
 	}
 	if got := resizeLabelFor(reading{id: "N", head: "NET"}, 5); got != "NET" {
 		t.Fatalf("narrow header = %q", got)
+	}
+}
+
+func TestNarrowResizeUsesColorOnly(t *testing.T) {
+	u := &ui{color: true, hybrid: true}
+	r := reading{id: "N", v: 42, green: 50, yellow: 150, red: 300}
+	got := u.resizeValueCell(r, 2)
+	if strings.Contains(got, "42") {
+		t.Fatalf("narrow cell contains value digits: %q", got)
+	}
+	if !strings.Contains(got, "\x1b[") {
+		t.Fatalf("narrow cell lost color: %q", got)
 	}
 }

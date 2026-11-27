@@ -266,6 +266,10 @@ func (u *ui) resizeHeaderCell(r reading, width int) string {
 }
 
 func (u *ui) resizeValueCell(r reading, width int) string {
+	// Совсем узкая клетка: цифры всё равно не читаются, оставляем цвет.
+	if width < 3 {
+		return u.resizeColorCell(r, width)
+	}
 	if u.blocks && (u.color || u.mono) {
 		return u.resizeBlockCell(r, width)
 	}
@@ -331,6 +335,36 @@ func numericWide(v, width int) string {
 		return text
 	}
 	return compactNumber(v, width)
+}
+
+func (u *ui) resizeColorCell(r reading, width int) string {
+	if r.blank {
+		return strings.Repeat(" ", width)
+	}
+	if !u.color {
+		if u.mono {
+			return u.resizeBlockCell(r, width)
+		}
+		return strings.Repeat(" ", width)
+	}
+	var c string
+	switch {
+	case r.v < 0:
+		if u.matrix {
+			c = bgSev(0, true)
+		} else {
+			c = purpleBg
+		}
+	case r.v == 999:
+		if u.matrix {
+			c = bgSev(1, true)
+		} else {
+			c = redBg
+		}
+	default:
+		c = bgSev(r.severity(), u.matrix)
+	}
+	return c + strings.Repeat(" ", width) + reset
 }
 
 func (u *ui) resizeBlockCell(r reading, width int) string {
